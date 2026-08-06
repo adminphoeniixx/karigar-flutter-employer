@@ -1,0 +1,1705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Karigar — Employer App</title>
+<style>
+  /* ===== Brand tokens (from web app: red-orange #F4470F, Outfit font) ===== */
+  :root{
+    --brand-50:#fff3ee; --brand-100:#ffe3d8; --brand-200:#ffc5b0; --brand-300:#ffa183;
+    --brand-400:#ff7448; --brand-500:#fb5a21; --brand-600:#f24711; --brand-700:#c93a06;
+    --primary:#f4470f;
+    --bg:#f6f7f9; --card:#ffffff; --line:#e9ebef; --line2:#f0f1f4;
+    --fg:#16181d; --muted:#6b7280; --muted2:#9aa1ad;
+    --amber-bg:#fff7ed; --amber-fg:#b45309;
+    --green-bg:#ecfdf5; --green-fg:#047857;
+    --rose-bg:#fff1f2; --rose-fg:#e11d48;
+    --indigo-bg:#eef2ff; --indigo-fg:#4f46e5;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 8px 24px rgba(16,24,40,.06);
+    --radius:16px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:"Outfit",system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:linear-gradient(135deg,#2a2d34,#14151a);
+    color:var(--fg);min-height:100vh;display:flex;align-items:center;justify-content:center;
+    padding:24px 12px;font-weight:400;
+  }
+  @font-face{font-family:"Outfit";src:local("Outfit");font-weight:300 700}
+
+  /* ===== Phone frame ===== */
+  .phone{
+    width:390px;max-width:100%;height:844px;max-height:94vh;background:var(--bg);
+    border-radius:44px;position:relative;overflow:hidden;
+    box-shadow:0 0 0 11px #0b0c0f,0 0 0 13px #23252b,0 40px 80px rgba(0,0,0,.55);
+    display:flex;flex-direction:column;
+  }
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:150px;height:30px;
+    background:#0b0c0f;border-radius:0 0 18px 18px;z-index:60}
+  .statusbar{height:46px;flex:0 0 46px;display:flex;align-items:flex-end;justify-content:space-between;
+    padding:0 22px 6px;font-size:13px;font-weight:600;color:var(--fg);z-index:55}
+  .statusbar .dots{display:flex;gap:5px;align-items:center}
+  .statusbar .dots span{font-size:11px}
+
+  /* ===== Screen system ===== */
+  .viewport{flex:1;position:relative;overflow:hidden}
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg);
+    transform:translateX(100%);opacity:0;pointer-events:none;transition:transform .28s ease,opacity .28s ease}
+  .screen.active{transform:none;opacity:1;pointer-events:auto;z-index:2}
+  .screen.behind{transform:translateX(-24%);opacity:.4;z-index:1}
+  .scroll{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch}
+  .scroll::-webkit-scrollbar{width:0}
+  .pad{padding:16px}
+  .pb-nav{padding-bottom:96px}
+
+  /* ===== App bar ===== */
+  .appbar{display:flex;align-items:center;gap:12px;padding:10px 16px;background:var(--card);
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:10}
+  .appbar h1{font-size:18px;font-weight:700;margin:0;flex:1;letter-spacing:-.2px}
+  .iconbtn{width:38px;height:38px;border-radius:12px;border:1px solid var(--line);background:var(--card);
+    display:grid;place-items:center;cursor:pointer;color:var(--fg);flex:0 0 auto}
+  .iconbtn:active{background:var(--line2)}
+  .backbtn{width:38px;height:38px;border-radius:12px;background:transparent;border:none;display:grid;place-items:center;cursor:pointer;color:var(--fg);margin-left:-6px}
+
+  /* ===== Bottom nav ===== */
+  .bottomnav{position:absolute;left:0;right:0;bottom:0;height:82px;background:var(--card);
+    border-top:1px solid var(--line);display:flex;padding:8px 6px 22px;z-index:40}
+  .bottomnav.hidden{display:none}
+  .navitem{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;
+    cursor:pointer;color:var(--muted2);font-size:11px;font-weight:600;position:relative;padding-top:6px}
+  .navitem.active{color:var(--primary)}
+  .navitem svg{width:23px;height:23px}
+  .navitem .badge{position:absolute;top:2px;right:calc(50% - 18px);background:var(--primary);color:#fff;
+    font-size:9px;min-width:16px;height:16px;border-radius:9px;display:grid;place-items:center;padding:0 4px}
+  /* center Post button */
+  .navpost{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:none;cursor:pointer;
+    color:var(--primary);font-size:11px;font-weight:700;width:70px;padding-top:0;margin-top:-18px}
+  .navpost .fab{width:52px;height:52px;border-radius:18px;background:var(--primary);color:#fff;display:grid;place-items:center;
+    box-shadow:0 8px 18px rgba(244,71,15,.4);transition:.15s}
+  .navpost:active .fab{transform:scale(.94)}
+  .navpost .fab svg{width:26px;height:26px;stroke:#fff}
+
+  /* ===== Reusable ===== */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:14px;font-weight:600;
+    font-size:15px;padding:13px 16px;border:none;cursor:pointer;width:100%;font-family:inherit;transition:.15s}
+  .btn-primary{background:var(--primary);color:#fff}
+  .btn-primary:active{background:var(--brand-700)}
+  .btn-primary:disabled{opacity:.5}
+  .btn-outline{background:var(--card);border:1px solid var(--line);color:var(--fg)}
+  .btn-ghost{background:var(--brand-50);color:var(--brand-700)}
+  .btn-sm{padding:9px 14px;font-size:13px;width:auto;border-radius:11px}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:12px;
+    font-weight:600;background:var(--brand-50);color:var(--brand-700);border:1px solid var(--brand-100)}
+  .chip-line{background:var(--card);border:1px solid var(--line);color:var(--muted)}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11.5px;font-weight:700}
+  .pill.pending{background:var(--amber-bg);color:var(--amber-fg)}
+  .pill.shortlisted{background:var(--indigo-bg);color:var(--indigo-fg)}
+  .pill.hired,.pill.accepted{background:var(--green-bg);color:var(--green-fg)}
+  .pill.rejected{background:var(--rose-bg);color:var(--rose-fg)}
+  .pill.active{background:var(--green-bg);color:var(--green-fg)}
+  .pill.closed{background:#f1f3f5;color:#667085}
+  .pill.draft{background:var(--amber-bg);color:var(--amber-fg)}
+  .pill.verified{background:var(--green-bg);color:var(--green-fg)}
+  .muted{color:var(--muted)}
+  .row{display:flex;align-items:center;gap:6px}
+  .between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .tiny{font-size:12px}
+  .sec-title{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:20px 4px 10px}
+  .divider{height:1px;background:var(--line);margin:0}
+  svg.ic{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+  svg.ic-lg{width:20px;height:20px}
+  .avatar{width:44px;height:44px;border-radius:50%;object-fit:cover;background:var(--brand-100);flex:0 0 auto}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:13px;font-weight:600;margin-bottom:7px;color:var(--fg)}
+  .input,.textarea,.select{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:12px;
+    font-size:15px;font-family:inherit;background:var(--card);color:var(--fg);outline:none}
+  .input:focus,.textarea:focus,.select:focus{border-color:var(--brand-400);box-shadow:0 0 0 3px var(--brand-50)}
+  .textarea{resize:none;min-height:86px}
+  .hint{font-size:12px;color:var(--muted);margin-top:6px}
+
+  /* Toggle */
+  .toggle{width:46px;height:27px;border-radius:20px;background:#d1d5db;position:relative;cursor:pointer;transition:.2s;flex:0 0 auto;border:none}
+  .toggle.on{background:var(--primary)}
+  .toggle::after{content:"";position:absolute;top:3px;left:3px;width:21px;height:21px;border-radius:50%;background:#fff;transition:.2s}
+  .toggle.on::after{left:22px}
+
+  /* Job card */
+  .jobcard{padding:15px}
+  .jobcard .title{font-size:16px;font-weight:700;letter-spacing:-.2px;margin:8px 0 2px}
+  .jobcard .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:9px}
+  .metaitem{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--muted)}
+  .wage{font-weight:700;color:var(--fg)}
+
+  /* OTP */
+  .otp-inputs{display:flex;gap:10px;justify-content:center;margin:8px 0}
+  .otp-inputs input{width:48px;height:56px;text-align:center;font-size:22px;font-weight:700;border:1.5px solid var(--line);border-radius:14px;background:var(--card);outline:none}
+  .otp-inputs input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--brand-50)}
+
+  /* Onboarding */
+  .onb{flex:1;display:flex;flex-direction:column;justify-content:space-between;padding:38px 26px 30px;
+    background:linear-gradient(160deg,var(--primary),#c93a06 90%);color:#fff}
+  .onb .logo{width:64px;height:64px;border-radius:20px;background:rgba(255,255,255,.16);display:grid;place-items:center;backdrop-filter:blur(6px)}
+  .onb h2{font-size:32px;font-weight:700;line-height:1.12;margin:16px 0 10px;letter-spacing:-.5px}
+  .onb p{font-size:15.5px;opacity:.92;line-height:1.5;margin:0}
+  .onb .feat{display:flex;gap:12px;align-items:center;margin:12px 0;font-size:14.5px}
+  .onb .feat .ib{width:38px;height:38px;border-radius:11px;background:rgba(255,255,255,.15);display:grid;place-items:center;flex:0 0 auto}
+
+  /* Map placeholder */
+  .map{height:150px;border-radius:14px;background:
+    linear-gradient(rgba(244,71,15,.05),rgba(244,71,15,.05)),
+    repeating-linear-gradient(0deg,#e8eef0 0 1px,transparent 1px 26px),
+    repeating-linear-gradient(90deg,#e8eef0 0 1px,transparent 1px 26px),#f2f5f6;
+    border:1px solid var(--line);position:relative;overflow:hidden}
+  .map::after{content:"";position:absolute;top:50%;left:50%;width:18px;height:18px;transform:translate(-50%,-100%);
+    background:var(--primary);border-radius:50% 50% 50% 0;rotate:-45deg;box-shadow:0 6px 12px rgba(244,71,15,.4)}
+
+  /* Stat */
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .stat{padding:14px}
+  .stat .v{font-size:24px;font-weight:700;letter-spacing:-.5px;margin:6px 0 2px}
+  .stat .l{font-size:12.5px;color:var(--muted);font-weight:600}
+  .stat .ib{width:34px;height:34px;border-radius:10px;display:grid;place-items:center}
+
+  /* Notification */
+  .noti{display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line2);cursor:pointer}
+  .noti.unread{background:var(--brand-50)}
+  .noti .dot{width:9px;height:9px;border-radius:50%;background:var(--primary);margin-top:6px;flex:0 0 auto}
+  .noti.read .dot{background:transparent}
+
+  /* Modal / sheet */
+  .sheet-wrap{position:absolute;inset:0;z-index:80;display:none}
+  .sheet-wrap.open{display:block}
+  .sheet-bg{position:absolute;inset:0;background:rgba(10,12,16,.45)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--card);border-radius:24px 24px 0 0;padding:8px 18px 26px;
+    box-shadow:0 -8px 30px rgba(0,0,0,.2);transform:translateY(100%);transition:transform .3s ease;max-height:88%;overflow-y:auto}
+  .sheet-wrap.open .sheet{transform:none}
+  .grip{width:40px;height:4px;border-radius:3px;background:#d5d8dd;margin:8px auto 14px}
+  .sheet h3{margin:0 0 4px;font-size:19px;font-weight:700}
+
+  /* Star rating */
+  .stars{display:flex;gap:8px;justify-content:center;margin:14px 0}
+  .stars svg{width:40px;height:40px;cursor:pointer;stroke:var(--brand-300);fill:none;stroke-width:1.6}
+  .stars svg.on{fill:#fbbf24;stroke:#fbbf24}
+
+  /* Toast */
+  .toast{position:absolute;left:16px;right:16px;bottom:100px;background:#16181d;color:#fff;padding:13px 16px;border-radius:14px;
+    font-size:14px;font-weight:600;z-index:90;display:flex;align-items:center;gap:9px;
+    opacity:0;visibility:hidden;transform:translateY(24px);pointer-events:none;
+    transition:opacity .28s ease,transform .28s ease,visibility .28s;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+  .toast.show{opacity:1;visibility:visible;transform:none}
+
+  .empty{text-align:center;padding:50px 24px;color:var(--muted)}
+  .empty svg{width:52px;height:52px;stroke:var(--muted2);opacity:.6;margin-bottom:12px}
+
+  .listrow{display:flex;align-items:center;gap:14px;padding:15px 16px;background:var(--card);cursor:pointer;border-bottom:1px solid var(--line2)}
+  .listrow:last-child{border-bottom:none}
+  .listrow .ib{width:38px;height:38px;border-radius:11px;background:var(--brand-50);color:var(--brand-700);display:grid;place-items:center;flex:0 0 auto}
+  .listrow .g{flex:1;min-width:0}
+  .listrow .t{font-weight:600;font-size:14.5px}
+  .segmented{display:flex;background:var(--line2);border-radius:12px;padding:4px;gap:4px}
+  .segmented button{flex:1;border:none;background:none;padding:8px;border-radius:9px;font-weight:600;font-size:13px;color:var(--muted);cursor:pointer;font-family:inherit}
+  .segmented button.active{background:var(--card);color:var(--fg);box-shadow:var(--shadow)}
+
+  /* Registration wizard */
+  .reg-h{font-size:22px;font-weight:700;letter-spacing:-.4px;margin:6px 0 6px}
+  .reg-p{font-size:14px;color:var(--muted);line-height:1.5;margin:0 0 20px}
+  .chip.big{font-size:14px;padding:9px 15px;cursor:pointer}
+  .chip-line.big{cursor:pointer}
+  .edu-row{display:flex;align-items:center;gap:12px;padding:15px 16px;border:1px solid var(--line);border-radius:14px;margin-bottom:10px;cursor:pointer;font-weight:600;font-size:15px;background:var(--card)}
+  .edu-row.sel{border-color:var(--primary);background:var(--brand-50);color:var(--brand-700)}
+  .edu-row .rd{width:22px;height:22px;border-radius:50%;border:2px solid var(--line);flex:0 0 auto;display:grid;place-items:center}
+  .edu-row.sel .rd{border-color:var(--primary)}
+  .edu-row.sel .rd::after{content:"";width:11px;height:11px;border-radius:50%;background:var(--primary)}
+
+  /* Applicant / worker card */
+  .wcard{padding:14px;margin-bottom:12px}
+  .wcard .top{display:flex;gap:12px;align-items:flex-start}
+  .wcard .nm{font-weight:700;font-size:15.5px;letter-spacing:-.2px}
+  .actbar{display:flex;gap:8px;margin-top:12px}
+  .actbar .btn{flex:1}
+  .kv{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--muted)}
+  .pill.interview{background:#eff6ff;color:#1d4ed8}
+
+  /* ===== Credits / contact lock ===== */
+  .creditpill{display:inline-flex;align-items:center;gap:5px;padding:7px 12px;border-radius:20px;font-size:13.5px;font-weight:700;
+    background:var(--card);color:var(--brand-700);border:1px solid var(--brand-200);cursor:pointer}
+  .creditpill svg{width:15px;height:15px;stroke:var(--primary)}
+  .btn-wa{background:#25D366;color:#fff}
+  .btn-wa:active{background:#1da851}
+  .lockcard{display:flex;align-items:center;gap:12px;padding:13px 14px}
+  .lockcard .num{font-weight:700;font-size:16px;letter-spacing:.4px}
+
+  /* ===== Chat ===== */
+  .chatthread{flex:1;overflow-y:auto;padding:14px 14px 6px;display:flex;flex-direction:column;gap:7px;background:var(--bg)}
+  .bubble{max-width:80%;padding:9px 13px;border-radius:16px;font-size:14px;line-height:1.42;box-shadow:var(--shadow)}
+  .bubble.me{align-self:flex-end;background:var(--primary);color:#fff;border-bottom-right-radius:5px}
+  .bubble.them{align-self:flex-start;background:var(--card);border:1px solid var(--line);border-bottom-left-radius:5px}
+  .bubble .bt{font-size:10px;opacity:.7;margin-top:3px;text-align:right}
+  .daylabel{align-self:center;font-size:11px;color:var(--muted);background:var(--line2);padding:3px 12px;border-radius:12px;margin:6px 0}
+  .chatbar{display:flex;gap:8px;align-items:center;padding:10px 12px 20px;background:var(--card);border-top:1px solid var(--line)}
+  .chatbar input{flex:1;border:1px solid var(--line);border-radius:22px;padding:11px 16px;font-size:14px;font-family:inherit;outline:none;background:var(--bg)}
+  .chatbar input:focus{border-color:var(--brand-400)}
+  .chatbar .send{width:44px;height:44px;border-radius:50%;background:var(--primary);border:none;display:grid;place-items:center;cursor:pointer;flex:0 0 auto}
+  .chatbar .send svg{stroke:#fff;width:20px;height:20px}
+  .quickreplies{display:flex;gap:8px;overflow-x:auto;padding:9px 12px;background:var(--card);border-top:1px solid var(--line2)}
+  .quickreplies::-webkit-scrollbar{height:0}
+  .quickreplies .chip-line{white-space:nowrap;cursor:pointer}
+  .convrow{display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line2);cursor:pointer;align-items:center}
+  .convrow .unreadn{background:var(--primary);color:#fff;font-size:10px;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 5px;font-weight:700;flex:0 0 auto}
+
+  /* ===== Plans ===== */
+  .plan{padding:18px;margin-bottom:14px;position:relative;border:1.5px solid var(--line)}
+  .plan.featured{border-color:var(--primary);box-shadow:0 8px 24px rgba(244,71,15,.14)}
+  .plan .badge-pop{position:absolute;top:-11px;left:18px;background:var(--primary);color:#fff;font-size:11px;font-weight:700;padding:4px 12px;border-radius:20px}
+  .plan .price{font-size:28px;font-weight:700;letter-spacing:-.5px}
+  .plan ul{list-style:none;padding:0;margin:13px 0 0;display:flex;flex-direction:column;gap:8px}
+  .plan li{display:flex;gap:9px;align-items:flex-start;font-size:13.5px;color:#374151}
+  .plan li svg{flex:0 0 auto;margin-top:2px;stroke:var(--green-fg)}
+
+  /* ===== Funnel / analytics ===== */
+  .funnel{display:flex;flex-direction:column;gap:9px;margin-top:4px}
+  .fbar{position:relative;height:36px;border-radius:10px;background:var(--line2);overflow:hidden;display:flex;align-items:center}
+  .fbar .fill{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,var(--brand-200),var(--brand-100));border-radius:10px}
+  .fbar .lab{position:relative;padding:0 12px;font-size:13px;font-weight:600;z-index:1}
+  .fbar .num{position:relative;margin-left:auto;padding:0 12px;font-weight:700;z-index:1}
+</style>
+</head>
+<body>
+<div class="phone" id="phone">
+  <div class="notch"></div>
+  <div class="statusbar">
+    <span>9:41</span>
+    <div class="dots"><span>●●●</span><span>📶</span><span>🔋</span></div>
+  </div>
+
+  <div class="viewport" id="viewport">
+
+    <!-- ========================= ONBOARDING ========================= -->
+    <section class="screen active" id="s-onboard">
+      <div class="onb">
+        <div>
+          <div class="logo">
+            <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M2 13h20"/></svg>
+          </div>
+          <h2>Hire skilled<br/>workers, fast.</h2>
+          <p>Post a job free and reach thousands of verified, work-ready karigars near you. No middlemen.</p>
+        </div>
+        <div>
+          <div class="feat"><div class="ib"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></div>Post jobs in under a minute</div>
+          <div class="feat"><div class="ib"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></div>KYC-verified worker profiles</div>
+          <div class="feat"><div class="ib"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>Call &amp; hire directly</div>
+          <button class="btn" style="background:#fff;color:var(--primary);margin-top:18px" onclick="go('s-otp')">Get Started</button>
+          <p style="text-align:center;font-size:12.5px;margin-top:14px;opacity:.85">For employers · Looking for work? <b>Karigar Worker app</b></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= OTP LOGIN ========================= -->
+    <section class="screen" id="s-otp">
+      <div class="appbar" style="border:none;background:transparent">
+        <button class="backbtn" onclick="go('s-onboard')"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+      </div>
+      <div class="scroll pad">
+        <div style="margin:8px 4px 24px">
+          <div style="width:56px;height:56px;border-radius:16px;background:var(--brand-50);display:grid;place-items:center;margin-bottom:16px">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="3"/><path d="M12 18h.01"/></svg>
+          </div>
+          <h1 style="font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.5px">Login with Mobile</h1>
+          <p class="muted" style="margin:0;font-size:15px">Employer · We'll send you a one-time code</p>
+        </div>
+
+        <!-- Step 1: phone -->
+        <div id="otp-step-phone">
+          <div class="field">
+            <label>Mobile number</label>
+            <div class="row" style="border:1px solid var(--line);border-radius:12px;overflow:hidden">
+              <span style="padding:12px 12px;background:var(--line2);font-weight:600;font-size:15px">🇮🇳 +91</span>
+              <input class="input" id="phoneInput" style="border:none;border-radius:0" inputmode="numeric" maxlength="10" placeholder="98765 43210" />
+            </div>
+            <p class="hint">Applicant alerts will be sent to this number.</p>
+          </div>
+          <button class="btn btn-primary" onclick="sendOtp()">Send OTP</button>
+        </div>
+
+        <!-- Step 2: verify -->
+        <div id="otp-step-verify" style="display:none">
+          <p style="font-size:15px;margin:0 0 4px">Enter the 6-digit code sent to</p>
+          <p style="font-weight:700;margin:0 0 18px" id="otpPhoneLabel">+91 98765 43210 <button class="btn-sm btn-ghost" style="padding:2px 8px;margin-left:6px" onclick="showPhoneStep()">Change</button></p>
+          <div class="otp-inputs" id="otpBoxes">
+            <input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1">
+            <input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1"><input inputmode="numeric" maxlength="1">
+          </div>
+          <p class="hint" style="text-align:center">Demo OTP autofilled. <span id="resendLine">Resend in <b id="cooldown">30</b>s</span></p>
+          <button class="btn btn-primary" style="margin-top:16px" onclick="verifyOtp()">Verify &amp; Continue</button>
+          <p class="tiny muted" style="text-align:center;margin-top:16px">By continuing you agree to our <b>Terms</b> &amp; <b>Privacy Policy</b>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= REGISTRATION WIZARD ========================= -->
+    <section class="screen" id="s-register">
+      <div class="appbar">
+        <button class="backbtn" id="regBack" onclick="regBack()"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px" id="regTitle">Set up your business</h1>
+        <span class="tiny muted" id="regCounter" style="font-weight:600">1/5</span>
+      </div>
+      <div style="height:4px;background:var(--line2)"><div id="regBar" style="height:100%;width:20%;background:var(--primary);transition:width .3s"></div></div>
+
+      <div class="scroll pad" style="padding-bottom:100px">
+
+        <!-- Step 1: Your name -->
+        <div class="reg-step" id="reg-1">
+          <h2 class="reg-h">Who are you hiring as?</h2>
+          <p class="reg-p">Workers will see this contact name on your jobs.</p>
+          <div class="field"><label>Your full name</label><input class="input" id="regName" placeholder="e.g. Anil Sharma" /></div>
+          <div class="field"><label>You are hiring as</label>
+            <div class="row" style="gap:8px;flex-wrap:wrap" id="regHireAs">
+              <span class="chip" onclick="pickOne(this,'#regHireAs')">Business / Company</span>
+              <span class="chip-line" onclick="pickOne(this,'#regHireAs')">Contractor</span>
+              <span class="chip-line" onclick="pickOne(this,'#regHireAs')">Individual / Household</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Business details -->
+        <div class="reg-step" id="reg-2" style="display:none">
+          <h2 class="reg-h">Tell us about your business</h2>
+          <p class="reg-p">This appears on your public employer profile.</p>
+          <div class="field"><label>Business / Company name</label><input class="input" placeholder="e.g. Sri Sai Constructions" /></div>
+          <div class="field"><label>Industry</label>
+            <select class="select"><option value="">Select industry</option><option>Construction &amp; Real Estate</option><option>Interiors &amp; Furnishing</option><option>Facility &amp; Maintenance</option><option>Manufacturing</option><option>Home Services</option><option>Hospitality</option><option>Other</option></select>
+          </div>
+          <div class="field"><label>Company size</label>
+            <div class="row" style="gap:8px;flex-wrap:wrap" id="regSize">
+              <span class="chip-line" onclick="pickOne(this,'#regSize')">1–10</span>
+              <span class="chip" onclick="pickOne(this,'#regSize')">11–50</span>
+              <span class="chip-line" onclick="pickOne(this,'#regSize')">51–200</span>
+              <span class="chip-line" onclick="pickOne(this,'#regSize')">200+</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 3: Location -->
+        <div class="reg-step" id="reg-3" style="display:none">
+          <h2 class="reg-h">Where are you based?</h2>
+          <p class="reg-p">We'll show your jobs to workers near this location.</p>
+          <button class="btn btn-ghost" style="margin-bottom:16px" onclick="toast('📍 Detecting your location…')">
+            <svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2"/></svg> Use my current location
+          </button>
+          <div class="field"><label>State</label><select class="select"><option value="">Select state</option><option>Tamil Nadu</option><option>Kerala</option><option>Karnataka</option><option>Maharashtra</option><option>Delhi</option><option>Uttar Pradesh</option></select></div>
+          <div class="field"><label>City / District</label><select class="select"><option value="">Select city</option><option>Chennai</option><option>Coimbatore</option><option>Madurai</option><option>Salem</option></select></div>
+          <div class="field"><label>Pin your work location</label><div class="map"></div><p class="hint">Tap the map to set your exact site location.</p></div>
+        </div>
+
+        <!-- Step 4: Hiring categories -->
+        <div class="reg-step" id="reg-4" style="display:none">
+          <h2 class="reg-h">What kind of workers do you hire?</h2>
+          <p class="reg-p">Pick the trades you usually need. We'll suggest matching workers. Choose all that apply.</p>
+          <div class="row" style="flex-wrap:wrap;gap:9px" id="regCats"></div>
+        </div>
+
+        <!-- Step 5: GST / KYC (optional) -->
+        <div class="reg-step" id="reg-5" style="display:none">
+          <div class="between" style="align-items:flex-start">
+            <div><h2 class="reg-h" style="margin-bottom:2px">Verify your business</h2></div>
+            <span class="chip chip-line" style="background:var(--line2)">Optional</span>
+          </div>
+          <p class="reg-p">Add GST / PAN to get a <b>Verified Employer</b> badge — verified employers get 3x more applications and rank higher. You can skip and do this later.</p>
+          <div class="field"><label>GST number (optional)</label><input class="input" placeholder="22ABCDE1234F1Z5" style="text-transform:uppercase" /></div>
+          <div class="field"><label>Business PAN</label><input class="input" placeholder="ABCDE1234F" style="text-transform:uppercase" /></div>
+          <label class="card" style="padding:18px;text-align:center;display:block;cursor:pointer;border-style:dashed;margin-bottom:4px">
+            <svg class="ic ic-lg" style="stroke:var(--primary);margin:0 auto 6px;display:block" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+            <div class="tiny" style="font-weight:600">Upload GST / registration proof</div><div class="tiny muted">JPG / PNG / PDF · max 5MB</div>
+          </label>
+          <p class="tiny muted" style="margin:8px 0 0"><svg class="ic" style="stroke:var(--green-fg);vertical-align:-3px" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Documents are encrypted and used only for verification.</p>
+        </div>
+
+      </div>
+
+      <!-- sticky footer -->
+      <div style="position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px 22px;display:flex;gap:10px;z-index:20">
+        <button class="btn btn-outline" id="regSkip" style="display:none;flex:1" onclick="finishRegister(false)">Skip for now</button>
+        <button class="btn btn-primary" id="regNext" style="flex:2" onclick="regNext()">Continue</button>
+      </div>
+    </section>
+
+    <!-- ========================= HOME / DASHBOARD ========================= -->
+    <section class="screen tab" id="s-home">
+      <div class="appbar">
+        <img class="avatar" style="width:38px;height:38px" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 44'><rect width='44' height='44' fill='%23ffe3d8'/><text x='22' y='29' font-size='16' text-anchor='middle' fill='%23c93a06' font-family='sans-serif' font-weight='700'>SS</text></svg>" />
+        <div style="flex:1">
+          <div class="tiny muted">Welcome back 👋</div>
+          <h1 style="font-size:17px">Sri Sai Constructions</h1>
+        </div>
+        <button class="iconbtn" onclick="go('s-chatlist')" style="position:relative">
+          <svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span style="position:absolute;top:5px;right:6px;width:8px;height:8px;background:var(--primary);border-radius:50%;border:2px solid #fff"></span>
+        </button>
+        <button class="iconbtn" onclick="switchTab('s-noti')" style="position:relative">
+          <svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span style="position:absolute;top:5px;right:6px;width:8px;height:8px;background:var(--primary);border-radius:50%;border:2px solid #fff"></span>
+        </button>
+      </div>
+      <div class="scroll pad pb-nav">
+        <!-- Post job CTA -->
+        <div class="card" style="padding:16px;margin-bottom:16px;background:linear-gradient(160deg,var(--primary),#c93a06);border:none;color:#fff">
+          <div class="between">
+            <div style="flex:1">
+              <div style="font-weight:700;font-size:16px">Hiring today?</div>
+              <div class="tiny" style="opacity:.92;margin-top:2px">Post a job free — reach workers instantly</div>
+            </div>
+            <button class="btn" style="background:#fff;color:var(--primary);width:auto;padding:11px 16px" onclick="go('s-postjob')">
+              <svg class="ic ic-lg" style="stroke:var(--primary)" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Post Job
+            </button>
+          </div>
+        </div>
+
+        <div class="stats">
+          <div class="card stat">
+            <div class="ib" style="background:var(--brand-50)"><svg class="ic ic-lg" style="stroke:var(--primary)" viewBox="0 0 24 24"><path d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg></div>
+            <div class="v">4</div><div class="l">Active Jobs</div>
+          </div>
+          <div class="card stat">
+            <div class="ib" style="background:var(--indigo-bg)"><svg class="ic ic-lg" style="stroke:var(--indigo-fg)" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+            <div class="v">37</div><div class="l">Total Applicants</div>
+          </div>
+          <div class="card stat">
+            <div class="ib" style="background:var(--amber-bg)"><svg class="ic ic-lg" style="stroke:var(--amber-fg)" viewBox="0 0 24 24"><path d="M12 2 15 9l7 .5-5.5 4.5L18 21l-6-4-6 4 1.5-7L2 9.5 9 9z"/></svg></div>
+            <div class="v">9</div><div class="l">Shortlisted</div>
+          </div>
+          <div class="card stat">
+            <div class="ib" style="background:var(--green-bg)"><svg class="ic ic-lg" style="stroke:var(--green-fg)" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+            <div class="v">5</div><div class="l">Hired</div>
+          </div>
+        </div>
+
+        <!-- Credits / plan card -->
+        <div class="card" style="padding:16px;margin-top:16px" onclick="go('s-plans')">
+          <div class="between">
+            <div class="row" style="gap:12px">
+              <div class="ib stat" style="width:44px;height:44px;border-radius:13px;background:var(--brand-50);display:grid;place-items:center">
+                <svg class="ic ic-lg" style="stroke:var(--primary)" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+              </div>
+              <div>
+                <div style="font-weight:700;font-size:17px" id="homeCredits">12 contact credits</div>
+                <div class="tiny muted" id="homePlan">Free plan · unlock worker numbers</div>
+              </div>
+            </div>
+            <button class="btn-sm btn-primary" style="width:auto" onclick="event.stopPropagation();go('s-plans')">Buy</button>
+          </div>
+        </div>
+
+        <!-- Verify business nudge -->
+        <div class="card" style="padding:15px;margin-top:16px;border:1px solid var(--brand-200);background:var(--brand-50)">
+          <div class="between">
+            <div>
+              <div style="font-weight:700">Get the Verified badge</div>
+              <div class="tiny muted" style="margin-top:2px">Verified employers get 3x more applicants</div>
+            </div>
+            <button class="btn-sm btn-primary" onclick="go('s-kyc')" style="width:auto">Verify</button>
+          </div>
+        </div>
+
+        <div class="between" style="margin:22px 4px 12px">
+          <div class="sec-title" style="margin:0">Recent applicants</div>
+          <button class="btn-sm" style="background:none;color:var(--primary);padding:0" onclick="switchTab('s-jobs')">See all →</button>
+        </div>
+        <div id="homeApplicants"></div>
+
+        <div class="between" style="margin:22px 4px 12px">
+          <div class="sec-title" style="margin:0">Your active jobs</div>
+          <button class="btn-sm" style="background:none;color:var(--primary);padding:0" onclick="switchTab('s-jobs')">See all →</button>
+        </div>
+        <div id="homeJobs"></div>
+      </div>
+    </section>
+
+    <!-- ========================= MY JOBS ========================= -->
+    <section class="screen tab" id="s-jobs">
+      <div class="appbar">
+        <h1>My Jobs</h1>
+        <button class="iconbtn" onclick="go('s-postjob')">
+          <svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <div style="padding:12px 16px 0;background:var(--card)">
+        <div class="segmented" id="jobSeg">
+          <button class="active" onclick="segJobs(this,'active')">Active</button>
+          <button onclick="segJobs(this,'closed')">Closed</button>
+          <button onclick="segJobs(this,'draft')">Drafts</button>
+        </div>
+      </div>
+      <div class="scroll pad pb-nav" id="myJobsList"></div>
+    </section>
+
+    <!-- ========================= POST JOB ========================= -->
+    <section class="screen" id="s-postjob">
+      <div class="appbar">
+        <button class="backbtn" onclick="back()"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px">Post a Job</h1>
+      </div>
+      <div class="scroll pad" style="padding-bottom:100px">
+        <div class="field"><label>Job title</label><input class="input" placeholder="e.g. Plumber for apartment project" /></div>
+        <div class="field"><label>Category</label>
+          <select class="select"><option value="">Select category</option><option>Plumbing</option><option>Electrical</option><option>Carpentry</option><option>Painting</option><option>Masonry</option><option>AC Repair</option><option>Driving</option><option>Housekeeping</option></select>
+        </div>
+        <div class="field"><label>Skills required</label>
+          <div class="row" style="flex-wrap:wrap;gap:8px" id="postSkills"></div>
+          <p class="hint">Tap to add. Workers with these skills are matched first.</p>
+        </div>
+
+        <div class="row" style="gap:12px">
+          <div class="field" style="flex:1"><label>Openings</label>
+            <input class="input" placeholder="3" inputmode="numeric" />
+          </div>
+          <div class="field" style="flex:1"><label>Min experience</label>
+            <div class="row" style="border:1px solid var(--line);border-radius:12px;padding:0 12px">
+              <input class="input" style="border:none;padding:12px 4px" placeholder="1" inputmode="numeric" /><span class="muted tiny">yrs</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="sec-title" style="margin-top:6px">Wage</div>
+        <div class="row" style="gap:12px">
+          <div class="field" style="flex:1"><label>Min ₹</label>
+            <div class="row" style="border:1px solid var(--line);border-radius:12px;padding:0 12px">
+              <span class="muted">₹</span><input class="input" style="border:none;padding:12px 6px" placeholder="800" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="field" style="flex:1"><label>Max ₹</label>
+            <div class="row" style="border:1px solid var(--line);border-radius:12px;padding:0 12px">
+              <span class="muted">₹</span><input class="input" style="border:none;padding:12px 6px" placeholder="1000" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="field" style="flex:0 0 92px"><label>Per</label>
+            <select class="select" style="padding:12px 8px"><option>day</option><option>hour</option><option>month</option><option>contract</option></select>
+          </div>
+        </div>
+
+        <div class="field"><label>Shift</label>
+          <div class="row" style="gap:8px;flex-wrap:wrap" id="postShift">
+            <span class="chip" onclick="pickOne(this,'#postShift')">Day</span>
+            <span class="chip-line" onclick="pickOne(this,'#postShift')">Night</span>
+            <span class="chip-line" onclick="pickOne(this,'#postShift')">Rotational</span>
+            <span class="chip-line" onclick="pickOne(this,'#postShift')">Flexible</span>
+          </div>
+        </div>
+
+        <div class="field"><label>Perks &amp; benefits</label>
+          <div class="row" style="flex-wrap:wrap;gap:8px" id="postPerks"></div>
+        </div>
+
+        <div class="field"><label>Job description</label>
+          <textarea class="textarea" placeholder="Describe the work, site details, duration, tools provided…"></textarea>
+        </div>
+
+        <div class="sec-title">Location</div>
+        <div class="row" style="gap:12px">
+          <div class="field" style="flex:1"><label>State</label><select class="select"><option>Tamil Nadu</option><option>Kerala</option><option>Karnataka</option></select></div>
+          <div class="field" style="flex:1"><label>City</label><select class="select"><option>Chennai</option><option>Coimbatore</option><option>Madurai</option></select></div>
+        </div>
+        <div class="field"><label>Pin the job location</label><div class="map"></div></div>
+
+        <div class="field"><label>How should workers reach you?</label>
+          <div class="row" style="gap:8px;flex-wrap:wrap" id="postContact">
+            <span class="chip" onclick="pickOne(this,'#postContact')">Apply + Call</span>
+            <span class="chip-line" onclick="pickOne(this,'#postContact')">Apply only</span>
+            <span class="chip-line" onclick="pickOne(this,'#postContact')">Call only</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- sticky footer -->
+      <div style="position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px 22px;display:flex;gap:10px;z-index:20">
+        <button class="btn btn-outline" style="flex:1" onclick="back();toast('Saved to drafts')">Save draft</button>
+        <button class="btn btn-primary" style="flex:2" onclick="publishJob()">Publish Job</button>
+      </div>
+    </section>
+
+    <!-- ========================= MANAGE JOB (applicants) ========================= -->
+    <section class="screen" id="s-jobmanage">
+      <div class="appbar">
+        <button class="backbtn" onclick="back()"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px">Manage Job</h1>
+        <button class="iconbtn" onclick="openSheet('sheet-jobactions')">
+          <svg class="ic ic-lg" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+        </button>
+      </div>
+      <div class="scroll pb-nav" id="jobManageBody"></div>
+    </section>
+
+    <!-- ========================= WORKER / APPLICANT PROFILE ========================= -->
+    <section class="screen" id="s-worker">
+      <div class="appbar">
+        <button class="backbtn" onclick="back()"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px">Worker Profile</h1>
+      </div>
+      <div class="scroll pb-nav" id="workerBody"></div>
+      <!-- sticky action bar (populated per worker) -->
+      <div style="position:absolute;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:10px 16px 16px;z-index:20" id="workerActions"></div>
+    </section>
+
+    <!-- ========================= FIND WORKERS ========================= -->
+    <section class="screen tab" id="s-workers">
+      <div class="appbar">
+        <h1>Find Workers</h1>
+        <button class="iconbtn" onclick="openSheet('sheet-wfilter')">
+          <svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg>
+        </button>
+      </div>
+      <div style="padding:12px 16px;background:var(--card);border-bottom:1px solid var(--line)">
+        <div class="row" style="border:1px solid var(--line);border-radius:12px;padding:0 12px;background:var(--bg)">
+          <svg class="ic" style="stroke:var(--muted)" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <input class="input" style="border:none;background:transparent;padding:11px 8px" placeholder="Search skill, trade, name…" oninput="filterWorkers(this.value)" />
+        </div>
+        <div class="row" style="gap:8px;margin-top:10px;overflow-x:auto;padding-bottom:2px" id="wCatChips"></div>
+      </div>
+      <div class="scroll pad pb-nav">
+        <div class="tiny muted" style="margin:2px 4px 12px"><b id="wCount">6</b> workers available · Chennai, TN</div>
+        <div id="workersList"></div>
+      </div>
+    </section>
+
+    <!-- ========================= NOTIFICATIONS ========================= -->
+    <section class="screen tab" id="s-noti">
+      <div class="appbar">
+        <h1>Notifications</h1>
+        <button class="btn-sm btn-ghost" style="width:auto" onclick="markAllRead()">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/><path d="m22 10-7.5 7.5"/></svg> Mark all read
+        </button>
+      </div>
+      <div class="scroll pb-nav" id="notiList"></div>
+    </section>
+
+    <!-- ========================= PROFILE (menu) ========================= -->
+    <section class="screen tab" id="s-profile">
+      <div class="appbar"><h1>Business Profile</h1><button class="iconbtn" onclick="go('s-settings')"><svg class="ic ic-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9c.14.63.66 1.11 1.3 1.28"/></svg></button></div>
+      <div class="scroll pb-nav">
+        <!-- profile header -->
+        <div style="padding:20px 16px;background:linear-gradient(160deg,var(--primary),#c93a06);color:#fff">
+          <div class="row" style="gap:14px">
+            <div style="position:relative">
+              <div class="avatar" style="width:64px;height:64px;border:3px solid rgba(255,255,255,.4);display:grid;place-items:center;background:#fff">
+                <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>
+              </div>
+            </div>
+            <div style="flex:1">
+              <div class="row" style="gap:6px"><div style="font-size:20px;font-weight:700">Sri Sai Constructions</div></div>
+              <div style="font-size:13px;opacity:.9;margin-top:2px">Construction &amp; Real Estate</div>
+              <div class="row" style="margin-top:6px;font-size:13px;opacity:.95">
+                <svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Chennai, TN
+                <span style="margin-left:8px">★ 4.6 (18)</span>
+              </div>
+              <span class="pill verified" style="margin-top:8px;background:rgba(255,255,255,.2);color:#fff">
+                <svg class="ic" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> Verified Employer
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div class="pad" style="padding-bottom:0">
+          <button class="btn btn-outline" onclick="go('s-profileedit')" style="border-color:var(--brand-200);color:var(--brand-700);background:var(--brand-50)">
+            <svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg> Edit Business Profile
+          </button>
+        </div>
+
+        <div class="pad" style="padding-top:16px">
+          <div class="sec-title" style="margin-top:4px">Usually hiring for</div>
+          <div class="row" style="flex-wrap:wrap;gap:8px">
+            <span class="chip">Plumbing</span><span class="chip">Electrical</span>
+            <span class="chip">Masonry</span><span class="chip">Painting</span>
+          </div>
+        </div>
+
+        <div class="divider" style="margin:8px 0"></div>
+        <div class="listrow" onclick="switchTab('s-jobs')">
+          <div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M20 7h-4V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2H4a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg></div>
+          <div class="g"><div class="t">My Job Posts</div><div class="tiny muted">Active, closed &amp; drafts</div></div>
+          <span class="tiny muted">6 →</span>
+        </div>
+        <div class="listrow" onclick="go('s-kyc')">
+          <div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <div class="g"><div class="t">Business Verification</div><div class="tiny muted">GST &amp; PAN verified</div></div>
+          <span class="pill verified">Verified</span>
+        </div>
+        <div class="listrow" onclick="go('s-reviews')">
+          <div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 2 15 9l7 .5-5.5 4.5L18 21l-6-4-6 4 1.5-7L2 9.5 9 9z"/></svg></div>
+          <div class="g"><div class="t">Reviews &amp; Ratings</div><div class="tiny muted">How workers rated you</div></div>
+          <span class="tiny muted">★ 4.6 →</span>
+        </div>
+        <div class="listrow" onclick="go('s-plans')">
+          <div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+          <div class="g"><div class="t">Credits &amp; Plans</div><div class="tiny muted" id="profilePlan">Free plan · 12 credits left</div></div>
+          <span class="tiny muted">→</span>
+        </div>
+        <div class="listrow" onclick="go('s-settings')">
+          <div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg></div>
+          <div class="g"><div class="t">Settings</div><div class="tiny muted">Language, security, theme</div></div>
+          <span class="tiny muted">→</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= PROFILE EDIT ========================= -->
+    <section class="screen" id="s-profileedit">
+      <div class="appbar">
+        <button class="backbtn" onclick="go('s-profile')"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px">Edit Business Profile</h1>
+      </div>
+      <div class="scroll pad pb-nav">
+        <div style="text-align:center;margin:6px 0 20px">
+          <div style="display:inline-block;position:relative">
+            <div class="avatar" style="width:88px;height:88px;display:grid;place-items:center;background:var(--brand-50)">
+              <svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>
+            </div>
+            <div style="position:absolute;bottom:0;right:0;width:30px;height:30px;background:var(--primary);border-radius:50%;display:grid;place-items:center;border:3px solid #fff"><svg class="ic" style="stroke:#fff;width:15px;height:15px" viewBox="0 0 24 24"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+          </div>
+          <div class="tiny muted" style="margin-top:8px">Tap to change logo</div>
+        </div>
+
+        <div class="field"><label>Business name</label><input class="input" value="Sri Sai Constructions" /></div>
+        <div class="field"><label>Contact person</label><input class="input" value="Anil Sharma" /></div>
+        <div class="field"><label>Mobile number</label>
+          <input class="input" value="+91 98765 43210" disabled style="background:var(--line2);color:var(--muted)" />
+          <p class="hint">Verified via OTP · can't be changed</p>
+        </div>
+        <div class="field"><label>Industry</label>
+          <select class="select"><option selected>Construction &amp; Real Estate</option><option>Interiors &amp; Furnishing</option><option>Facility &amp; Maintenance</option><option>Home Services</option></select>
+        </div>
+        <div class="field"><label>Usually hiring for</label>
+          <div class="row" style="flex-wrap:wrap;gap:7px;padding:8px;border:1px solid var(--line);border-radius:12px;min-height:46px">
+            <span class="chip">Plumbing <b style="cursor:pointer">×</b></span>
+            <span class="chip">Electrical <b style="cursor:pointer">×</b></span>
+            <span class="chip">Masonry <b style="cursor:pointer">×</b></span>
+            <input class="input" style="border:none;flex:1;min-width:80px;padding:4px" placeholder="+ Add trade" />
+          </div>
+        </div>
+        <div class="field"><label>About the business</label><textarea class="textarea" placeholder="Tell workers about your company…">Residential & commercial construction firm with 20+ ongoing projects across Chennai. On-time daily payments, safe sites.</textarea></div>
+
+        <div class="sec-title">Location</div>
+        <div class="row" style="gap:12px">
+          <div class="field" style="flex:1"><label>State</label><select class="select"><option>Tamil Nadu</option><option>Kerala</option><option>Karnataka</option></select></div>
+          <div class="field" style="flex:1"><label>City</label><select class="select"><option>Chennai</option><option>Coimbatore</option></select></div>
+        </div>
+        <div class="field"><label>Pin office / site location</label><div class="map"></div><p class="hint">Tap the map to set your exact location.</p></div>
+
+        <button class="btn btn-primary" style="margin-top:8px" onclick="saveProfile()">Save Profile</button>
+      </div>
+    </section>
+
+    <!-- ========================= BUSINESS VERIFICATION (KYC) ========================= -->
+    <section class="screen" id="s-kyc">
+      <div class="appbar">
+        <button class="backbtn" onclick="go('s-profile')"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px">Business Verification</h1>
+      </div>
+      <div class="scroll pad pb-nav">
+        <div class="card" style="padding:16px;text-align:center;margin-bottom:18px;background:var(--brand-50);border-color:var(--brand-200)">
+          <div style="width:52px;height:52px;border-radius:15px;background:#fff;display:grid;place-items:center;margin:0 auto 10px"><svg class="ic" style="stroke:var(--primary);width:26px;height:26px" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
+          <div style="font-weight:700;font-size:16px">Build trust with workers</div>
+          <p class="tiny muted" style="margin:6px 0 0">Verified employers get 3x more applications and rank higher in search.</p>
+        </div>
+
+        <div class="field"><label>GST Number</label><input class="input" placeholder="22ABCDE1234F1Z5" style="text-transform:uppercase" /></div>
+        <div class="field"><label>Upload GST certificate</label>
+          <label class="card" style="padding:20px;text-align:center;display:block;cursor:pointer;border-style:dashed">
+            <svg class="ic ic-lg" style="stroke:var(--primary);margin:0 auto 6px;display:block" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+            <div class="tiny" style="font-weight:600">Tap to upload</div><div class="tiny muted">JPG / PNG / PDF · max 5MB</div>
+          </label>
+        </div>
+        <div class="field"><label>Business PAN</label><input class="input" placeholder="ABCDE1234F" style="text-transform:uppercase" /></div>
+        <div class="field"><label>Upload PAN card</label>
+          <label class="card" style="padding:20px;text-align:center;display:block;cursor:pointer;border-style:dashed">
+            <svg class="ic ic-lg" style="stroke:var(--primary);margin:0 auto 6px;display:block" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M17 8l-5-5-5 5M12 3v12"/></svg>
+            <div class="tiny" style="font-weight:600">Tap to upload</div><div class="tiny muted">JPG / PNG / PDF · max 5MB</div>
+          </label>
+        </div>
+        <p class="tiny muted" style="margin:4px 0 14px"><svg class="ic" style="stroke:var(--green-fg);vertical-align:-3px" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Your documents are encrypted and used only for verification.</p>
+        <button class="btn btn-primary" onclick="submitKyc()">Submit for Verification</button>
+      </div>
+    </section>
+
+    <!-- ========================= REVIEWS ========================= -->
+    <section class="screen" id="s-reviews">
+      <div class="appbar">
+        <button class="backbtn" onclick="go('s-profile')"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px">Reviews &amp; Ratings</h1>
+      </div>
+      <div class="scroll pad pb-nav">
+        <div class="card" style="padding:20px;text-align:center;margin-bottom:16px">
+          <div style="font-size:44px;font-weight:700;letter-spacing:-1px">4.6</div>
+          <div style="color:#fbbf24;font-size:20px;letter-spacing:2px">★★★★★</div>
+          <div class="tiny muted" style="margin-top:4px">Based on 18 worker reviews</div>
+        </div>
+        <div class="sec-title" style="margin-top:4px">What workers said</div>
+        <div id="reviewsList"></div>
+      </div>
+    </section>
+
+    <!-- ========================= SETTINGS ========================= -->
+    <section class="screen" id="s-settings">
+      <div class="appbar">
+        <button class="backbtn" onclick="go('s-profile')"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px">Settings</h1>
+      </div>
+      <div class="scroll pb-nav">
+        <div class="sec-title pad" style="padding-bottom:0;margin-bottom:6px">Preferences</div>
+        <div class="listrow" onclick="openSheet('sheet-lang')">
+          <div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg></div>
+          <div class="g"><div class="t">Language</div><div class="tiny muted" id="langLabel">English</div></div><span class="tiny muted">→</span>
+        </div>
+        <div class="listrow">
+          <div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9z"/></svg></div>
+          <div class="g"><div class="t">Dark theme</div><div class="tiny muted">Switch to a darker screen</div></div>
+          <button class="toggle" onclick="this.classList.toggle('on')"></button>
+        </div>
+        <div class="listrow">
+          <div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/></svg></div>
+          <div class="g"><div class="t">Applicant alerts</div><div class="tiny muted">Get notified on new applications</div></div>
+          <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+        </div>
+
+        <div class="sec-title pad" style="padding-bottom:0;margin-bottom:6px">Account &amp; Security</div>
+        <div class="listrow"><div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div><div class="g"><div class="t">Login &amp; security</div><div class="tiny muted">OTP · device sessions</div></div><span class="tiny muted">→</span></div>
+        <div class="listrow"><div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div class="g"><div class="t">Team members</div><div class="tiny muted">Add recruiters to your account</div></div><span class="tiny muted">→</span></div>
+        <div class="listrow"><div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg></div><div class="g"><div class="t">Terms &amp; Privacy</div></div><span class="tiny muted">→</span></div>
+        <div class="listrow"><div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></div><div class="g"><div class="t">Help &amp; Support</div></div><span class="tiny muted">→</span></div>
+
+        <div class="pad" style="margin-top:14px">
+          <button class="btn btn-outline" style="color:var(--rose-fg);border-color:var(--rose-bg)" onclick="logout()">
+            <svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg> Log out
+          </button>
+          <p class="tiny muted" style="text-align:center;margin-top:16px">Karigar for Employers · v1.0.0</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========================= CREDITS & PLANS ========================= -->
+    <section class="screen" id="s-plans">
+      <div class="appbar">
+        <button class="backbtn" onclick="back()"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px">Credits &amp; Plans</h1>
+      </div>
+      <div class="scroll pad pb-nav">
+        <div class="card" style="padding:18px;background:linear-gradient(160deg,var(--primary),#c93a06);border:none;color:#fff;margin-bottom:8px">
+          <div class="tiny" style="opacity:.9">Current balance</div>
+          <div style="font-size:34px;font-weight:700;letter-spacing:-.5px;margin:2px 0" id="plansBalance">12 credits</div>
+          <div class="tiny" style="opacity:.92" id="plansPlan">Free plan · 1 credit unlocks a worker's contact</div>
+        </div>
+        <p class="tiny muted" style="margin:14px 4px 12px">Use credits to unlock worker phone numbers, chat directly and boost your job posts.</p>
+
+        <div class="card plan">
+          <div class="between"><div style="font-weight:700;font-size:17px">Free</div><span class="pill" style="background:var(--green-bg);color:var(--green-fg)">Current</span></div>
+          <div style="margin-top:6px"><span class="price">₹0</span><span class="tiny muted"> / month</span></div>
+          <ul>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>12 contact credits / month</li>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Unlimited free job posts</li>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Applicant management</li>
+          </ul>
+          <button class="btn btn-outline" style="margin-top:14px" disabled>Your current plan</button>
+        </div>
+
+        <div class="card plan">
+          <div style="font-weight:700;font-size:17px">Starter</div>
+          <div style="margin-top:6px"><span class="price">₹499</span><span class="tiny muted"> / month</span></div>
+          <ul>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>50 contact unlocks / month</li>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>1 boosted job</li>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Direct chat with workers</li>
+          </ul>
+          <button class="btn btn-primary" style="margin-top:14px" onclick="buyPlan('Starter',50)">Choose Starter</button>
+        </div>
+
+        <div class="card plan featured">
+          <span class="badge-pop">Most popular</span>
+          <div style="font-weight:700;font-size:17px">Growth</div>
+          <div style="margin-top:6px"><span class="price">₹1,499</span><span class="tiny muted"> / month</span></div>
+          <ul>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>200 contact unlocks / month</li>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>5 boosted jobs</li>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Top placement in worker search</li>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Priority support</li>
+          </ul>
+          <button class="btn btn-primary" style="margin-top:14px" onclick="buyPlan('Growth',200)">Choose Growth</button>
+        </div>
+
+        <div class="card plan">
+          <div style="font-weight:700;font-size:17px">Pro</div>
+          <div style="margin-top:6px"><span class="price">₹3,999</span><span class="tiny muted"> / month</span></div>
+          <ul>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Unlimited contact unlocks</li>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Unlimited boosted jobs</li>
+            <li><svg class="ic" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Dedicated account manager</li>
+          </ul>
+          <button class="btn btn-primary" style="margin-top:14px" onclick="buyPlan('Pro',9999)">Choose Pro</button>
+        </div>
+
+        <div class="card" style="padding:14px;margin-top:2px">
+          <div class="between">
+            <div><div style="font-weight:700;font-size:14.5px">Just need a few unlocks?</div><div class="tiny muted" style="margin-top:2px">Buy a one-time credit top-up</div></div>
+            <button class="btn-sm btn-ghost" style="width:auto" onclick="buyPlan('Top-up',25)">+25 credits · ₹299</button>
+          </div>
+        </div>
+        <p class="tiny muted" style="text-align:center;margin:16px 8px 0">Payments are secured by Razorpay · GST invoice provided</p>
+      </div>
+    </section>
+
+    <!-- ========================= MESSAGES (conversation list) ========================= -->
+    <section class="screen" id="s-chatlist">
+      <div class="appbar">
+        <button class="backbtn" onclick="back()"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <h1 style="font-size:16px">Messages</h1>
+      </div>
+      <div class="scroll pb-nav" id="convList"></div>
+    </section>
+
+    <!-- ========================= CHAT (thread) ========================= -->
+    <section class="screen" id="s-chat">
+      <div class="appbar">
+        <button class="backbtn" onclick="back()"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+        <div class="avatar" id="chatAvatar" style="width:36px;height:36px;display:grid;place-items:center;font-weight:700;color:var(--brand-700);font-size:14px"></div>
+        <div style="flex:1;min-width:0">
+          <h1 style="font-size:15px;margin:0" id="chatName">Worker</h1>
+          <div class="tiny" style="color:var(--green-fg);font-weight:600" id="chatSub">● Online</div>
+        </div>
+        <button class="iconbtn" onclick="callWorker(curChatId)"><svg class="ic ic-lg" style="stroke:var(--primary)" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg></button>
+      </div>
+      <div class="chatthread" id="chatThread"></div>
+      <div class="quickreplies" id="chatQuick"></div>
+      <div class="chatbar">
+        <input id="chatInput" placeholder="Type a message…" onkeydown="if(event.key==='Enter')sendMsg()" />
+        <button class="send" onclick="sendMsg()"><svg class="ic" viewBox="0 0 24 24"><path d="M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z"/></svg></button>
+      </div>
+    </section>
+
+  </div><!-- /viewport -->
+
+  <!-- ===== Bottom nav ===== -->
+  <nav class="bottomnav hidden" id="bnav">
+    <button class="navitem active" data-tab="s-home" onclick="switchTab('s-home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Home
+    </button>
+    <button class="navitem" data-tab="s-jobs" onclick="switchTab('s-jobs')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>My Jobs
+    </button>
+    <button class="navpost" onclick="go('s-postjob')">
+      <span class="fab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></span>
+      Post
+    </button>
+    <button class="navitem" data-tab="s-workers" onclick="switchTab('s-workers')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>Workers
+    </button>
+    <button class="navitem" data-tab="s-profile" onclick="switchTab('s-profile')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/></svg>Profile
+    </button>
+  </nav>
+
+  <!-- ===== Sheets ===== -->
+  <!-- Hire sheet -->
+  <div class="sheet-wrap" id="sheet-hire">
+    <div class="sheet-bg" onclick="closeSheet('sheet-hire')"></div>
+    <div class="sheet">
+      <div class="grip"></div>
+      <h3>Hire this worker</h3>
+      <p class="tiny muted" style="margin:0 0 16px">The worker will be notified and their contact will be shared with you.</p>
+      <div class="field"><label>Offered wage</label>
+        <div class="row" style="border:1px solid var(--line);border-radius:12px;padding:0 12px">
+          <span class="muted">₹</span><input class="input" style="border:none;padding:12px 6px" value="900" inputmode="numeric" /><span class="muted tiny">/ day</span>
+        </div>
+      </div>
+      <div class="field"><label>Start date</label><input class="input" type="date" /></div>
+      <div class="field"><label>Message to worker (optional)</label><textarea class="textarea" placeholder="Report to the site by 9 AM…"></textarea></div>
+      <button class="btn btn-primary" onclick="confirmHire()">Confirm &amp; Send Offer</button>
+    </div>
+  </div>
+
+  <!-- Job actions sheet -->
+  <div class="sheet-wrap" id="sheet-jobactions">
+    <div class="sheet-bg" onclick="closeSheet('sheet-jobactions')"></div>
+    <div class="sheet">
+      <div class="grip"></div>
+      <h3>Job actions</h3>
+      <div style="margin-top:10px">
+        <div class="listrow" onclick="closeSheet('sheet-jobactions');go('s-postjob')"><div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg></div><div class="g"><div class="t">Edit job</div></div></div>
+        <div class="listrow" onclick="closeSheet('sheet-jobactions');openSheet('sheet-boost')"><div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg></div><div class="g"><div class="t">Boost job</div><div class="tiny muted">Reach 3x more workers</div></div></div>
+        <div class="listrow" onclick="closeSheet('sheet-jobactions');toast('Share link copied')"><div class="ib"><svg class="ic ic-lg" viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg></div><div class="g"><div class="t">Share job</div></div></div>
+        <div class="listrow" onclick="closeSheet('sheet-jobactions');toast('Job closed')"><div class="ib" style="background:var(--rose-bg);color:var(--rose-fg)"><svg class="ic ic-lg" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></div><div class="g"><div class="t" style="color:var(--rose-fg)">Close job</div><div class="tiny muted">Stop receiving applications</div></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Worker filter sheet -->
+  <div class="sheet-wrap" id="sheet-wfilter">
+    <div class="sheet-bg" onclick="closeSheet('sheet-wfilter')"></div>
+    <div class="sheet">
+      <div class="grip"></div>
+      <h3>Filter workers</h3>
+      <div class="field" style="margin-top:14px"><label>Trade / Category</label><select class="select"><option>All trades</option><option>Plumbing</option><option>Electrical</option><option>Carpentry</option><option>Painting</option><option>Masonry</option></select></div>
+      <div class="field"><label>Minimum experience</label><select class="select"><option>Any</option><option>1+ years</option><option>3+ years</option><option>5+ years</option></select></div>
+      <div class="field"><label>Expected wage (₹/day)</label>
+        <div class="row" style="gap:10px">
+          <div class="row" style="flex:1;border:1px solid var(--line);border-radius:12px;padding:0 12px"><span class="muted">₹</span><input class="input" style="border:none;padding:11px 6px" placeholder="Min 600" inputmode="numeric" /></div>
+          <div class="row" style="flex:1;border:1px solid var(--line);border-radius:12px;padding:0 12px"><span class="muted">₹</span><input class="input" style="border:none;padding:11px 6px" placeholder="Max 1200" inputmode="numeric" /></div>
+        </div>
+      </div>
+      <div class="field"><label>Distance from site</label><select class="select"><option>Any distance</option><option>Within 3 km</option><option>Within 5 km</option><option>Within 10 km</option></select></div>
+      <div class="field"><label>Speaks</label>
+        <div class="row" style="flex-wrap:wrap;gap:8px">
+          <span class="chip-line" onclick="toggleSel(this)">Hindi</span><span class="chip-line" onclick="toggleSel(this)">Tamil</span>
+          <span class="chip-line" onclick="toggleSel(this)">Telugu</span><span class="chip-line" onclick="toggleSel(this)">English</span>
+          <span class="chip-line" onclick="toggleSel(this)">Kannada</span>
+        </div>
+      </div>
+      <div class="field"><label>Sort by</label><select class="select"><option>Best match</option><option>Nearest first</option><option>Highest rated</option><option>Most experienced</option><option>Lowest wage</option></select></div>
+      <div class="field">
+        <label class="row between" style="cursor:pointer"><span>Only KYC-verified</span><button class="toggle on" onclick="event.preventDefault();this.classList.toggle('on')"></button></label>
+      </div>
+      <div class="field">
+        <label class="row between" style="cursor:pointer"><span>Available now</span><button class="toggle on" onclick="event.preventDefault();this.classList.toggle('on')"></button></label>
+      </div>
+      <div class="row" style="gap:10px;margin-top:6px">
+        <button class="btn btn-outline" onclick="closeSheet('sheet-wfilter')">Reset</button>
+        <button class="btn btn-primary" onclick="closeSheet('sheet-wfilter');toast('Filters applied')">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Language sheet -->
+  <div class="sheet-wrap" id="sheet-lang">
+    <div class="sheet-bg" onclick="closeSheet('sheet-lang')"></div>
+    <div class="sheet">
+      <div class="grip"></div>
+      <h3>Choose language</h3>
+      <p class="tiny muted" style="margin:0 0 14px">Pick your preferred app language · English, हिन्दी, தமிழ் &amp; more</p>
+      <div id="langOpts"></div>
+    </div>
+  </div>
+
+  <!-- Review sheet (rate worker) -->
+  <div class="sheet-wrap" id="sheet-review">
+    <div class="sheet-bg" onclick="closeSheet('sheet-review')"></div>
+    <div class="sheet">
+      <div class="grip"></div>
+      <h3>Rate this worker</h3>
+      <p class="tiny muted" style="margin:0 0 4px">How was the work? Your rating helps other employers.</p>
+      <div class="stars" id="starRow">
+        <svg viewBox="0 0 24 24" onclick="setStars(1)"><path d="M12 2 15 9l7 .5-5.5 4.5L18 21l-6-4-6 4 1.5-7L2 9.5 9 9z"/></svg>
+        <svg viewBox="0 0 24 24" onclick="setStars(2)"><path d="M12 2 15 9l7 .5-5.5 4.5L18 21l-6-4-6 4 1.5-7L2 9.5 9 9z"/></svg>
+        <svg viewBox="0 0 24 24" onclick="setStars(3)"><path d="M12 2 15 9l7 .5-5.5 4.5L18 21l-6-4-6 4 1.5-7L2 9.5 9 9z"/></svg>
+        <svg viewBox="0 0 24 24" onclick="setStars(4)"><path d="M12 2 15 9l7 .5-5.5 4.5L18 21l-6-4-6 4 1.5-7L2 9.5 9 9z"/></svg>
+        <svg viewBox="0 0 24 24" onclick="setStars(5)"><path d="M12 2 15 9l7 .5-5.5 4.5L18 21l-6-4-6 4 1.5-7L2 9.5 9 9z"/></svg>
+      </div>
+      <div class="field"><textarea class="textarea" placeholder="Write about the work (optional)"></textarea></div>
+      <button class="btn btn-primary" onclick="closeSheet('sheet-review');toast('Review submitted ★')">Submit Review</button>
+    </div>
+  </div>
+
+  <!-- Interview sheet -->
+  <div class="sheet-wrap" id="sheet-interview">
+    <div class="sheet-bg" onclick="closeSheet('sheet-interview')"></div>
+    <div class="sheet">
+      <div class="grip"></div>
+      <h3>Schedule interview</h3>
+      <p class="tiny muted" style="margin:0 0 16px" id="ivWho">The worker gets an invite and can confirm the slot.</p>
+      <div class="field"><label>Mode</label>
+        <div class="row" style="gap:8px;flex-wrap:wrap" id="ivMode">
+          <span class="chip" onclick="pickOne(this,'#ivMode')">At site</span>
+          <span class="chip-line" onclick="pickOne(this,'#ivMode')">Phone call</span>
+          <span class="chip-line" onclick="pickOne(this,'#ivMode')">Video call</span>
+        </div>
+      </div>
+      <div class="row" style="gap:12px">
+        <div class="field" style="flex:1"><label>Date</label><input class="input" type="date" /></div>
+        <div class="field" style="flex:1"><label>Time</label><input class="input" type="time" /></div>
+      </div>
+      <div class="field"><label>Address / note (optional)</label><textarea class="textarea" placeholder="Site address, what to bring, whom to meet…"></textarea></div>
+      <button class="btn btn-primary" onclick="confirmInterview()">Send interview invite</button>
+    </div>
+  </div>
+
+  <!-- Boost sheet -->
+  <div class="sheet-wrap" id="sheet-boost">
+    <div class="sheet-bg" onclick="closeSheet('sheet-boost')"></div>
+    <div class="sheet">
+      <div class="grip"></div>
+      <h3>Boost this job 🚀</h3>
+      <p class="tiny muted" style="margin:0 0 16px">Boosted jobs sit at the top of worker search and get more applicants.</p>
+      <div id="boostOpts">
+        <div class="edu-row sel" onclick="pickBoost(this)"><div class="rd"></div><div style="flex:1"><div>Standard boost</div><div class="tiny muted" style="font-weight:400">3 days · ~2x reach · 1 credit</div></div></div>
+        <div class="edu-row" onclick="pickBoost(this)"><div class="rd"></div><div style="flex:1"><div>Turbo boost</div><div class="tiny muted" style="font-weight:400">7 days · ~3x reach · 3 credits</div></div></div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:6px" onclick="confirmBoost()">Boost now</button>
+    </div>
+  </div>
+
+  <!-- Out of credits sheet -->
+  <div class="sheet-wrap" id="sheet-nocredits">
+    <div class="sheet-bg" onclick="closeSheet('sheet-nocredits')"></div>
+    <div class="sheet">
+      <div class="grip"></div>
+      <div style="width:52px;height:52px;border-radius:15px;background:var(--brand-50);display:grid;place-items:center;margin:6px auto 10px"><svg class="ic" style="stroke:var(--primary);width:26px;height:26px" viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg></div>
+      <h3 style="text-align:center">You're out of credits</h3>
+      <p class="tiny muted" style="text-align:center;margin:6px 0 18px">Buy a plan to keep unlocking worker contacts, chatting and boosting jobs.</p>
+      <button class="btn btn-primary" onclick="closeSheet('sheet-nocredits');go('s-plans')">See plans</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script>
+/* ============================ DATA ============================ */
+// Employer's posted jobs
+const MYJOBS = [
+  {id:1,title:"Plumber for Apartment Project",cat:"Plumbing",city:"Chennai",state:"TN",min:800,max:1000,type:"day",vac:3,shift:"day",status:"active",posted:"2 days ago",applicants:12,shortlisted:3,hired:1,views:340,skills:["Plumbing","Pipe Fitting","Waterproofing"],perks:["Food","Accommodation"],desc:"Experienced plumbers needed for a 12-floor residential project. Bathroom & kitchen line fitting, drainage and testing. 3 months of work with on-time daily payment."},
+  {id:2,title:"Electrician — House Wiring",cat:"Electrical",city:"Chennai",state:"TN",min:900,max:1200,type:"day",vac:2,shift:"day",status:"active",posted:"1 day ago",applicants:8,shortlisted:2,hired:0,views:210,skills:["Electrical Wiring","Electrician"],perks:["Food"],desc:"Complete wiring for a 3BHK villa — DB board, fitting and testing. Tools provided."},
+  {id:3,title:"Masons — 4 needed",cat:"Masonry",city:"Chennai",state:"TN",min:850,max:1000,type:"day",vac:4,shift:"day",status:"active",posted:"4 days ago",applicants:14,shortlisted:4,hired:2,views:405,skills:["Masonry","Plastering"],perks:["Accommodation"],desc:"Compound wall construction and plastering. Helper provided, weekly payment."},
+  {id:4,title:"Painters (interior) — 2 needed",cat:"Painting",city:"Chennai",state:"TN",min:700,max:850,type:"day",vac:2,shift:"day",status:"active",posted:"6 days ago",applicants:3,shortlisted:0,hired:0,views:98,skills:["Painting","Wall Putty"],perks:["Food","Travel"],desc:"Interior painting — putty, primer and 2 coats. About 10 days of work."},
+  {id:5,title:"Carpenter for Modular Kitchen",cat:"Carpentry",city:"Chennai",state:"TN",min:1000,max:1400,type:"day",vac:1,shift:"day",status:"closed",posted:"3 weeks ago",applicants:20,shortlisted:5,hired:2,views:610,skills:["Carpentry","Woodwork"],perks:[],desc:"Modular kitchen and wardrobe fitting with fine finishing."},
+  {id:6,title:"AC Technician — Split & Window",cat:"AC Repair",city:"Chennai",state:"TN",min:600,max:900,type:"day",vac:2,shift:"rotational",status:"draft",posted:"Draft",applicants:0,shortlisted:0,hired:0,views:0,skills:["AC Repair"],perks:["Travel","Incentives"],desc:"AC installation, servicing and gas charging. Own bike required."},
+];
+
+// Applicants (worker pool) — reused for both applicant lists and Find Workers
+const WORKERS = [
+  {id:1,name:"Rakesh Kumar",init:"RK",trade:"Plumber",exp:6,city:"Chennai",dist:4.2,rating:"4.8",count:23,wage:900,verified:true,available:true,skills:["Plumbing","Pipe Fitting","Waterproofing","Tiling"],langs:["Hindi","Tamil"],bio:"6 years of experience. Bathroom & kitchen plumbing, leak repair and tiling specialist. On-time and clean work.",appliedFor:1,status:"shortlisted"},
+  {id:2,name:"Suresh Babu",init:"SB",trade:"Plumber",exp:9,city:"Chennai",dist:6.1,rating:"4.6",count:41,wage:1000,verified:true,available:true,skills:["Plumbing","Drainage","Testing"],langs:["Tamil","Telugu"],bio:"Senior plumber, handled 30+ apartment projects. Team lead experience.",appliedFor:1,status:"pending"},
+  {id:3,name:"Mohan Das",init:"MD",trade:"Plumber",exp:3,city:"Chennai",dist:2.8,rating:"4.4",count:9,wage:750,verified:false,available:true,skills:["Plumbing","Helper"],langs:["Tamil"],bio:"Hardworking plumber, quick learner. Available immediately.",appliedFor:1,status:"pending"},
+  {id:4,name:"Vijay Anand",init:"VA",trade:"Electrician",exp:7,city:"Chennai",dist:5.5,rating:"4.9",count:31,wage:1100,verified:true,available:true,skills:["Electrical Wiring","DB Board","Testing"],langs:["Tamil","English"],bio:"Certified electrician (ITI). Residential & commercial wiring expert.",appliedFor:2,status:"shortlisted"},
+  {id:5,name:"Karthik R",init:"KR",trade:"Electrician",exp:4,city:"Chennai",dist:3.4,rating:"4.5",count:15,wage:950,verified:true,available:false,skills:["Electrician","Appliance Repair"],langs:["Tamil","Kannada"],bio:"House wiring and appliance repair. Own tools.",appliedFor:2,status:"pending"},
+  {id:6,name:"Ganesh Iyer",init:"GI",trade:"Mason",exp:12,city:"Chennai",dist:7.2,rating:"4.7",count:52,wage:1000,verified:true,available:true,skills:["Masonry","Plastering","Bricklaying"],langs:["Tamil","Hindi"],bio:"12 years masonry experience. Compound walls, plastering, brickwork.",appliedFor:3,status:"hired"},
+  {id:7,name:"Prakash M",init:"PM",trade:"Plumber",exp:5,city:"Chennai",dist:3.1,rating:"4.5",count:18,wage:850,verified:true,available:true,skills:["Plumbing","Pipe Fitting","Sanitary"],langs:["Tamil","Hindi"],bio:"5 years plumbing experience across residential projects. Available immediately.",appliedFor:0,status:"pending"},
+  {id:8,name:"Imran Shaikh",init:"IS",trade:"Electrician",exp:8,city:"Chennai",dist:4.8,rating:"4.7",count:29,wage:1050,verified:true,available:true,skills:["Electrical Wiring","DB Board","Motor Repair"],langs:["Hindi","Urdu","Tamil"],bio:"8 years as an electrician. Wiring, panel work and motor repair. Own tools & bike.",appliedFor:0,status:"pending"},
+];
+
+const NOTIS = [
+  {msg:"👤 3 new applicants for your 'Plumber for Apartment Project' job.",time:"1 hour ago",read:false,type:"applicant"},
+  {msg:"Rakesh Kumar (★4.8) applied for your Plumber job.",time:"3 hours ago",read:false,type:"applicant"},
+  {msg:"Ganesh Iyer accepted your hire offer for the Mason job! 🎉",time:"6 hours ago",read:false,type:"hire"},
+  {msg:"Your 'Painters' job has low views. Boost it to reach more workers.",time:"1 day ago",read:true,type:"boost"},
+  {msg:"✓ Your business verification is complete — you now have the Verified badge.",time:"2 days ago",read:true,type:"verify"},
+];
+
+const REVIEWS = [
+  {name:"Rakesh Kumar",stars:5,text:"Paid on time every day and the site was well organised. Would work here again.",date:"Jun 2026"},
+  {name:"Ganesh Iyer",stars:5,text:"Good employer, clear instructions and respectful staff. Recommended.",date:"May 2026"},
+  {name:"Vijay Anand",stars:4,text:"Work was good, payment a day late once but otherwise fine.",date:"Apr 2026"},
+];
+
+const CATS = ["All","Plumbing","Electrical","Carpentry","Painting","Masonry","AC Repair"];
+const LANGS = [["en","English","English"],["hi","हिन्दी","Hindi"],["ta","தமிழ்","Tamil"],["te","తెలుగు","Telugu"],["bn","বাংলা","Bengali"],["mr","मराठी","Marathi"]];
+const REG_CATS = ["Plumbing","Electrical","Carpentry","Painting","Masonry","AC Repair","Welding","Driving","Housekeeping","Helper","Fabrication","Tiling"];
+const POST_SKILLS = ["Plumbing","Pipe Fitting","Waterproofing","Tiling","Electrical Wiring","Carpentry","Painting","Masonry","Plastering","AC Repair","Welding","Helper"];
+const POST_PERKS = ["Food","Accommodation","Travel","Incentives","PF / ESI","Weekly pay","Tools provided","Overtime"];
+
+/* ============================ CREDITS / PLANS ============================ */
+let credits = 12, planName = 'Free';
+const unlocked = new Set();
+const phoneFor = id => ({1:"98765 43210",2:"91234 56789",3:"90045 11228",4:"98884 22337",5:"97773 55669",6:"96662 88991"}[id] || "98765 43210");
+function refreshCredits(){
+  const set=(id,t)=>{const e=document.getElementById(id);if(e)e.textContent=t;};
+  set('homeCredits', credits+' contact credits');
+  set('homePlan', planName+' plan · unlock worker numbers');
+  set('plansBalance', credits+' credits');
+  set('plansPlan', planName+" plan · 1 credit unlocks a worker's contact");
+  set('profilePlan', planName+' plan · '+credits+' credits left');
+}
+function buyPlan(name, add){
+  if(name!=='Top-up') planName = name;
+  credits += add; refreshCredits();
+  toast(name==='Top-up' ? add+' credits added ✓' : name+' plan activated · +'+add+' credits 🎉');
+}
+function needCredit(){ if(credits>0) return true; openSheet('sheet-nocredits'); return false; }
+function unlockContact(id){
+  if(unlocked.has(id)) return;
+  if(!needCredit()) return;
+  credits--; unlocked.add(id); refreshCredits();
+  toast('Contact unlocked · '+credits+' credits left');
+  refreshCurrent();
+}
+function waWorker(id){ if(!unlocked.has(id)){unlockContact(id);return;} toast('Opening WhatsApp… (demo)'); }
+
+/* refresh whichever screen is on top after a state change */
+function refreshCurrent(){
+  const top = stack[stack.length-1];
+  if(top==='s-worker') openWorker(curWorkerId);
+  else if(top==='s-jobmanage') renderManage();
+  else if(top==='s-workers') renderWorkers(WORKERS);
+  else if(top==='s-jobs') renderMyJobs(document.querySelector('#jobSeg .active')?.textContent.toLowerCase()||'active');
+}
+
+/* ============================ CONTACT + PIPELINE BUTTONS ============================ */
+const SVG_PHONE='<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>';
+const SVG_STAR='<path d="M12 2 15 9l7 .5-5.5 4.5L18 21l-6-4-6 4 1.5-7L2 9.5 9 9z"/>';
+const SVG_CAL='<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>';
+const SVG_CHAT='<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>';
+const SVG_WA='<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/>';
+function contactBtns(w){
+  if(unlocked.has(w.id)){
+    return `<button class="btn btn-outline btn-sm" onclick="callWorker(${w.id})"><svg class="ic" style="stroke:var(--primary)" viewBox="0 0 24 24">${SVG_PHONE}</svg> Call</button>
+      <button class="btn btn-wa btn-sm" onclick="waWorker(${w.id})"><svg class="ic" style="stroke:#fff" viewBox="0 0 24 24">${SVG_WA}</svg> WhatsApp</button>
+      <button class="btn btn-outline btn-sm" onclick="openChat(${w.id})"><svg class="ic" viewBox="0 0 24 24">${SVG_CHAT}</svg> Chat</button>`;
+  }
+  return `<button class="btn btn-ghost btn-sm" style="flex:1" onclick="unlockContact(${w.id})"><svg class="ic" style="stroke:var(--brand-700)" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg> View contact · 1 credit</button>`;
+}
+function pipelineBtns(w){
+  const rej = `<button class="btn btn-outline btn-sm" style="flex:0 0 46px;border-color:var(--rose-bg)" onclick="rejectWorker(${w.id})" title="Reject"><svg class="ic" style="stroke:var(--rose-fg)" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>`;
+  if(w.status==='hired') return `<button class="btn btn-outline btn-sm" style="flex:1" onclick="reviewWorker(${w.id})"><svg class="ic" style="stroke:var(--amber-fg)" viewBox="0 0 24 24">${SVG_STAR}</svg> Review</button>`;
+  if(w.status==='rejected') return `<button class="btn btn-outline btn-sm" style="flex:1" onclick="restoreWorker(${w.id})">Move back to New</button>`;
+  const hire = `<button class="btn btn-primary btn-sm" style="flex:1" onclick="quickHire(${w.id})">Hire</button>`;
+  let left='';
+  if(w.status==='pending') left=`<button class="btn btn-outline btn-sm" style="flex:1" onclick="quickShortlist(${w.id})"><svg class="ic" style="stroke:var(--indigo-fg)" viewBox="0 0 24 24">${SVG_STAR}</svg> Shortlist</button>`;
+  else if(w.status==='shortlisted') left=`<button class="btn btn-outline btn-sm" style="flex:1" onclick="openInterview(${w.id})"><svg class="ic" viewBox="0 0 24 24">${SVG_CAL}</svg> Interview</button>`;
+  else if(w.status==='interview') left=`<button class="btn btn-outline btn-sm" style="flex:1" onclick="openInterview(${w.id})"><svg class="ic" viewBox="0 0 24 24">${SVG_CAL}</svg> Reschedule</button>`;
+  return left+hire+rej;
+}
+
+/* ============================ INTERVIEW / REJECT / REVIEW ============================ */
+function openInterview(id){ curWorkerId=id; const w=WORKERS.find(x=>x.id===id); document.getElementById('ivWho').textContent=(w?w.name:'The worker')+' will get an invite and can confirm the slot.'; openSheet('sheet-interview'); }
+function confirmInterview(){ const w=WORKERS.find(x=>x.id===curWorkerId); if(w&&w.status!=='hired')w.status='interview'; closeSheet('sheet-interview'); toast('Interview invite sent to '+(w?w.name:'worker')+' 📅'); refreshCurrent(); }
+function rejectWorker(id){ const w=WORKERS.find(x=>x.id===id); w.status='rejected'; toast(w.name+' rejected'); refreshCurrent(); }
+function restoreWorker(id){ const w=WORKERS.find(x=>x.id===id); w.status='pending'; toast(w.name+' moved back to New'); refreshCurrent(); }
+function reviewWorker(id){ curWorkerId=id; openSheet('sheet-review'); }
+function inviteWorker(id){ const w=WORKERS.find(x=>x.id===id); toast('Invite sent to '+w.name+' — asked to apply'); }
+
+/* ============================ BOOST ============================ */
+let boostSel='Standard';
+function pickBoost(el){ document.querySelectorAll('#boostOpts .edu-row').forEach(r=>r.classList.remove('sel')); el.classList.add('sel'); boostSel=el.textContent.includes('Turbo')?'Turbo':'Standard'; }
+function confirmBoost(){ const cost=boostSel==='Turbo'?3:1; if(credits<cost){closeSheet('sheet-boost');openSheet('sheet-nocredits');return;} credits-=cost; refreshCredits(); closeSheet('sheet-boost'); toast('Job boosted 🚀 · '+credits+' credits left'); }
+
+/* ============================ CHAT ============================ */
+const THREADS = {
+  1:[{me:false,text:"Namaste sir, I saw your plumber job. I have 6 years experience.",t:"10:24 AM"},{me:true,text:"Good. Can you start this week?",t:"10:26 AM"},{me:false,text:"Yes sir, available from Monday.",t:"10:27 AM"}],
+  4:[{me:false,text:"Sir, I'm an ITI-certified electrician. Interested in the wiring job.",t:"Yesterday"}],
+  6:[{me:true,text:"We'd like to hire you for the mason work. Congrats!",t:"Mon"},{me:false,text:"Thank you sir! I'll report at 9 AM.",t:"Mon"}],
+};
+const CONVS = [{wid:1,unread:2},{wid:4,unread:0},{wid:6,unread:0}];
+const QUICK = ["Are you available?","Come for an interview?","Expected wage?","Share your location","Please call me"];
+let curChatId=null;
+function renderConvList(){
+  document.getElementById('convList').innerHTML = CONVS.map(c=>{
+    const w=WORKERS.find(x=>x.id===c.wid); const th=THREADS[c.wid]||[]; const last=th[th.length-1];
+    return `<div class="convrow" onclick="openChat(${c.wid})">
+      <div class="avatar" style="display:grid;place-items:center;font-weight:700;color:var(--brand-700)">${w.init}</div>
+      <div style="flex:1;min-width:0">
+        <div class="between"><span class="nm" style="font-size:14.5px;font-weight:700">${w.name}</span><span class="tiny muted">${last?last.t:''}</span></div>
+        <div class="tiny muted" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:230px">${last?(last.me?'You: ':'')+last.text:'Start a conversation'}</div>
+      </div>
+      ${c.unread?`<span class="unreadn">${c.unread}</span>`:''}
+    </div>`;
+  }).join('') || emptyHtml('No messages yet','Chat with applicants from their profile');
+}
+function openChat(id){
+  curChatId=id; const w=WORKERS.find(x=>x.id===id);
+  if(!THREADS[id]) THREADS[id]=[];
+  let conv=CONVS.find(c=>c.wid===id); if(!conv){conv={wid:id,unread:0};CONVS.unshift(conv);} conv.unread=0;
+  document.getElementById('chatAvatar').textContent=w.init;
+  document.getElementById('chatName').textContent=w.name;
+  document.getElementById('chatQuick').innerHTML=QUICK.map(q=>`<span class="chip-line" onclick="sendQuick(this)">${q}</span>`).join('');
+  renderThread(); renderConvList();
+  go('s-chat');
+}
+function renderThread(){
+  const th=THREADS[curChatId]||[];
+  document.getElementById('chatThread').innerHTML = th.map(m=>`<div class="bubble ${m.me?'me':'them'}">${m.text}<div class="bt">${m.t}${m.me?' ✓✓':''}</div></div>`).join('');
+  const el=document.getElementById('chatThread'); el.scrollTop=el.scrollHeight;
+}
+function nowTime(){ return new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); }
+function pushMsg(text){
+  THREADS[curChatId].push({me:true,text,t:nowTime()}); renderThread();
+  setTimeout(()=>{ if(curChatId!=null){ THREADS[curChatId].push({me:false,text:"Ok sir 👍",t:nowTime()}); renderThread(); } },1100);
+}
+function sendMsg(){ const i=document.getElementById('chatInput'); const v=i.value.trim(); if(!v)return; i.value=''; pushMsg(v); }
+function sendQuick(el){ pushMsg(el.textContent); }
+
+/* ============================ NAV ============================ */
+let stack = ['s-onboard'];
+const TABS = ['s-home','s-jobs','s-workers','s-profile','s-noti'];
+
+function screenEl(id){return document.getElementById(id);}
+function go(id){
+  const cur = stack[stack.length-1];
+  if(cur===id) return;
+  showScreen(id, cur);
+  stack.push(id);
+  updateChrome(id);
+}
+function back(){
+  if(stack.length<=1) return;
+  const cur = stack.pop();
+  const prev = stack[stack.length-1];
+  showScreen(prev, cur, true);
+  updateChrome(prev);
+}
+function switchTab(id){
+  const cur = stack[stack.length-1];
+  showScreen(id, cur);
+  stack = [id];
+  updateChrome(id);
+  document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active', n.dataset.tab===id));
+}
+function showScreen(id, from, isBack){
+  const el = screenEl(id), fromEl = from?screenEl(from):null;
+  document.querySelectorAll('.screen').forEach(s=>{if(s!==el&&s!==fromEl){s.classList.remove('active','behind');}});
+  if(fromEl && fromEl!==el){ fromEl.classList.remove('active'); fromEl.classList.add('behind'); setTimeout(()=>fromEl.classList.remove('behind'),300);}
+  el.classList.remove('behind'); el.classList.add('active');
+  el.querySelector('.scroll') && (el.querySelector('.scroll').scrollTop = 0);
+}
+function updateChrome(id){
+  const bnav = document.getElementById('bnav');
+  const showNav = TABS.includes(id);
+  bnav.classList.toggle('hidden', !showNav);
+  if(showNav) document.querySelectorAll('.navitem').forEach(n=>n.classList.toggle('active', n.dataset.tab===id));
+}
+
+/* ============================ OTP ============================ */
+function sendOtp(){
+  const v = document.getElementById('phoneInput').value.replace(/\D/g,'');
+  if(v.length<10){toast('Enter a valid 10-digit number');return;}
+  document.getElementById('otp-step-phone').style.display='none';
+  document.getElementById('otp-step-verify').style.display='block';
+  document.getElementById('otpPhoneLabel').firstChild.textContent = '+91 '+v.slice(0,5)+' '+v.slice(5)+' ';
+  const boxes = document.querySelectorAll('#otpBoxes input');
+  '482913'.split('').forEach((d,i)=>boxes[i].value=d);
+  startCooldown();
+}
+function showPhoneStep(){
+  document.getElementById('otp-step-verify').style.display='none';
+  document.getElementById('otp-step-phone').style.display='block';
+}
+let cd;
+function startCooldown(){
+  let t=30; const el=document.getElementById('cooldown'); const line=document.getElementById('resendLine');
+  clearInterval(cd);
+  cd=setInterval(()=>{ t--; if(t<=0){clearInterval(cd); line.innerHTML='<b style="color:var(--primary);cursor:pointer" onclick="startCooldown()">Resend OTP</b>';} else el.textContent=t; },1000);
+  line.innerHTML='Resend in <b id="cooldown">'+t+'</b>s';
+}
+function verifyOtp(){
+  const boxes=[...document.querySelectorAll('#otpBoxes input')];
+  if(boxes.some(b=>!b.value)){toast('Enter the full 6-digit code');return;}
+  clearInterval(cd);
+  go('s-register'); regStep(1);
+}
+
+/* ============================ REGISTRATION WIZARD ============================ */
+const REG_TOTAL = 5;
+let regCur = 1;
+function pickOne(el, sel){ [...document.querySelector(sel).children].forEach(c=>{c.classList.remove('chip');c.classList.add('chip-line');}); el.classList.remove('chip-line'); el.classList.add('chip'); }
+function toggleSel(el){ el.classList.toggle('chip'); el.classList.toggle('chip-line'); }
+function regStep(n){
+  regCur = n;
+  document.querySelectorAll('.reg-step').forEach((s,i)=>s.style.display = (i===n-1)?'block':'none');
+  document.getElementById('regBar').style.width = (n/REG_TOTAL*100)+'%';
+  document.getElementById('regCounter').textContent = n+'/'+REG_TOTAL;
+  document.getElementById('regBack').style.visibility = n===1?'hidden':'visible';
+  const isLast = n===REG_TOTAL;
+  document.getElementById('regSkip').style.display = isLast?'block':'none';
+  document.getElementById('regNext').textContent = isLast?'Verify & Finish':'Continue';
+  document.querySelector('#s-register .scroll').scrollTop = 0;
+}
+function regNext(){ if(regCur<REG_TOTAL) regStep(regCur+1); else finishRegister(true); }
+function regBack(){ if(regCur>1) regStep(regCur-1); else go('s-otp'); }
+function finishRegister(kycDone){
+  document.getElementById('bnav').classList.remove('hidden');
+  switchTab('s-home');
+  toast(kycDone?'Business created — verification submitted ✓':'Business created! Verify anytime 🎉');
+}
+function renderRegChips(){
+  document.getElementById('regCats').innerHTML = REG_CATS.map(c=>`<span class="chip-line big" onclick="toggleSel(this)">${c}</span>`).join('');
+}
+// otp auto-advance
+document.querySelectorAll('#otpBoxes input').forEach((b,i,arr)=>{
+  b.addEventListener('input',()=>{ if(b.value&&arr[i+1]) arr[i+1].focus(); });
+  b.addEventListener('keydown',e=>{ if(e.key==='Backspace'&&!b.value&&arr[i-1]) arr[i-1].focus(); });
+});
+
+/* ============================ POST JOB chips ============================ */
+function renderPostChips(){
+  document.getElementById('postSkills').innerHTML = POST_SKILLS.map(s=>`<span class="chip-line" onclick="toggleSel(this)">${s}</span>`).join('');
+  document.getElementById('postPerks').innerHTML = POST_PERKS.map(p=>`<span class="chip-line" onclick="toggleSel(this)">${p}</span>`).join('');
+}
+function publishJob(){ switchTab('s-jobs'); toast('Job published! Workers are being notified 🎉'); }
+
+/* ============================ MY JOBS ============================ */
+function wageStr(j){ if(!j.min&&!j.max) return "Not disclosed"; return "₹"+[j.min,j.max].filter(Boolean).join("–")+(j.type?" / "+j.type:""); }
+function myJobCardHtml(j){
+  return `<div class="card jobcard" style="margin-bottom:12px" onclick="openManage(${j.id})">
+    <div class="between">
+      <span class="chip">${j.cat}</span>
+      <span class="pill ${j.status}">${j.status[0].toUpperCase()+j.status.slice(1)}</span>
+    </div>
+    <div class="title">${j.title}</div>
+    <div class="tiny muted">${wageStr(j)} · ${j.vac} openings · ${j.posted}</div>
+    ${j.status!=='draft'?`<div class="meta" style="margin-top:11px">
+      <span class="metaitem"><svg class="ic" style="stroke:var(--indigo-fg)" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><b style="color:var(--fg)">${j.applicants}</b> applied</span>
+      <span class="metaitem"><svg class="ic" style="stroke:var(--amber-fg)" viewBox="0 0 24 24"><path d="M12 2 15 9l7 .5-5.5 4.5L18 21l-6-4-6 4 1.5-7L2 9.5 9 9z"/></svg><b style="color:var(--fg)">${j.shortlisted}</b> shortlisted</span>
+      <span class="metaitem"><svg class="ic" style="stroke:var(--green-fg)" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg><b style="color:var(--fg)">${j.hired}</b> hired</span>
+    </div>`:'<div class="tiny muted" style="margin-top:10px">Not published yet · tap to finish &amp; post</div>'}
+  </div>`;
+}
+function segJobs(btn,f){
+  document.querySelectorAll('#jobSeg button').forEach(b=>b.classList.remove('active')); btn.classList.add('active');
+  renderMyJobs(f);
+}
+function renderMyJobs(filter='active'){
+  const list = MYJOBS.filter(j=>j.status===filter);
+  document.getElementById('myJobsList').innerHTML = list.map(myJobCardHtml).join('') || emptyHtml('No '+filter+' jobs', filter==='active'?'Post a job to start hiring':'');
+}
+function renderHomeJobs(){ document.getElementById('homeJobs').innerHTML = MYJOBS.filter(j=>j.status==='active').slice(0,2).map(myJobCardHtml).join(''); }
+
+/* ============================ MANAGE JOB ============================ */
+let curJobId=null, curTab='pending';
+function openManage(id){
+  curJobId=id; curTab='pending';
+  renderManage(); go('s-jobmanage');
+}
+const TRADE_MAP={"Plumbing":"Plumber","Electrical":"Electrician","Masonry":"Mason","Carpentry":"Carpenter","Painting":"Painter"};
+function renderManage(){
+  const j = MYJOBS.find(x=>x.id===curJobId);
+  const applicants = WORKERS.filter(w=>w.appliedFor===curJobId);
+  const byStatus = s => applicants.filter(a=>a.status===s);
+  const listFor = byStatus(curTab);
+  const wantTrade = TRADE_MAP[j.cat]||j.cat;
+  const matched = WORKERS.filter(w=>w.appliedFor!==curJobId && w.trade===wantTrade);
+  const funnel = [['Views',j.views],['Applied',j.applicants],['Shortlisted',j.shortlisted],['Interview',byStatus('interview').length],['Hired',j.hired]];
+  const fmax = Math.max(...funnel.map(f=>f[1]),1);
+  const seg=(k,l)=>`<button style="font-size:12px;padding:8px 3px" class="${curTab===k?'active':''}" onclick="segManage('${k}')">${l} ${byStatus(k).length}</button>`;
+  document.getElementById('jobManageBody').innerHTML = `
+    <div class="pad" style="padding-bottom:0">
+      <span class="chip">${j.cat}</span>
+      <span class="pill ${j.status}" style="margin-left:6px">${j.status[0].toUpperCase()+j.status.slice(1)}</span>
+      <h1 style="font-size:20px;font-weight:700;margin:10px 0 2px;letter-spacing:-.3px">${j.title}</h1>
+      <div class="tiny muted">${wageStr(j)} · ${j.vac} openings · Posted ${j.posted}</div>
+
+      <div class="between" style="margin:18px 2px 8px"><div class="sec-title" style="margin:0">Performance</div><button class="btn-sm btn-ghost" style="width:auto" onclick="openSheet('sheet-boost')"><svg class="ic" style="stroke:var(--brand-700)" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg> Boost</button></div>
+      <div class="funnel">
+        ${funnel.map(([l,n])=>`<div class="fbar"><div class="fill" style="width:${Math.max(n/fmax*100,7)}%"></div><span class="lab">${l}</span><span class="num">${n}</span></div>`).join('')}
+      </div>
+    </div>
+
+    <div style="padding:16px 16px 0">
+      <div class="segmented" id="mSeg">
+        ${seg('pending','New')}${seg('shortlisted','Short')}${seg('interview','Intrvw')}${seg('hired','Hired')}
+      </div>
+    </div>
+    <div class="pad">
+      ${curTab==='pending' && matched.length ? `
+        <div class="between" style="margin:2px 2px 10px"><div class="sec-title" style="margin:0">✨ Matched for this job</div><span class="tiny muted">${matched.length} nearby</span></div>
+        ${matched.map(matchedCardHtml).join('')}
+        <div class="sec-title" style="margin:18px 2px 10px">Applicants</div>`:''}
+      ${listFor.map(applicantCardHtml).join('') || emptyHtml('No applicants in this stage yet')}
+    </div>`;
+}
+function segManage(t){ curTab=t; renderManage(); }
+
+/* ============================ APPLICANT / WORKER CARDS ============================ */
+function applicantCardHtml(w){
+  return `<div class="card wcard" onclick="openWorker(${w.id})">
+    <div class="top">
+      <div class="avatar" style="display:grid;place-items:center;font-weight:700;color:var(--brand-700)">${w.init}</div>
+      <div style="flex:1;min-width:0">
+        <div class="row" style="gap:6px"><span class="nm">${w.name}</span>${w.verified?'<svg class="ic" style="stroke:var(--green-fg)" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>':''}</div>
+        <div class="tiny muted">${w.trade} · ${w.exp} yrs exp · ★ ${w.rating} (${w.count})</div>
+        <div class="row" style="gap:10px;margin-top:5px">
+          <span class="kv"><svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${w.dist} km</span>
+          <span class="kv wage" style="color:var(--fg)">₹${w.wage}/day</span>
+        </div>
+      </div>
+      <span class="pill ${w.status}">${w.status[0].toUpperCase()+w.status.slice(1)}</span>
+    </div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:10px">${w.skills.slice(0,3).map(s=>`<span class="chip chip-line" style="font-size:11px">${s}</span>`).join('')}</div>
+    <div class="actbar" onclick="event.stopPropagation()">${contactBtns(w)}</div>
+    <div class="actbar" style="margin-top:8px" onclick="event.stopPropagation()">${pipelineBtns(w)}</div>
+  </div>`;
+}
+function matchedCardHtml(w){
+  return `<div class="card wcard" style="margin-bottom:10px" onclick="openWorker(${w.id})">
+    <div class="top">
+      <div class="avatar" style="display:grid;place-items:center;font-weight:700;color:var(--brand-700)">${w.init}</div>
+      <div style="flex:1;min-width:0">
+        <div class="row" style="gap:6px"><span class="nm">${w.name}</span>${w.verified?`<svg class="ic" style="stroke:var(--green-fg)" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>`:''}</div>
+        <div class="tiny muted">${w.trade} · ${w.exp} yrs · ★ ${w.rating} · ${w.dist} km</div>
+      </div>
+      <button class="btn-sm btn-ghost" style="width:auto" onclick="event.stopPropagation();inviteWorker(${w.id})">Invite</button>
+    </div>
+  </div>`;
+}
+function quickShortlist(id){ const w=WORKERS.find(x=>x.id===id); w.status='shortlisted'; refreshCurrent(); toast(w.name+' shortlisted ★'); }
+function quickHire(id){ curWorkerId=id; openSheet('sheet-hire'); }
+
+function renderHomeApplicants(){
+  document.getElementById('homeApplicants').innerHTML = WORKERS.slice(0,2).map(applicantCardHtml).join('');
+}
+
+/* ============================ WORKER PROFILE ============================ */
+let curWorkerId=null;
+function openWorker(id){
+  const w = WORKERS.find(x=>x.id===id); curWorkerId=id;
+  const unl = unlocked.has(id);
+  document.getElementById('workerBody').innerHTML = `
+    <div style="padding:22px 16px;background:linear-gradient(160deg,var(--primary),#c93a06);color:#fff">
+      <div class="row" style="gap:14px">
+        <div class="avatar" style="width:66px;height:66px;display:grid;place-items:center;font-size:24px;font-weight:700;color:var(--brand-700);border:3px solid rgba(255,255,255,.4)">${w.init}</div>
+        <div style="flex:1">
+          <div class="row" style="gap:6px"><div style="font-size:20px;font-weight:700">${w.name}</div>${w.verified?'<svg class="ic ic-lg" style="stroke:#fff" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>':''}</div>
+          <div style="font-size:13.5px;opacity:.92;margin-top:2px">${w.trade} · ${w.exp} yrs experience</div>
+          <div class="row" style="margin-top:6px;font-size:13px;opacity:.95">
+            <svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> ${w.city} · ${w.dist} km
+            <span style="margin-left:8px">★ ${w.rating} (${w.count})</span>
+          </div>
+        </div>
+      </div>
+      <div class="row" style="gap:8px;margin-top:14px">
+        ${w.verified?'<span class="pill" style="background:rgba(255,255,255,.2);color:#fff">KYC Verified</span>':'<span class="pill" style="background:rgba(255,255,255,.2);color:#fff">Not verified</span>'}
+        ${w.available?'<span class="pill" style="background:rgba(255,255,255,.2);color:#fff">● Available now</span>':'<span class="pill" style="background:rgba(255,255,255,.2);color:#fff">Busy</span>'}
+        <span class="pill" style="background:#fff;color:var(--primary)">₹${w.wage}/day</span>
+      </div>
+    </div>
+    <div class="pad" style="padding-bottom:0">
+      <div class="card lockcard">
+        <div style="width:40px;height:40px;border-radius:12px;background:var(--brand-50);color:var(--brand-700);display:grid;place-items:center;flex:0 0 auto"><svg class="ic ic-lg" style="stroke:var(--primary)" viewBox="0 0 24 24">${SVG_PHONE}</svg></div>
+        <div style="flex:1"><div class="tiny muted">Phone number</div><div class="num">+91 ${unl?phoneFor(id):phoneFor(id).slice(0,6)+'•••••'}</div></div>
+        ${unl?'<span class="pill" style="background:var(--green-bg);color:var(--green-fg)">Unlocked</span>':`<button class="btn-sm btn-ghost" style="width:auto" onclick="unlockContact(${id})">Unlock · 1 credit</button>`}
+      </div>
+    </div>
+    <div class="pad">
+      <div class="sec-title" style="margin-top:4px">About</div>
+      <p style="font-size:14.5px;line-height:1.55;color:#374151;margin:0">${w.bio}</p>
+
+      <div class="sec-title">Skills</div>
+      <div class="row" style="flex-wrap:wrap;gap:8px">${w.skills.map(s=>`<span class="chip">${s}</span>`).join('')}</div>
+
+      <div class="sec-title">Languages</div>
+      <div class="row" style="flex-wrap:wrap;gap:8px">${w.langs.map(l=>`<span class="chip chip-line">${l}</span>`).join('')}</div>
+
+      <div class="sec-title">Recent ratings</div>
+      <div class="card" style="padding:14px">
+        <div class="between"><div style="font-weight:600;font-size:13.5px">Kumar Interiors</div><div style="color:#fbbf24;font-size:13px">★★★★★</div></div>
+        <p class="tiny" style="color:#374151;margin:6px 0 0;line-height:1.5">Neat work and finished ahead of time. Reliable.</p>
+      </div>
+    </div>`;
+  document.getElementById('workerActions').innerHTML =
+    `<div class="actbar" style="margin-top:0">${contactBtns(w)}</div>
+     <div class="actbar" style="margin-top:8px">${pipelineBtns(w)}</div>`;
+  go('s-worker');
+}
+function callWorker(id){ if(id && !unlocked.has(id)){ unlockContact(id); return; } toast('📞 Calling '+(id?'+91 '+phoneFor(id):'worker')+'… (demo)'); }
+function confirmHire(){ const w=WORKERS.find(x=>x.id===curWorkerId); if(w)w.status='hired'; closeSheet('sheet-hire'); toast('Hire offer sent to '+(w?w.name:'worker')+' 🎉'); refreshCurrent(); }
+
+/* ============================ FIND WORKERS ============================ */
+function workerBrowseCardHtml(w){
+  return `<div class="card wcard" onclick="openWorker(${w.id})">
+    <div class="top">
+      <div class="avatar" style="display:grid;place-items:center;font-weight:700;color:var(--brand-700)">${w.init}</div>
+      <div style="flex:1;min-width:0">
+        <div class="row" style="gap:6px"><span class="nm">${w.name}</span>${w.verified?'<svg class="ic" style="stroke:var(--green-fg)" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>':''}</div>
+        <div class="tiny muted">${w.trade} · ${w.exp} yrs · ★ ${w.rating} (${w.count})</div>
+        <div class="row" style="gap:10px;margin-top:5px">
+          <span class="kv"><svg class="ic" viewBox="0 0 24 24"><path d="M21 10c0 7-9 12-9 12s-9-5-9-12a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>${w.dist} km</span>
+          <span class="kv wage" style="color:var(--fg)">₹${w.wage}/day</span>
+          ${w.available?'<span class="kv" style="color:var(--green-fg);font-weight:600">● Available</span>':''}
+        </div>
+      </div>
+    </div>
+    <div class="row" style="flex-wrap:wrap;gap:6px;margin-top:10px">${w.skills.slice(0,3).map(s=>`<span class="chip chip-line" style="font-size:11px">${s}</span>`).join('')}</div>
+  </div>`;
+}
+function renderWorkers(list){
+  document.getElementById('workersList').innerHTML = list.map(workerBrowseCardHtml).join('') || emptyHtml('No workers match','Try a different trade or filter');
+  document.getElementById('wCount').textContent = list.length;
+}
+function filterWorkers(q){
+  q=q.toLowerCase();
+  renderWorkers(WORKERS.filter(w=>w.name.toLowerCase().includes(q)||w.trade.toLowerCase().includes(q)||w.skills.join(' ').toLowerCase().includes(q)));
+}
+function renderWCatChips(){
+  document.getElementById('wCatChips').innerHTML = CATS.map((c,i)=>`<span class="chip ${i===0?'':'chip-line'}" style="white-space:nowrap;cursor:pointer" onclick="selWCat(this,'${c}')">${c}</span>`).join('');
+}
+function selWCat(el,c){
+  document.querySelectorAll('#wCatChips .chip').forEach(x=>x.classList.add('chip-line'));
+  el.classList.remove('chip-line');
+  const map={"Plumbing":"Plumber","Electrical":"Electrician","Masonry":"Mason"};
+  renderWorkers(c==='All'?WORKERS:WORKERS.filter(w=>w.trade===(map[c]||c)||w.skills.includes(c)));
+}
+
+/* ============================ NOTIFICATIONS ============================ */
+function renderNotis(){
+  document.getElementById('notiList').innerHTML = NOTIS.map(n=>`
+    <div class="noti ${n.read?'read':'unread'}" onclick="this.classList.remove('unread');this.classList.add('read');updateBadge(-1)">
+      <div class="dot"></div>
+      <div style="flex:1">
+        <div style="font-size:14px;line-height:1.4;${n.read?'':'font-weight:600'}">${n.msg}</div>
+        <div class="tiny muted" style="margin-top:4px">${n.time}</div>
+      </div>
+    </div>`).join('');
+}
+let unread = NOTIS.filter(n=>!n.read).length;
+function updateBadge(d){ unread=Math.max(0,unread+d); }
+function markAllRead(){ document.querySelectorAll('.noti').forEach(n=>{n.classList.remove('unread');n.classList.add('read');}); unread=0; toast('All marked read'); }
+
+/* ============================ REVIEWS ============================ */
+function renderReviews(){
+  document.getElementById('reviewsList').innerHTML = REVIEWS.map(r=>`
+    <div class="card" style="padding:15px;margin-bottom:12px">
+      <div class="between">
+        <div style="font-weight:700;font-size:14.5px">${r.name}</div>
+        <div style="color:#fbbf24;font-size:14px">${'★'.repeat(r.stars)}<span style="color:var(--line)">${'★'.repeat(5-r.stars)}</span></div>
+      </div>
+      <p style="font-size:14px;line-height:1.5;color:#374151;margin:8px 0 0">${r.text}</p>
+      <div class="tiny muted" style="margin-top:8px">${r.date}</div>
+    </div>`).join('');
+}
+
+/* ============================ LANGUAGE ============================ */
+function renderLangs(){
+  document.getElementById('langOpts').innerHTML = LANGS.map(([code,native,en],i)=>`
+    <div class="listrow" style="border-radius:12px;border:1px solid ${i===0?'var(--brand-200)':'var(--line)'};margin-bottom:8px;background:${i===0?'var(--brand-50)':'var(--card)'}" onclick="pickLang('${native}','${en}',this)">
+      <div class="g"><div class="t">${native}</div><div class="tiny muted">${en}</div></div>
+      <span class="langcheck" style="color:var(--primary)">${i===0?'✓':''}</span>
+    </div>`).join('');
+}
+function pickLang(native,en,el){
+  document.querySelectorAll('#langOpts .listrow').forEach(r=>{r.style.background='var(--card)';r.style.borderColor='var(--line)';r.querySelector('.langcheck').textContent='';});
+  el.style.background='var(--brand-50)'; el.style.borderColor='var(--brand-200)'; el.querySelector('.langcheck').textContent='✓';
+  document.getElementById('langLabel').textContent = en;
+  closeSheet('sheet-lang'); toast(native+' selected');
+}
+
+/* ============================ REVIEW STARS ============================ */
+let starVal=0;
+function setStars(n){ starVal=n; document.querySelectorAll('#starRow svg').forEach((s,i)=>s.classList.toggle('on',i<n)); }
+
+/* ============================ SHEETS / MISC ============================ */
+function openSheet(id){ document.getElementById(id).classList.add('open'); }
+function closeSheet(id){ document.getElementById(id).classList.remove('open'); }
+function saveProfile(){ go('s-profile'); toast('Profile saved ✓'); }
+function submitKyc(){ go('s-profile'); toast('Verification submitted ⏳'); }
+function logout(){ document.getElementById('bnav').classList.add('hidden'); stack=['s-onboard']; showScreen('s-onboard'); showPhoneStep(); }
+let toastTimer;
+function toast(msg){ const t=document.getElementById('toast'); t.innerHTML='<svg class="ic" style="stroke:#4ade80" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>'+msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200); }
+function emptyHtml(t,s){ return `<div class="empty"><svg fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg><div style="font-weight:600;color:var(--fg)">${t}</div>${s?`<div class="tiny" style="margin-top:4px">${s}</div>`:''}</div>`; }
+
+/* ============================ INIT ============================ */
+renderRegChips(); renderPostChips();
+renderMyJobs('active'); renderHomeJobs(); renderHomeApplicants();
+renderWCatChips(); renderWorkers(WORKERS);
+renderNotis(); renderReviews(); renderLangs();
+renderConvList(); refreshCredits();
+
+// Optional deep-link for demo/testing: employer-app.html#s-home (or any screen id)
+(function(){
+  const h = location.hash.replace('#','');
+  if(!h) return;
+  document.getElementById('bnav').classList.remove('hidden');
+  if(h.startsWith('manage')){ stack=['s-jobs']; openManage(parseInt(h.slice(6))||1); }
+  else if(h.startsWith('worker')){ stack=['s-workers']; openWorker(parseInt(h.slice(6))||1); }
+  else if(h.startsWith('chat')){ stack=['s-home']; openChat(parseInt(h.slice(4))||1); }
+  else if(h.startsWith('reg')){ document.getElementById('bnav').classList.add('hidden'); stack=['s-otp']; go('s-register'); regStep(parseInt(h.slice(3))||1); }
+  else if(TABS.includes(h)){ switchTab(h); }
+  else if(document.getElementById(h)){ stack=['s-home']; go(h); }
+})();
+</script>
+</body>
+</html>
