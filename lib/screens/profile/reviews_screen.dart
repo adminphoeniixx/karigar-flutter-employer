@@ -74,24 +74,26 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                           ),
                         ),
                         const SizedBox(width: 14),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '★★★★★',
-                              style: TextStyle(
-                                color: Color(0xFFFBBF24),
-                                fontSize: 20,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '★★★★★',
+                                style: TextStyle(
+                                  color: Color(0xFFFBBF24),
+                                  fontSize: 20,
+                                ),
                               ),
-                            ),
-                            Text(
-                              'Based on ${summary['count'] ?? 0} worker reviews',
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                color: AppColors.muted,
+                              Text(
+                                'Based on ${summary['count'] ?? 0} worker reviews',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  color: AppColors.muted,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ],
                     ),
@@ -136,7 +138,13 @@ class _Review extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              Expanded(
+                child: Text(
+                  name,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 8),
               Text(
                 '${'★' * stars}${'☆' * (5 - stars)}',
                 style: const TextStyle(color: Color(0xFFFBBF24)),

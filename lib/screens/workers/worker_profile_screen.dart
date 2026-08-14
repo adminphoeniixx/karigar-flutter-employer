@@ -78,12 +78,12 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                   ],
                 ),
                 const SizedBox(height: 14),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
                     const StatusPill('Verified'),
-                    const SizedBox(width: 8),
                     const BrandChip('● Available'),
-                    const Spacer(),
                     BrandChip('₹${w.wage}/day'),
                   ],
                 ),

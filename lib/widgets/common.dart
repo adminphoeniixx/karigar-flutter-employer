@@ -88,77 +88,89 @@ class WorkerCard extends StatelessWidget {
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 310;
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppColors.brand100,
-                  child: Text(
-                    worker.initials,
-                    style: const TextStyle(
-                      color: AppColors.brandDark,
-                      fontWeight: FontWeight.w700,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    CircleAvatar(
+                      radius: 22,
+                      backgroundColor: AppColors.brand100,
+                      child: Text(
+                        worker.initials,
+                        style: const TextStyle(
+                          color: AppColors.brandDark,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Flexible(
-                            child: Text(
-                              worker.name,
-                              style: const TextStyle(
-                                fontSize: 15.5,
-                                fontWeight: FontWeight.w700,
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  worker.name,
+                                  style: const TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
                               ),
+                              const SizedBox(width: 5),
+                              const Icon(
+                                LucideIcons.badgeCheck,
+                                size: 17,
+                                color: AppColors.green,
+                              ),
+                            ],
+                          ),
+                          Text(
+                            '${worker.trade} · ${worker.experience} yrs exp · ★ ${worker.rating}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.muted,
                             ),
                           ),
-                          const SizedBox(width: 5),
-                          const Icon(
-                            LucideIcons.badgeCheck,
-                            size: 17,
-                            color: AppColors.green,
+                          const SizedBox(height: 5),
+                          Text(
+                            '⌖ ${worker.distance} km     ₹${worker.wage}/day',
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
-                      Text(
-                        '${worker.trade} · ${worker.experience} yrs exp · ★ ${worker.rating}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        '⌖ ${worker.distance} km     ₹${worker.wage}/day',
-                        style: const TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                    if (!compact) StatusPill(worker.status),
+                  ],
                 ),
-                StatusPill(worker.status),
+                if (compact) ...[
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: StatusPill(worker.status),
+                  ),
+                ],
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: worker.skills
+                      .map((s) => BrandChip(s, neutral: true))
+                      .toList(),
+                ),
               ],
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: worker.skills
-                  .map((s) => BrandChip(s, neutral: true))
-                  .toList(),
-            ),
-          ],
+            );
+          },
         ),
       ),
     ),

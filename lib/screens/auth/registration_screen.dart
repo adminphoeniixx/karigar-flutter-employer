@@ -537,9 +537,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
             ],
           )
-        : FilledButton(
-            onPressed: loading ? null : _next,
-            child: const Text('Continue'),
+        : SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: loading ? null : _next,
+              child: const Text('Continue'),
+            ),
           ),
   );
 

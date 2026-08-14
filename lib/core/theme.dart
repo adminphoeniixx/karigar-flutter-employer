@@ -83,6 +83,26 @@ abstract final class AppTheme {
             borderRadius: BorderRadius.circular(14),
           ),
           textStyle: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+          disabledBackgroundColor: AppColors.line,
+          disabledForegroundColor: AppColors.muted2,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(64, 50),
+          foregroundColor: AppColors.foreground,
+          side: const BorderSide(color: AppColors.line),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+          disabledForegroundColor: AppColors.muted2,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          textStyle: text.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
       ),
       cardTheme: CardThemeData(

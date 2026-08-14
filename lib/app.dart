@@ -64,6 +64,11 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
       title: 'Karigar Employer',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+      builder: (context, child) => MediaQuery.withClampedTextScaling(
+        minScaleFactor: 0.9,
+        maxScaleFactor: 1.3,
+        child: child!,
+      ),
       home: !ready
           ? const Scaffold(body: Center(child: CircularProgressIndicator()))
           : auth.authenticated

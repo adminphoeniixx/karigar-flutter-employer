@@ -286,9 +286,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   style: TextStyle(fontSize: 12, color: AppColors.muted),
                 ),
                 const SizedBox(height: 20),
-                FilledButton(
-                  onPressed: saving ? null : _save,
-                  child: Text(saving ? 'Saving...' : 'Save Profile'),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: saving ? null : _save,
+                    child: Text(saving ? 'Saving...' : 'Save Profile'),
+                  ),
                 ),
               ],
             ),

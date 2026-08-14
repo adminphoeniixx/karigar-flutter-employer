@@ -1,5 +1,7 @@
 import 'package:employer_kariger_app/app.dart';
 import 'package:employer_kariger_app/core/theme.dart';
+import 'package:employer_kariger_app/core/data.dart';
+import 'package:employer_kariger_app/widgets/common.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -32,5 +34,40 @@ void main() {
 
     expect(tester.takeException(), isNull);
     expect(find.text('Buy'), findsOneWidget);
+  });
+
+  testWidgets('key UI does not overflow on a narrow screen', (tester) async {
+    tester.view.physicalSize = const Size(320, 568);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    SharedPreferences.setMockInitialValues({});
+    await tester.pumpWidget(const KarigarEmployerApp());
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    const worker = Worker(
+      'A very long worker name for responsive testing',
+      'Commercial Electrician',
+      12,
+      4.9,
+      18.5,
+      1250,
+      ['Electrical wiring', 'Commercial maintenance'],
+      status: 'Shortlisted',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light,
+        home: const Scaffold(
+          body: Padding(
+            padding: EdgeInsets.all(8),
+            child: WorkerCard(worker: worker),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
   });
 }

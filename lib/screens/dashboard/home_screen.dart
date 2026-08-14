@@ -400,30 +400,28 @@ class _PostJobBanner extends StatelessWidget {
       ),
       borderRadius: BorderRadius.circular(16),
     ),
-    child: Row(
-      children: [
-        const Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Hiring today?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
+    child: LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 300;
+        final copy = const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Hiring today?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
               ),
-              SizedBox(height: 3),
-              Text(
-                'Post a job free — reach workers\ninstantly',
-                style: TextStyle(color: Colors.white, fontSize: 11.5),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(
-          width: 118,
+            ),
+            SizedBox(height: 3),
+            Text(
+              'Post a job free — reach workers instantly',
+              style: TextStyle(color: Colors.white, fontSize: 11.5),
+            ),
+          ],
+        );
+        final button = SizedBox(
           height: 42,
           child: FilledButton.icon(
             onPressed: onTap,
@@ -439,8 +437,20 @@ class _PostJobBanner extends StatelessWidget {
             icon: const Icon(LucideIcons.plus, size: 19),
             label: const Text('Post Job'),
           ),
-        ),
-      ],
+        );
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [copy, const SizedBox(height: 12), button],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: copy),
+            button,
+          ],
+        );
+      },
     ),
   );
 }
@@ -461,7 +471,7 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Container(
-    height: 120,
+    constraints: const BoxConstraints(minHeight: 120),
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
       color: Colors.white,
@@ -487,7 +497,7 @@ class _StatCard extends StatelessWidget {
           ),
           child: Icon(icon, color: iconColor, size: 19),
         ),
-        const Spacer(),
+        const SizedBox(height: 12),
         Text(
           value,
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),

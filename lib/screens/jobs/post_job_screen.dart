@@ -240,40 +240,42 @@ class _PostJobScreenState extends State<PostJobScreen> {
                 ],
               ),
               const _SectionLabel('Wage'),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _Label('Min ₹'),
-                        _Input(
-                          hint: '800',
-                          prefix: '₹',
-                          controller: wageMinController,
-                          number: true,
-                        ),
-                      ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final compact = constraints.maxWidth < 390;
+                  final amountFields = <Widget>[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _Label('Min ₹'),
+                          _Input(
+                            hint: '800',
+                            prefix: '₹',
+                            controller: wageMinController,
+                            number: true,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _Label('Max ₹'),
-                        _Input(
-                          hint: '1000',
-                          prefix: '₹',
-                          controller: wageMaxController,
-                          number: true,
-                        ),
-                      ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const _Label('Max ₹'),
+                          _Input(
+                            hint: '1000',
+                            prefix: '₹',
+                            controller: wageMaxController,
+                            number: true,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  SizedBox(
-                    width: 88,
+                  ];
+                  final periodField = SizedBox(
+                    width: compact ? double.infinity : 88,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -288,8 +290,24 @@ class _PostJobScreenState extends State<PostJobScreen> {
                         ),
                       ],
                     ),
-                  ),
-                ],
+                  );
+                  if (compact) {
+                    return Column(
+                      children: [
+                        Row(children: amountFields),
+                        const SizedBox(height: 10),
+                        periodField,
+                      ],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      ...amountFields,
+                      const SizedBox(width: 10),
+                      periodField,
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 14),
               const _Label('Shift'),

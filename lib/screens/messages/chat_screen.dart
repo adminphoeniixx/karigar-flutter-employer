@@ -96,21 +96,23 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           const SizedBox(width: 9),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.worker.name,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.worker.name,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const Text(
-                'Online',
-                style: TextStyle(fontSize: 11, color: AppColors.green),
-              ),
-            ],
+                const Text(
+                  'Online',
+                  style: TextStyle(fontSize: 11, color: AppColors.green),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -132,7 +134,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     horizontal: 13,
                     vertical: 9,
                   ),
-                  constraints: const BoxConstraints(maxWidth: 280),
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+                  ),
                   decoration: BoxDecoration(
                     color: me ? AppColors.primary : Colors.white,
                     borderRadius: BorderRadius.circular(16),

@@ -191,10 +191,13 @@ class _KycScreenState extends State<KycScreen> {
                 onTap: () => _pick(false),
               ),
               const SizedBox(height: 22),
-              FilledButton(
-                onPressed: submitting ? null : _submit,
-                child: Text(
-                  submitting ? 'Submitting...' : 'Submit for Verification',
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: submitting ? null : _submit,
+                  child: Text(
+                    submitting ? 'Submitting...' : 'Submit for Verification',
+                  ),
                 ),
               ),
             ],

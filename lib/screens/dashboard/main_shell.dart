@@ -56,66 +56,71 @@ class _BottomNav extends StatelessWidget {
   ];
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 81,
-    decoration: const BoxDecoration(
-      color: Colors.white,
-      border: Border(top: BorderSide(color: AppColors.line)),
-    ),
-    child: Row(
-      children: List.generate(items.length, (i) {
-        final selected = selectedIndex == i;
-        final center = i == 2;
-        return Expanded(
-          child: InkWell(
-            onTap: () => onSelected(i),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (center)
-                  Transform.translate(
-                    offset: const Offset(0, -12),
-                    child: Container(
-                      width: 54,
-                      height: 54,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x45F4470F),
-                            blurRadius: 12,
-                            offset: Offset(0, 5),
-                          ),
-                        ],
+  Widget build(BuildContext context) => SafeArea(
+    top: false,
+    child: Container(
+      height: 78,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.line)),
+      ),
+      child: Row(
+        children: List.generate(items.length, (i) {
+          final selected = selectedIndex == i;
+          final center = i == 2;
+          return Expanded(
+            child: InkWell(
+              onTap: () => onSelected(i),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (center)
+                    Transform.translate(
+                      offset: const Offset(0, -9),
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x45F4470F),
+                              blurRadius: 12,
+                              offset: Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          LucideIcons.plus,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
-                      child: const Icon(
-                        LucideIcons.plus,
-                        color: Colors.white,
-                        size: 28,
-                      ),
+                    )
+                  else
+                    Icon(
+                      items[i].$1,
+                      size: 22,
+                      color: selected ? AppColors.primary : AppColors.muted2,
                     ),
-                  )
-                else
-                  Icon(
-                    items[i].$1,
-                    size: 22,
-                    color: selected ? AppColors.primary : AppColors.muted2,
+                  SizedBox(height: center ? 1 : 5),
+                  Text(
+                    items[i].$2,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected ? AppColors.primary : AppColors.muted2,
+                      fontSize: 10.5,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
                   ),
-                SizedBox(height: center ? 1 : 5),
-                Text(
-                  items[i].$2,
-                  style: TextStyle(
-                    color: selected ? AppColors.primary : AppColors.muted2,
-                    fontSize: 10.5,
-                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      }),
+          );
+        }),
+      ),
     ),
   );
 }

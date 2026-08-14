@@ -113,74 +113,94 @@ class _OtpScreenState extends State<OtpScreen> {
         icon: const Icon(LucideIcons.arrowLeft),
       ),
     ),
-    body: ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: AppColors.brand50,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(
-                  LucideIcons.smartphone,
-                  size: 28,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Login with Mobile',
-                style: const TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: -.5,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                "Employer · We'll send you a one-time code",
-                style: const TextStyle(color: AppColors.muted, fontSize: 15),
-              ),
-            ],
-          ),
+    body: LayoutBuilder(
+      builder: (context, constraints) => ListView(
+        padding: EdgeInsets.fromLTRB(
+          constraints.maxWidth < 360 ? 12 : 16,
+          8,
+          constraints.maxWidth < 360 ? 12 : 16,
+          24,
         ),
-        const SizedBox(height: 24),
-        if (!sent)
-          _PhoneForm(controller: phoneController)
-        else
-          _VerificationForm(
-            phone: phoneController.text,
-            controllers: otpControllers,
-            focusNodes: otpFocusNodes,
-            onChange: () => setState(() => sent = false),
-          ),
-        const SizedBox(height: 12),
-        FilledButton(
-          onPressed: loading ? null : _continue,
-          child: loading
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Text(sent ? 'Verify & Continue' : 'Send OTP'),
-        ),
-        if (sent) ...[
-          const SizedBox(height: 16),
-          const Text(
-            'By continuing you agree to our Terms & Privacy Policy.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: AppColors.muted, fontSize: 11.5),
+        children: [
+          Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
+                            color: AppColors.brand50,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Icon(
+                            LucideIcons.smartphone,
+                            size: 28,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Login with Mobile',
+                          style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: -.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "Employer · We'll send you a one-time code",
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  if (!sent)
+                    _PhoneForm(controller: phoneController)
+                  else
+                    _VerificationForm(
+                      phone: phoneController.text,
+                      controllers: otpControllers,
+                      focusNodes: otpFocusNodes,
+                      onChange: () => setState(() => sent = false),
+                    ),
+                  const SizedBox(height: 12),
+                  FilledButton(
+                    onPressed: loading ? null : _continue,
+                    child: loading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(sent ? 'Verify & Continue' : 'Send OTP'),
+                  ),
+                  if (sent) ...[
+                    const SizedBox(height: 16),
+                    const Text(
+                      'By continuing you agree to our Terms & Privacy Policy.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppColors.muted, fontSize: 11.5),
+                    ),
+                  ],
+                ],
+              ),
+            ),
           ),
         ],
-      ],
+      ),
     ),
   );
 }
@@ -288,54 +308,57 @@ class _VerificationForm extends StatelessWidget {
       ),
       const SizedBox(height: 18),
       Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: List.generate(
           4,
-          (index) => Focus(
-            onKeyEvent: (_, event) {
-              if (event is KeyDownEvent &&
-                  event.logicalKey == LogicalKeyboardKey.backspace &&
-                  controllers[index].text.isEmpty &&
-                  index > 0) {
-                controllers[index - 1].clear();
-                focusNodes[index - 1].requestFocus();
-                return KeyEventResult.handled;
-              }
-              return KeyEventResult.ignored;
-            },
-            child: SizedBox(
-              width: 58,
-              height: 54,
-              child: TextField(
-                controller: controllers[index],
-                focusNode: focusNodes[index],
-                onChanged: (value) {
-                  if (value.isNotEmpty && index < controllers.length - 1) {
-                    focusNodes[index + 1].requestFocus();
-                  } else if (value.isEmpty && index > 0) {
+          (index) => Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(left: index == 0 ? 0 : 6),
+              child: Focus(
+                onKeyEvent: (_, event) {
+                  if (event is KeyDownEvent &&
+                      event.logicalKey == LogicalKeyboardKey.backspace &&
+                      controllers[index].text.isEmpty &&
+                      index > 0) {
+                    controllers[index - 1].clear();
                     focusNodes[index - 1].requestFocus();
+                    return KeyEventResult.handled;
                   }
+                  return KeyEventResult.ignored;
                 },
-                onTap: () {
-                  controllers[index].selection = TextSelection(
-                    baseOffset: 0,
-                    extentOffset: controllers[index].text.length,
-                  );
-                },
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                textAlign: TextAlign.center,
-                maxLength: 1,
-                keyboardType: TextInputType.number,
-                textInputAction: index == controllers.length - 1
-                    ? TextInputAction.done
-                    : TextInputAction.next,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                ),
-                decoration: const InputDecoration(
-                  counterText: '',
-                  contentPadding: EdgeInsets.zero,
+                child: SizedBox(
+                  height: 54,
+                  child: TextField(
+                    controller: controllers[index],
+                    focusNode: focusNodes[index],
+                    onChanged: (value) {
+                      if (value.isNotEmpty && index < controllers.length - 1) {
+                        focusNodes[index + 1].requestFocus();
+                      } else if (value.isEmpty && index > 0) {
+                        focusNodes[index - 1].requestFocus();
+                      }
+                    },
+                    onTap: () {
+                      controllers[index].selection = TextSelection(
+                        baseOffset: 0,
+                        extentOffset: controllers[index].text.length,
+                      );
+                    },
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    textAlign: TextAlign.center,
+                    maxLength: 1,
+                    keyboardType: TextInputType.number,
+                    textInputAction: index == controllers.length - 1
+                        ? TextInputAction.done
+                        : TextInputAction.next,
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    decoration: const InputDecoration(
+                      counterText: '',
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
                 ),
               ),
             ),
