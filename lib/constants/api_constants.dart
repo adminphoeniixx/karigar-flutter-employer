@@ -12,6 +12,7 @@ class ApiConstants {
   static const locale = '/locale';
   static const reference = '/reference';
   static const cities = '/reference/cities';
+  static const jobCategories = '/reference/job-categories';
   static const dashboard = '/employer/dashboard';
   static const profile = '/employer/profile';
   static const profileLogo = '/employer/profile/logo';
@@ -21,6 +22,7 @@ class ApiConstants {
   static const kyc = '/employer/kyc';
   static const notifications = '/notifications';
   static const notificationsReadAll = '/notifications/read-all';
+  static const deviceTokens = '/device-tokens';
   static const reviews = '/employer/reviews';
   static const team = '/employer/team';
   static const conversations = '/conversations';

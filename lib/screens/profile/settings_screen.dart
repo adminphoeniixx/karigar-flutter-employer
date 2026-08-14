@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
+import 'package:employer_kariger_app/screens/auth/onboarding_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -14,6 +16,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool darkTheme = false;
   bool applicantAlerts = true;
   String language = 'English';
+  bool loaded = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!loaded) {
+      loaded = true;
+      _load();
+    }
+  }
+
+  Future<void> _load() async {
+    try {
+      final response = await AppScope.of(context).api.preferences();
+      final preferences = response['preferences'];
+      if (!mounted || preferences is! Map) return;
+      setState(() {
+        darkTheme = preferences['theme'] == 'dark';
+        applicantAlerts = preferences['applicant_alerts'] != false;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _updatePreference(Map<String, dynamic> values) async {
+    try {
+      await AppScope.of(context).api.updatePreferences(values);
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$exception')));
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -40,7 +76,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle: 'Switch to a darker screen',
           trailing: _CompactSwitch(
             value: darkTheme,
-            onChanged: (value) => setState(() => darkTheme = value),
+            onChanged: (value) {
+              setState(() => darkTheme = value);
+              _updatePreference({'theme': value ? 'dark' : 'light'});
+            },
           ),
         ),
         _SettingsRow(
@@ -49,7 +88,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           subtitle: 'Get notified on new applications',
           trailing: _CompactSwitch(
             value: applicantAlerts,
-            onChanged: (value) => setState(() => applicantAlerts = value),
+            onChanged: (value) {
+              setState(() => applicantAlerts = value);
+              _updatePreference({'applicant_alerts': value});
+            },
           ),
         ),
         const _SectionHeader('Account & Security'),
@@ -74,7 +116,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
           child: OutlinedButton.icon(
-            onPressed: () {},
+            onPressed: () async {
+              await AppScope.of(context).auth.logout();
+              if (!context.mounted) return;
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+                (_) => false,
+              );
+            },
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
               backgroundColor: Colors.white,
@@ -135,10 +185,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: Text(item),
                   trailing: item == language
-                      ? const Icon(
-                          LucideIcons.check,
-                          color: AppColors.primary,
-                        )
+                      ? const Icon(LucideIcons.check, color: AppColors.primary)
                       : null,
                   onTap: () => Navigator.pop(context, item),
                 ),
@@ -148,7 +195,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
-    if (selected != null) setState(() => language = selected);
+    if (selected != null) {
+      final locale = {
+        'English': 'en',
+        'हिन्दी': 'hi',
+        'தமிழ்': 'ta',
+        'తెలుగు': 'te',
+        'ಕನ್ನಡ': 'kn',
+      }[selected];
+      if (locale != null) {
+        try {
+          await AppScope.of(context).api.setLocale(locale);
+          if (mounted) setState(() => language = selected);
+        } catch (exception) {
+          if (mounted) {
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('$exception')));
+          }
+        }
+      }
+    }
   }
 }
 

@@ -125,7 +125,11 @@ class _LocationMapState extends State<LocationMap> {
                   ),
                   const Center(
                     child: IgnorePointer(
-                      child: Icon(LucideIcons.plus, size: 17, color: Colors.white),
+                      child: Icon(
+                        LucideIcons.plus,
+                        size: 17,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ],

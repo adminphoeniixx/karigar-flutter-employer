@@ -131,10 +131,8 @@ class ProfileScreen extends StatelessWidget {
     ),
   );
 
-  static void _open(BuildContext context, Widget page) => Navigator.push(
-    context,
-    MaterialPageRoute(builder: (_) => page),
-  );
+  static void _open(BuildContext context, Widget page) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => page));
 }
 
 class _BusinessHeader extends StatelessWidget {

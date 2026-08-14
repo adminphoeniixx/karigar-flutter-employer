@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/dashboard/main_shell.dart';
 import 'package:employer_kariger_app/widgets/location_map.dart';
@@ -17,6 +18,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String hiringAs = 'Business / Company';
   String companySize = '11\u201350';
   final selectedTrades = <String>{};
+  final nameController = TextEditingController();
+  final companyController = TextEditingController();
+  final addressController = TextEditingController();
+  final gstinController = TextEditingController();
+  String? industry;
+  String? state;
+  String? city;
+  bool loading = false;
+  bool referenceLoading = false;
+  bool _loadedReference = false;
+  List<String> industries = const [];
+  List<String> states = const [];
+  List<String> cities = const [];
+  List<String> availableTrades = trades;
 
   static const trades = [
     'Plumbing',
@@ -33,11 +48,72 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     'Tiling',
   ];
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedReference) {
+      _loadedReference = true;
+      _loadReference();
+    }
+  }
+
+  Future<void> _loadReference() async {
+    setState(() => referenceLoading = true);
+    try {
+      final response = await AppScope.of(context).api.reference();
+      if (!mounted) return;
+      setState(() {
+        industries = List<String>.from(
+          (response['industries'] as List? ?? const []).map((e) => '$e'),
+        );
+        states = List<String>.from(
+          (response['states'] as List? ?? const [])
+              .map((e) {
+                if (e is Map) return '${e['name'] ?? e['label'] ?? ''}';
+                return '$e';
+              })
+              .where((e) => e.isNotEmpty),
+        );
+        final skills = List<String>.from(
+          (response['skills'] as List? ?? const [])
+              .map((e) {
+                if (e is Map) return '${e['name'] ?? e['label'] ?? ''}';
+                return '$e';
+              })
+              .where((e) => e.isNotEmpty),
+        );
+        if (skills.isNotEmpty) availableTrades = skills;
+      });
+    } catch (_) {
+      // The form remains usable with its bundled fallback choices.
+    } finally {
+      if (mounted) setState(() => referenceLoading = false);
+    }
+  }
+
+  Future<void> _loadCities(String selectedState) async {
+    setState(() {
+      state = selectedState;
+      city = null;
+      cities = const [];
+      referenceLoading = true;
+    });
+    try {
+      final result = await AppScope.of(context).api.cities(selectedState);
+      if (mounted) setState(() => cities = result);
+    } catch (_) {
+      _message('Could not load cities. Please try again.');
+    } finally {
+      if (mounted) setState(() => referenceLoading = false);
+    }
+  }
+
   void _next() {
+    if (!_validateStep()) return;
     if (step < 4) {
       setState(() => step++);
     } else {
-      _finish();
+      _saveAndFinish();
     }
   }
 
@@ -49,11 +125,71 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
-  void _finish() => Navigator.pushAndRemoveUntil(
+  bool _validateStep() {
+    String? error;
+    if (step == 0 && nameController.text.trim().isEmpty) {
+      error = 'Enter your full name.';
+    } else if (step == 1 && companyController.text.trim().isEmpty) {
+      error = 'Enter your business or company name.';
+    } else if (step == 1 && industry == null) {
+      error = 'Select an industry.';
+    } else if (step == 2 && (state == null || city == null)) {
+      error = 'Select your state and city.';
+    } else if (step == 3 && selectedTrades.isEmpty) {
+      error = 'Select at least one worker category.';
+    }
+    if (error != null) _message(error);
+    return error == null;
+  }
+
+  Future<void> _saveAndFinish() async {
+    if (loading) return;
+    setState(() => loading = true);
+    final success = await AppScope.of(context).profile.save({
+      'name': nameController.text.trim(),
+      'company_name': companyController.text.trim(),
+      'hiring_as': {
+        'Business / Company': 'business',
+        'Contractor': 'contractor',
+        'Individual / Household': 'individual',
+      }[hiringAs],
+      'industry': industry,
+      'company_size': companySize,
+      'hiring_categories': selectedTrades.toList(),
+      'state': state,
+      'city': city,
+      if (addressController.text.trim().isNotEmpty)
+        'address': addressController.text.trim(),
+      if (gstinController.text.trim().isNotEmpty)
+        'gstin': gstinController.text.trim().toUpperCase(),
+    });
+    if (!mounted) return;
+    setState(() => loading = false);
+    if (!success) {
+      _message(
+        AppScope.of(context).profile.error ?? 'Could not save the profile.',
+      );
+      return;
+    }
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const MainShell()),
+      (_) => false,
+    );
+  }
+
+  void _message(String value) => ScaffoldMessenger.of(
     context,
-    MaterialPageRoute(builder: (_) => const MainShell()),
-    (_) => false,
-  );
+  ).showSnackBar(SnackBar(content: Text(value)));
+
+  @override
+  void dispose() {
+    nameController.dispose();
+    companyController.dispose();
+    addressController.dispose();
+    gstinController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -107,21 +243,22 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           subtitle: 'Workers will see this contact name on your jobs.',
           children: [
             const _FieldLabel('Your full name'),
-            const _Input(hint: 'e.g. Anil Sharma'),
+            _Input(hint: 'e.g. Anil Sharma', controller: nameController),
             const SizedBox(height: 16),
             const _FieldLabel('You are hiring as'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: ['Business / Company', 'Contractor', 'Individual / Household']
-                  .map(
-                    (item) => _SelectChip(
-                      text: item,
-                      selected: hiringAs == item,
-                      onTap: () => setState(() => hiringAs = item),
-                    ),
-                  )
-                  .toList(),
+              children:
+                  ['Business / Company', 'Contractor', 'Individual / Household']
+                      .map(
+                        (item) => _SelectChip(
+                          text: item,
+                          selected: hiringAs == item,
+                          onTap: () => setState(() => hiringAs = item),
+                        ),
+                      )
+                      .toList(),
             ),
           ],
         );
@@ -131,21 +268,26 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           subtitle: 'This appears on your public employer profile.',
           children: [
             const _FieldLabel('Business / Company name'),
-            const _Input(hint: 'e.g. Sri Sai Constructions'),
+            _Input(
+              hint: 'e.g. Sri Sai Constructions',
+              controller: companyController,
+            ),
             const SizedBox(height: 16),
             const _FieldLabel('Industry'),
-            const _SelectBox(hint: 'Select industry'),
+            _SelectBox(
+              hint: industry ?? 'Select industry',
+              onTap: () => _choose(
+                title: 'Select industry',
+                values: industries,
+                onSelected: (value) => setState(() => industry = value),
+              ),
+            ),
             const SizedBox(height: 16),
             const _FieldLabel('Company size'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: [
-                '1\u201310',
-                '11\u201350',
-                '51\u2013200',
-                '200+',
-              ]
+              children: ['1\u201310', '11\u201350', '51\u2013200', '200+']
                   .map(
                     (item) => _SelectChip(
                       text: item,
@@ -171,7 +313,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(LucideIcons.locateFixed, size: 19, color: AppColors.primary),
+                  Icon(
+                    LucideIcons.locateFixed,
+                    size: 19,
+                    color: AppColors.primary,
+                  ),
                   SizedBox(width: 9),
                   Text(
                     'Use my current location',
@@ -185,10 +331,29 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             ),
             const SizedBox(height: 18),
             const _FieldLabel('State'),
-            const _SelectBox(hint: 'Select state'),
+            _SelectBox(
+              hint: state ?? 'Select state',
+              onTap: () => _choose(
+                title: 'Select state',
+                values: states,
+                onSelected: _loadCities,
+              ),
+            ),
             const SizedBox(height: 16),
             const _FieldLabel('City / District'),
-            const _SelectBox(hint: 'Select city'),
+            _SelectBox(
+              hint: city ?? (referenceLoading ? 'Loading...' : 'Select city'),
+              onTap: state == null
+                  ? () => _message('Select a state first.')
+                  : () => _choose(
+                      title: 'Select city',
+                      values: cities,
+                      onSelected: (value) => setState(() => city = value),
+                    ),
+            ),
+            const SizedBox(height: 16),
+            const _FieldLabel('Address (optional)'),
+            _Input(hint: 'Work address', controller: addressController),
             const SizedBox(height: 16),
             const _FieldLabel('Pin your work location'),
             const SizedBox(height: 150, child: LocationMap()),
@@ -203,7 +368,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 9,
-              children: trades
+              children: availableTrades
                   .map(
                     (item) => _SelectChip(
                       text: item,
@@ -239,18 +404,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 ),
               ],
             ),
-            style: TextStyle(
-              color: AppColors.muted,
-              fontSize: 14,
-              height: 1.5,
-            ),
+            style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.5),
           ),
           children: [
             const _FieldLabel('GST number (optional)'),
-            const _Input(hint: '22ABCDE1234F1Z5'),
+            _Input(hint: '22ABCDE1234F1Z5', controller: gstinController),
             const SizedBox(height: 16),
             const _FieldLabel('Business PAN'),
-            const _Input(hint: 'ABCDE1234F'),
+            const _Input(hint: 'Submit documents later from KYC screen'),
             const SizedBox(height: 16),
             CustomPaint(
               painter: _DashedBorderPainter(),
@@ -264,7 +425,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 child: const Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(LucideIcons.upload, color: AppColors.primary, size: 22),
+                    Icon(
+                      LucideIcons.upload,
+                      color: AppColors.primary,
+                      size: 22,
+                    ),
                     SizedBox(height: 7),
                     Text(
                       'Upload GST / registration proof',
@@ -350,7 +515,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: _finish,
+                  onPressed: loading ? null : _saveAndFinish,
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(50),
                     foregroundColor: AppColors.foreground,
@@ -366,14 +531,57 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               Expanded(
                 flex: 2,
                 child: FilledButton(
-                  onPressed: _finish,
-                  child: const Text('Verify & Finish'),
+                  onPressed: loading ? null : _saveAndFinish,
+                  child: Text(loading ? 'Saving...' : 'Finish setup'),
                 ),
               ),
             ],
           )
-        : FilledButton(onPressed: _next, child: const Text('Continue')),
+        : FilledButton(
+            onPressed: loading ? null : _next,
+            child: const Text('Continue'),
+          ),
   );
+
+  Future<void> _choose({
+    required String title,
+    required List<String> values,
+    required ValueChanged<String> onSelected,
+  }) async {
+    if (values.isEmpty) {
+      _message(
+        referenceLoading ? 'Options are loading.' : 'No options were found.',
+      );
+      return;
+    }
+    final value = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            ...values.map(
+              (item) => ListTile(
+                title: Text(item),
+                onTap: () => Navigator.pop(context, item),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (value != null) onSelected(value);
+  }
 }
 
 class _FieldLabel extends StatelessWidget {
@@ -391,34 +599,43 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _Input extends StatelessWidget {
-  const _Input({required this.hint});
+  const _Input({required this.hint, this.controller});
   final String hint;
+  final TextEditingController? controller;
 
   @override
   Widget build(BuildContext context) => SizedBox(
     height: 46,
-    child: TextField(decoration: InputDecoration(hintText: hint)),
+    child: TextField(
+      controller: controller,
+      decoration: InputDecoration(hintText: hint),
+    ),
   );
 }
 
 class _SelectBox extends StatelessWidget {
-  const _SelectBox({required this.hint});
+  const _SelectBox({required this.hint, this.onTap});
   final String hint;
+  final VoidCallback? onTap;
 
   @override
-  Widget build(BuildContext context) => Container(
-    height: 48,
-    padding: const EdgeInsets.symmetric(horizontal: 14),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: AppColors.line),
-      borderRadius: BorderRadius.circular(12),
-    ),
-    child: Row(
-      children: [
-        Expanded(child: Text(hint, style: const TextStyle(fontSize: 14))),
-        const Icon(LucideIcons.chevronDown, size: 17),
-      ],
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: Container(
+      height: 48,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.line),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(child: Text(hint, style: const TextStyle(fontSize: 14))),
+          const Icon(LucideIcons.chevronDown, size: 17),
+        ],
+      ),
     ),
   );
 }
@@ -482,12 +699,7 @@ class _DashedBorderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     const radius = Radius.circular(14);
     final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(
-          Offset.zero & size,
-          radius,
-        ),
-      );
+      ..addRRect(RRect.fromRectAndRadius(Offset.zero & size, radius));
     final metric = path.computeMetrics().first;
     final paint = Paint()
       ..color = AppColors.line

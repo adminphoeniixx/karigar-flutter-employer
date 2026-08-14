@@ -1,22 +1,87 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/data.dart';
+import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key, required this.worker});
+  const ChatScreen({super.key, required this.worker, this.conversationId});
   final Worker worker;
+  final int? conversationId;
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
   final controller = TextEditingController();
-  final messages = <String>[
-    'Hello, are you available for plumbing work?',
-    'Yes sir, I can join tomorrow.',
-    'Great. Please reach the site by 9 AM.',
-  ];
+  final messages = <Map<String, dynamic>>[];
+  bool loading = false;
+  bool sending = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.conversationId != null && messages.isEmpty && !loading) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => loading = true);
+    try {
+      final response = await AppScope.of(
+        context,
+      ).api.conversation(widget.conversationId!);
+      final rows = response['messages'] as List? ?? const [];
+      if (!mounted) return;
+      setState(() {
+        messages
+          ..clear()
+          ..addAll(
+            rows.whereType<Map>().map(
+              (item) => Map<String, dynamic>.from(item),
+            ),
+          );
+      });
+      await AppScope.of(context).api.readConversation(widget.conversationId!);
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> _send([String? suggested]) async {
+    final body = (suggested ?? controller.text).trim();
+    if (body.isEmpty || sending) return;
+    if (widget.conversationId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Start the conversation from an applicant profile.'),
+        ),
+      );
+      return;
+    }
+    setState(() => sending = true);
+    try {
+      final response = await AppScope.of(
+        context,
+      ).api.sendMessage(widget.conversationId!, body);
+      final message = response['message'];
+      if (!mounted) return;
+      setState(() {
+        if (message is Map) {
+          messages.add(Map<String, dynamic>.from(message));
+        }
+        controller.clear();
+      });
+    } finally {
+      if (mounted) setState(() => sending = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -57,7 +122,8 @@ class _ChatScreenState extends State<ChatScreen> {
             padding: const EdgeInsets.all(14),
             itemCount: messages.length,
             itemBuilder: (_, i) {
-              final me = i.isEven;
+              final message = messages[i];
+              final me = message['sent_by_me'] == true;
               return Align(
                 alignment: me ? Alignment.centerRight : Alignment.centerLeft,
                 child: Container(
@@ -73,7 +139,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     border: me ? null : Border.all(color: AppColors.line),
                   ),
                   child: Text(
-                    messages[i],
+                    '${message['body'] ?? ''}',
                     style: TextStyle(
                       color: me ? Colors.white : AppColors.foreground,
                       fontSize: 14,
@@ -97,7 +163,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         padding: const EdgeInsets.only(right: 8),
                         child: ActionChip(
                           label: Text(e),
-                          onPressed: () => setState(() => messages.add(e)),
+                          onPressed: sending ? null : () => _send(e),
                         ),
                       ),
                     )
@@ -122,12 +188,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 const SizedBox(width: 8),
                 IconButton.filled(
-                  onPressed: () {
-                    if (controller.text.trim().isNotEmpty) {
-                      setState(() => messages.add(controller.text.trim()));
-                      controller.clear();
-                    }
-                  },
+                  onPressed: sending ? null : _send,
                   icon: const Icon(LucideIcons.send),
                 ),
               ],

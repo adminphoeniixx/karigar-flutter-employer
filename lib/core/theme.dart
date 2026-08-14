@@ -73,7 +73,10 @@ abstract final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(50),
+          // Keep the global button width finite so buttons remain valid inside
+          // Rows, dialog action bars, and list-card trailing areas. Parents
+          // that provide tight width constraints still render full-width.
+          minimumSize: const Size(64, 50),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(

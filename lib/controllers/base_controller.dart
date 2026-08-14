@@ -14,9 +14,19 @@ abstract class BaseController extends ChangeNotifier {
       return await action();
     } on ApiException catch (exception) {
       error = exception.message;
+      if (kDebugMode) {
+        debugPrint(
+          'API controller error: ${exception.message} '
+          '(status: ${exception.statusCode}, code: ${exception.code})',
+        );
+      }
       return null;
-    } catch (_) {
-      error = 'Kuch galat ho gaya. Dobara try karein.';
+    } catch (exception, stackTrace) {
+      error = 'Something went wrong. Please try again.';
+      if (kDebugMode) {
+        debugPrint('Unexpected controller error: $exception');
+        debugPrintStack(stackTrace: stackTrace);
+      }
       return null;
     } finally {
       loading = false;

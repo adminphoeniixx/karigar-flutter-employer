@@ -172,11 +172,13 @@ class LabeledField extends StatelessWidget {
     this.hint,
     this.lines = 1,
     this.keyboardType,
+    this.controller,
   });
   final String label;
   final String? hint;
   final int lines;
   final TextInputType? keyboardType;
+  final TextEditingController? controller;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 14),
@@ -189,6 +191,7 @@ class LabeledField extends StatelessWidget {
         ),
         const SizedBox(height: 7),
         TextField(
+          controller: controller,
           maxLines: lines,
           keyboardType: keyboardType,
           decoration: InputDecoration(hintText: hint),

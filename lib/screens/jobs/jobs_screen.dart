@@ -21,7 +21,11 @@ class _JobsScreenState extends State<JobsScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (controller.items.isEmpty && !controller.loading) {
-      controller.load();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && controller.items.isEmpty && !controller.loading) {
+          controller.load();
+        }
+      });
     }
   }
 

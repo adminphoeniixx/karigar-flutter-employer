@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/theme.dart';
@@ -17,7 +18,8 @@ class _OtpScreenState extends State<OtpScreen> {
   bool sent = false;
   bool loading = false;
   final phoneController = TextEditingController();
-  final otpControllers = List.generate(6, (_) => TextEditingController());
+  final otpControllers = List.generate(4, (_) => TextEditingController());
+  final otpFocusNodes = List.generate(4, (_) => FocusNode());
 
   @override
   void dispose() {
@@ -25,13 +27,16 @@ class _OtpScreenState extends State<OtpScreen> {
     for (final controller in otpControllers) {
       controller.dispose();
     }
+    for (final focusNode in otpFocusNodes) {
+      focusNode.dispose();
+    }
     super.dispose();
   }
 
   Future<void> _continue() async {
     final phone = phoneController.text.replaceAll(RegExp(r'\D'), '');
     if (phone.length != 10) {
-      _message('10 digit mobile number enter karein.');
+      _message('Enter a valid 10-digit mobile number.');
       return;
     }
     setState(() => loading = true);
@@ -43,18 +48,47 @@ class _OtpScreenState extends State<OtpScreen> {
         loading = false;
         if (success) sent = true;
       });
-      if (!success) _message(auth.error ?? 'OTP send nahi ho paaya.');
+      if (!success) _message(auth.error ?? 'Could not send the OTP.');
       return;
     }
     final otp = otpControllers.map((e) => e.text).join();
+    if (!RegExp(r'^\d{4}$').hasMatch(otp)) {
+      setState(() => loading = false);
+      _message('Enter the 4-digit OTP.');
+      return;
+    }
     final response = await auth.verifyOtp(phone, otp);
     if (!mounted) return;
     setState(() => loading = false);
     if (response == null) {
-      _message(auth.error ?? 'OTP verify nahi ho paaya.');
+      _message(auth.error ?? 'Could not verify the OTP.');
       return;
     }
-    final needsRegistration = response['needs_registration'] == true;
+    final user = response['user'];
+    final role = user is Map
+        ? user['role']?.toString().trim().toLowerCase()
+        : null;
+    if (role != null && role.isNotEmpty && role != 'employer') {
+      await auth.logout();
+      if (!mounted) return;
+      setState(() {
+        sent = false;
+        for (final controller in otpControllers) {
+          controller.clear();
+        }
+      });
+      _message(
+        'This number is already registered as a $role account. '
+        'Use a different number for the employer app.',
+      );
+      return;
+    }
+    final needsRegistration =
+        response['needs_registration'] == true ||
+        response['is_new'] == true ||
+        (user is Map &&
+            (user['company_name'] == null ||
+                user['company_name'].toString().trim().isEmpty));
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(
@@ -124,6 +158,7 @@ class _OtpScreenState extends State<OtpScreen> {
           _VerificationForm(
             phone: phoneController.text,
             controllers: otpControllers,
+            focusNodes: otpFocusNodes,
             onChange: () => setState(() => sent = false),
           ),
         const SizedBox(height: 12),
@@ -221,16 +256,18 @@ class _VerificationForm extends StatelessWidget {
     required this.onChange,
     required this.phone,
     required this.controllers,
+    required this.focusNodes,
   });
   final VoidCallback onChange;
   final String phone;
   final List<TextEditingController> controllers;
+  final List<FocusNode> focusNodes;
 
   @override
   Widget build(BuildContext context) => Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
-      const Text('Enter the 6-digit code sent to'),
+      const Text('Enter the 4-digit code sent to'),
       const SizedBox(height: 4),
       Row(
         children: [
@@ -253,24 +290,53 @@ class _VerificationForm extends StatelessWidget {
       Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: List.generate(
-          6,
-          (index) => SizedBox(
-            width: 48,
-            height: 54,
-            child: TextField(
-              controller: controllers[index],
-              onChanged: (value) {
-                if (value.isNotEmpty && index < controllers.length - 1) {
-                  FocusScope.of(context).nextFocus();
-                }
-              },
-              textAlign: TextAlign.center,
-              maxLength: 1,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-              decoration: const InputDecoration(
-                counterText: '',
-                contentPadding: EdgeInsets.zero,
+          4,
+          (index) => Focus(
+            onKeyEvent: (_, event) {
+              if (event is KeyDownEvent &&
+                  event.logicalKey == LogicalKeyboardKey.backspace &&
+                  controllers[index].text.isEmpty &&
+                  index > 0) {
+                controllers[index - 1].clear();
+                focusNodes[index - 1].requestFocus();
+                return KeyEventResult.handled;
+              }
+              return KeyEventResult.ignored;
+            },
+            child: SizedBox(
+              width: 58,
+              height: 54,
+              child: TextField(
+                controller: controllers[index],
+                focusNode: focusNodes[index],
+                onChanged: (value) {
+                  if (value.isNotEmpty && index < controllers.length - 1) {
+                    focusNodes[index + 1].requestFocus();
+                  } else if (value.isEmpty && index > 0) {
+                    focusNodes[index - 1].requestFocus();
+                  }
+                },
+                onTap: () {
+                  controllers[index].selection = TextSelection(
+                    baseOffset: 0,
+                    extentOffset: controllers[index].text.length,
+                  );
+                },
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                textAlign: TextAlign.center,
+                maxLength: 1,
+                keyboardType: TextInputType.number,
+                textInputAction: index == controllers.length - 1
+                    ? TextInputAction.done
+                    : TextInputAction.next,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                ),
+                decoration: const InputDecoration(
+                  counterText: '',
+                  contentPadding: EdgeInsets.zero,
+                ),
               ),
             ),
           ),

@@ -33,6 +33,9 @@ class EmployerApiService {
   Future<List<String>> cities(String state) async => asStrings(
     (await client.get(ApiConstants.cities, query: {'state': state}))['cities'],
   );
+  Future<List<String>> jobCategories() async => asStrings(
+    (await client.get(ApiConstants.jobCategories))['job_categories'],
+  );
 
   Future<DashboardData> dashboard() async =>
       DashboardData.fromJson(await client.get(ApiConstants.dashboard));
@@ -167,6 +170,13 @@ class EmployerApiService {
   Future<Json> readNotification(String id) =>
       client.post('/notifications/$id/read');
   Future<Json> readAllNotifications() => client.post('/notifications/read-all');
+  Future<Json> registerDeviceToken(String token, String platform) =>
+      client.post(
+        ApiConstants.deviceTokens,
+        body: {'token': token, 'platform': platform},
+      );
+  Future<Json> removeDeviceToken(String token) =>
+      client.delete(ApiConstants.deviceTokens, body: {'token': token});
   Future<Json> reviews({int page = 1}) =>
       client.get('/employer/reviews', query: {'page': page});
 
