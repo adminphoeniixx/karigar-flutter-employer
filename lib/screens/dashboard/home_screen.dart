@@ -396,7 +396,7 @@ class _PostJobBanner extends StatelessWidget {
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [AppColors.primary, AppColors.brandDark],
+        colors: [AppColors.primary, AppColors.gradientEnd],
       ),
       borderRadius: BorderRadius.circular(16),
     ),
@@ -474,7 +474,7 @@ class _StatCard extends StatelessWidget {
     constraints: const BoxConstraints(minHeight: 120),
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: AppColors.card,
       border: Border.all(color: AppColors.line),
       borderRadius: BorderRadius.circular(16),
       boxShadow: const [

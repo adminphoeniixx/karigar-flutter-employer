@@ -419,7 +419,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 height: 96,
                 width: double.infinity,
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.card,
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: const Column(
@@ -507,7 +507,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   Widget _bottomBar() => Container(
     padding: const EdgeInsets.fromLTRB(16, 11, 16, 20),
     decoration: const BoxDecoration(
-      color: Colors.white,
+      color: AppColors.card,
       border: Border(top: BorderSide(color: AppColors.line)),
     ),
     child: step == 4
@@ -629,7 +629,7 @@ class _SelectBox extends StatelessWidget {
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         border: Border.all(color: AppColors.line),
         borderRadius: BorderRadius.circular(12),
       ),

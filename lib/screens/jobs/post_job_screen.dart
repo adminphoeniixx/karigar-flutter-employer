@@ -393,7 +393,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
         Container(
           padding: const EdgeInsets.fromLTRB(16, 11, 16, 20),
           decoration: const BoxDecoration(
-            color: Colors.white,
+            color: AppColors.card,
             border: Border(top: BorderSide(color: AppColors.line)),
           ),
           child: Row(
@@ -570,7 +570,7 @@ class _Select extends StatelessWidget {
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 13),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         border: Border.all(color: AppColors.line),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -631,7 +631,7 @@ class _Choice extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
       decoration: BoxDecoration(
-        color: selected ? AppColors.brand50 : Colors.white,
+        color: selected ? AppColors.brand50 : AppColors.card,
         border: Border.all(
           color: selected ? AppColors.brand100 : AppColors.line,
         ),

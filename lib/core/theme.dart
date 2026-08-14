@@ -2,24 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 abstract final class AppColors {
-  static const primary = Color(0xFFF4470F);
-  static const brandDark = Color(0xFFC93A06);
-  static const brand50 = Color(0xFFFFF3EE);
-  static const brand100 = Color(0xFFFFE3D8);
-  static const brand200 = Color(0xFFFFC5B0);
-  static const background = Color(0xFFF6F7F9);
-  static const card = Colors.white;
-  static const line = Color(0xFFE9EBEF);
-  static const line2 = Color(0xFFF0F1F4);
-  static const foreground = Color(0xFF16181D);
-  static const muted = Color(0xFF6B7280);
-  static const muted2 = Color(0xFF9AA1AD);
-  static const green = Color(0xFF047857);
-  static const greenBg = Color(0xFFECFDF5);
-  static const amber = Color(0xFFB45309);
-  static const amberBg = Color(0xFFFFF7ED);
-  static const indigo = Color(0xFF4F46E5);
-  static const indigoBg = Color(0xFFEEF2FF);
+  static const primary = Color(0xFFBF3A16);
+  static const gradientEnd = Color(0xFFC93A06);
+  static const brandDark = Color(0xFF9E2F12);
+  static const brand50 = Color(0xFFFDF3EE);
+  static const brand100 = Color(0xFFFAE2D6);
+  static const brand200 = Color(0xFFF4C3AD);
+  static const brand400 = Color(0xFFE06C48);
+  static const background = Color(0xFFF4EFE7);
+  static const card = Color(0xFFFBF8F3);
+  static const line = Color(0xFFE3DBD0);
+  static const line2 = Color(0xFFECE5DA);
+  static const foreground = Color(0xFF1E1712);
+  static const muted = Color(0xFF6B5F55);
+  static const muted2 = Color(0xFF9C8D80);
+  static const green = Color(0xFF3F5C3A);
+  static const greenBg = Color(0xFFEEF4EC);
+  static const amber = Color(0xFF9A6413);
+  static const amberBg = Color(0xFFFDF3E3);
+  static const indigo = Color(0xFF7A6326);
+  static const indigoBg = Color(0xFFF2EFE6);
+  static const rose = Color(0xFFB3261E);
+  static const roseBg = Color(0xFFFDECEB);
 }
 
 abstract final class AppTheme {
@@ -68,7 +72,7 @@ abstract final class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary),
+          borderSide: const BorderSide(color: AppColors.brand400),
         ),
       ),
       filledButtonTheme: FilledButtonThemeData(
@@ -107,7 +111,8 @@ abstract final class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: AppColors.card,
-        elevation: 0,
+        elevation: 2,
+        shadowColor: const Color(0x1F1E1712),
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),

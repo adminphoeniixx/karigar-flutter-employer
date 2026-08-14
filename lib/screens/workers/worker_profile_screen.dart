@@ -25,7 +25,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
             padding: const EdgeInsets.all(20),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [AppColors.primary, AppColors.brandDark],
+                colors: [AppColors.primary, AppColors.gradientEnd],
               ),
             ),
             child: Column(

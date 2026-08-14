@@ -132,7 +132,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
       body: Column(
         children: [
           Container(
-            color: Colors.white,
+            color: AppColors.card,
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
             child: Column(
               children: [
@@ -326,9 +326,7 @@ class _WorkerResultCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Wrap(
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        runSpacing: 4,
+                      Row(
                         children: [
                           Flexible(
                             child: Text(
@@ -355,7 +353,9 @@ class _WorkerResultCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        runSpacing: 4,
                         children: [
                           const Icon(
                             LucideIcons.mapPin,
@@ -455,7 +455,7 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
     heightFactor: .88,
     child: Container(
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       child: Column(
@@ -562,7 +562,7 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
                             decoration: BoxDecoration(
                               color: selected
                                   ? AppColors.brand50
-                                  : Colors.white,
+                                  : AppColors.card,
                               border: Border.all(
                                 color: selected
                                     ? AppColors.brand200
@@ -621,7 +621,7 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
           Container(
             padding: const EdgeInsets.fromLTRB(18, 11, 18, 20),
             decoration: const BoxDecoration(
-              color: Colors.white,
+              color: AppColors.card,
               border: Border(top: BorderSide(color: AppColors.line)),
             ),
             child: Row(
@@ -742,7 +742,7 @@ class _FilterSelect extends StatelessWidget {
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         border: Border.all(color: AppColors.line),
         borderRadius: BorderRadius.circular(12),
       ),

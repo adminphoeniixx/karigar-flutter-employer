@@ -157,7 +157,7 @@ class _MapButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white,
+      color: AppColors.card,
       elevation: 2,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(

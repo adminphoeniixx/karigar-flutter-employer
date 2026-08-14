@@ -144,7 +144,7 @@ class _Notification extends StatelessWidget {
   Widget build(BuildContext context) => InkWell(
     onTap: onTap,
     child: Container(
-      color: unread ? AppColors.brand50 : Colors.white,
+      color: unread ? AppColors.brand50 : AppColors.card,
       padding: const EdgeInsets.all(16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,7 +153,7 @@ class _Notification extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.card,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.line),
             ),

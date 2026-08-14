@@ -61,7 +61,7 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
     workers: workers,
     profile: profile,
     child: MaterialApp(
-      title: 'Karigar Employer',
+      title: 'Super Karigar Employer',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       builder: (context, child) => MediaQuery.withClampedTextScaling(

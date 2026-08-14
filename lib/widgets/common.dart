@@ -51,6 +51,7 @@ class StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final positive = ['Active', 'Hired', 'Accepted', 'Verified'].contains(text);
     final shortlisted = text == 'Shortlisted';
+    final rejected = text == 'Rejected' || text == 'Closed';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
@@ -58,6 +59,8 @@ class StatusPill extends StatelessWidget {
             ? AppColors.greenBg
             : shortlisted
             ? AppColors.indigoBg
+            : rejected
+            ? AppColors.roseBg
             : AppColors.amberBg,
         borderRadius: BorderRadius.circular(20),
       ),
@@ -70,6 +73,8 @@ class StatusPill extends StatelessWidget {
               ? AppColors.green
               : shortlisted
               ? AppColors.indigo
+              : rejected
+              ? AppColors.rose
               : AppColors.amber,
         ),
       ),

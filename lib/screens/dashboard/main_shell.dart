@@ -61,7 +61,7 @@ class _BottomNav extends StatelessWidget {
     child: Container(
       height: 78,
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         border: Border(top: BorderSide(color: AppColors.line)),
       ),
       child: Row(

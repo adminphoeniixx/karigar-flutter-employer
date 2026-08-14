@@ -145,7 +145,7 @@ class _BusinessHeader extends StatelessWidget {
       gradient: LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [AppColors.primary, AppColors.brandDark],
+        colors: [AppColors.primary, AppColors.gradientEnd],
       ),
     ),
     child: const Row(
@@ -260,7 +260,7 @@ class _ProfileRow extends StatelessWidget {
       height: 69,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         border: Border(bottom: BorderSide(color: AppColors.line2)),
       ),
       child: Row(

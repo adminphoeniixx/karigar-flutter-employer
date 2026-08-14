@@ -178,7 +178,7 @@ class _ChatScreenState extends State<ChatScreen> {
           top: false,
           child: Container(
             padding: const EdgeInsets.all(10),
-            color: Colors.white,
+            color: AppColors.card,
             child: Row(
               children: [
                 Expanded(

@@ -221,7 +221,7 @@ class _PlansScreenState extends State<PlansScreen> {
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
-                      colors: [AppColors.primary, AppColors.brandDark],
+                      colors: [AppColors.primary, AppColors.gradientEnd],
                     ),
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -350,7 +350,7 @@ class _Plan extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: plan['is_current'] == true

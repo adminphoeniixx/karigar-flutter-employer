@@ -127,7 +127,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
-              backgroundColor: Colors.white,
+              backgroundColor: AppColors.card,
               foregroundColor: const Color(0xFFE11D48),
               side: const BorderSide(color: Color(0xFFFFE4E6)),
               shape: RoundedRectangleBorder(
@@ -152,7 +152,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _showLanguageSheet() async {
     final selected = await showModalBottomSheet<String>(
       context: context,
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.card,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -263,7 +263,7 @@ class _SettingsRow extends StatelessWidget {
       constraints: const BoxConstraints(minHeight: 69),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: const BoxDecoration(
-        color: Colors.white,
+        color: AppColors.card,
         border: Border(bottom: BorderSide(color: AppColors.line2)),
       ),
       child: Row(

@@ -222,7 +222,7 @@ class _PhoneForm extends StatelessWidget {
         height: 58,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.card,
           border: Border.all(color: AppColors.line),
           borderRadius: BorderRadius.circular(12),
         ),
