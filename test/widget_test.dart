@@ -11,7 +11,11 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const KarigarEmployerApp());
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Super Karigar Employer'), findsOneWidget);
+    expect(find.text('Kaam. Hunar. Bharosa.'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 1500));
 
     expect(find.text('Hire skilled\nworkers, fast.'), findsOneWidget);
     expect(find.text('Get Started'), findsOneWidget);

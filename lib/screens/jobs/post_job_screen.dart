@@ -22,6 +22,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
   String? state;
   String? city;
   bool loading = false;
+  bool suggesting = false;
   bool _referenceLoaded = false;
   List<String> categories = const [];
   List<String> skills = const [
@@ -136,7 +137,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
       'category': category,
       'skills': selectedSkills.toList(),
       'wage_min': wageMin,
-      if (wageMax != null) 'wage_max': wageMax,
+      'wage_max': ?wageMax,
       'wage_type': wageType,
       'city': city,
       'state': state,
@@ -157,6 +158,68 @@ class _PostJobScreenState extends State<PostJobScreen> {
       return;
     }
     Navigator.pop(context, true);
+  }
+
+  Future<void> _suggestDescription() async {
+    final title = titleController.text.trim();
+    if (title.length < 3) {
+      _message('Enter a job title first.');
+      return;
+    }
+    setState(() => suggesting = true);
+    try {
+      final suggestions = await AppScope.of(context).api.suggestJobDescription(
+        title: title,
+        category: category,
+        city: city,
+        state: state,
+        skills: selectedSkills.toList(),
+      );
+      if (!mounted) return;
+      if (suggestions.isEmpty) {
+        _message('No description suggestion is available right now.');
+        return;
+      }
+      final selected = suggestions.length == 1
+          ? suggestions.first
+          : await showModalBottomSheet<String>(
+              context: context,
+              showDragHandle: true,
+              builder: (context) => SafeArea(
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                  children: [
+                    const Text(
+                      'Choose a description',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    ...suggestions.map(
+                      (suggestion) => Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          title: Text(suggestion),
+                          trailing: const Icon(LucideIcons.chevronRight),
+                          onTap: () => Navigator.pop(context, suggestion),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+      if (selected != null) {
+        descriptionController.text = selected;
+      }
+    } catch (exception) {
+      if (mounted) _message('$exception');
+    } finally {
+      if (mounted) setState(() => suggesting = false);
+    }
   }
 
   void _message(String text) =>
@@ -320,7 +383,23 @@ class _PostJobScreenState extends State<PostJobScreen> {
               const _Label('Perks & benefits'),
               _chips(perks, selectedPerks, multi: true),
               const SizedBox(height: 14),
-              const _Label('Job description'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const _Label('Job description'),
+                  TextButton.icon(
+                    onPressed: suggesting ? null : _suggestDescription,
+                    icon: suggesting
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(LucideIcons.sparkles, size: 16),
+                    label: const Text('Suggest with AI'),
+                  ),
+                ],
+              ),
               _Input(
                 hint:
                     'Describe the work, site details, duration, tools provided…',

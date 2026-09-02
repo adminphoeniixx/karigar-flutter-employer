@@ -136,7 +136,7 @@ class _MessagesScreenState extends State<MessagesScreen> {
                               ),
                             ),
                           );
-                          _load();
+                          if (mounted) _load();
                         },
                       );
                     }).toList(),

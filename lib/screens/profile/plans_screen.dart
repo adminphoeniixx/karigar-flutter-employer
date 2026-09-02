@@ -5,6 +5,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
+import 'package:employer_kariger_app/screens/profile/invoice_screen.dart';
 
 class PlansScreen extends StatefulWidget {
   const PlansScreen({super.key});
@@ -20,6 +21,7 @@ class _PlansScreenState extends State<PlansScreen> {
   Map<String, dynamic> credits = const {};
   List<Map<String, dynamic>> plans = const [];
   List<Map<String, dynamic>> packs = const [];
+  List<Map<String, dynamic>> invoices = const [];
   String? pendingSubscriptionId;
   String? pendingOrderId;
 
@@ -72,6 +74,7 @@ class _PlansScreenState extends State<PlansScreen> {
             : {};
         plans = _maps(response['plans']);
         packs = _maps(response['credit_packs']);
+        invoices = _maps(response['invoices']);
       });
     } catch (exception) {
       if (mounted) setState(() => error = '$exception');
@@ -321,6 +324,35 @@ class _PlansScreenState extends State<PlansScreen> {
                           ],
                         ),
                       ),
+                    ),
+                  ),
+                ],
+                if (invoices.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Invoices',
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 10),
+                  ...invoices.map(
+                    (invoice) => ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(LucideIcons.receiptText),
+                      title: Text('${invoice['invoice_number'] ?? 'Invoice'}'),
+                      subtitle: Text(
+                        '${invoice['plan'] ?? ''} · ${invoice['date'] ?? ''}',
+                      ),
+                      trailing: Text('₹${invoice['total'] ?? 0}'),
+                      onTap: () {
+                        final id = (invoice['id'] as num?)?.toInt();
+                        if (id == null) return;
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => InvoiceScreen(subscriptionId: id),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],

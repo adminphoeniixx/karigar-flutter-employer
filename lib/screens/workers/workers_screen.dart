@@ -83,6 +83,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
     final visible = controller.items
         .map(
           (item) => _WorkerView(
+            profileId: item.id,
             worker: Worker(
               item.name,
               item.skills.isEmpty ? 'Worker' : item.skills.first,
@@ -240,8 +241,10 @@ class _WorkersScreenState extends State<WorkersScreen> {
                       onTap: () => Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) =>
-                              WorkerProfileScreen(worker: item.worker),
+                          builder: (_) => WorkerProfileScreen(
+                            worker: item.worker,
+                            profileId: item.profileId,
+                          ),
                         ),
                       ),
                     ),
@@ -272,6 +275,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
 
 class _WorkerView {
   const _WorkerView({
+    required this.profileId,
     required this.worker,
     required this.name,
     required this.experience,
@@ -283,6 +287,7 @@ class _WorkerView {
   });
 
   final Worker worker;
+  final int profileId;
   final String name;
   final int experience;
   final double rating;

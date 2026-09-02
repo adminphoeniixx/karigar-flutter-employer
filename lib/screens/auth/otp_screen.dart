@@ -21,6 +21,26 @@ class _OtpScreenState extends State<OtpScreen> {
   final otpControllers = List.generate(4, (_) => TextEditingController());
   final otpFocusNodes = List.generate(4, (_) => FocusNode());
 
+  void _focusFirstOtpField() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !sent) return;
+      otpFocusNodes.first.requestFocus();
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+    });
+  }
+
+  void _handleBack() {
+    if (!sent) {
+      Navigator.maybePop(context);
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    for (final controller in otpControllers) {
+      controller.clear();
+    }
+    setState(() => sent = false);
+  }
+
   @override
   void dispose() {
     phoneController.dispose();
@@ -48,6 +68,7 @@ class _OtpScreenState extends State<OtpScreen> {
         loading = false;
         if (success) sent = true;
       });
+      if (success) _focusFirstOtpField();
       if (!success) _message(auth.error ?? 'Could not send the OTP.');
       return;
     }
@@ -104,102 +125,111 @@ class _OtpScreenState extends State<OtpScreen> {
   ).showSnackBar(SnackBar(content: Text(value)));
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      backgroundColor: Colors.transparent,
-      shape: const Border(),
-      leading: IconButton(
-        onPressed: () => Navigator.maybePop(context),
-        icon: const Icon(LucideIcons.arrowLeft),
-      ),
-    ),
-    body: LayoutBuilder(
-      builder: (context, constraints) => ListView(
-        padding: EdgeInsets.fromLTRB(
-          constraints.maxWidth < 360 ? 12 : 16,
-          8,
-          constraints.maxWidth < 360 ? 12 : 16,
-          24,
+  Widget build(BuildContext context) => PopScope(
+    canPop: !sent,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _handleBack();
+    },
+    child: Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        shape: const Border(),
+        leading: IconButton(
+          onPressed: _handleBack,
+          icon: const Icon(LucideIcons.arrowLeft),
         ),
-        children: [
-          Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 520),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppColors.brand50,
-                            borderRadius: BorderRadius.circular(16),
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) => ListView(
+          padding: EdgeInsets.fromLTRB(
+            constraints.maxWidth < 360 ? 12 : 16,
+            8,
+            constraints.maxWidth < 360 ? 12 : 16,
+            24,
+          ),
+          children: [
+            Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 520),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: AppColors.brand50,
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: const Icon(
+                              LucideIcons.smartphone,
+                              size: 28,
+                              color: AppColors.primary,
+                            ),
                           ),
-                          child: const Icon(
-                            LucideIcons.smartphone,
-                            size: 28,
-                            color: AppColors.primary,
+                          const SizedBox(height: 16),
+                          Text(
+                            'Login with Mobile',
+                            style: const TextStyle(
+                              fontSize: 26,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -.5,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Login with Mobile',
-                          style: const TextStyle(
-                            fontSize: 26,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: -.5,
+                          const SizedBox(height: 6),
+                          Text(
+                            "Employer · We'll send you a one-time code",
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 15,
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          "Employer · We'll send you a one-time code",
-                          style: const TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 15,
-                          ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  if (!sent)
-                    _PhoneForm(controller: phoneController)
-                  else
-                    _VerificationForm(
-                      phone: phoneController.text,
-                      controllers: otpControllers,
-                      focusNodes: otpFocusNodes,
-                      onChange: () => setState(() => sent = false),
+                    const SizedBox(height: 24),
+                    if (!sent)
+                      _PhoneForm(controller: phoneController)
+                    else
+                      _VerificationForm(
+                        phone: phoneController.text,
+                        controllers: otpControllers,
+                        focusNodes: otpFocusNodes,
+                        onChange: () => setState(() => sent = false),
+                      ),
+                    const SizedBox(height: 12),
+                    FilledButton(
+                      onPressed: loading ? null : _continue,
+                      child: loading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text(sent ? 'Verify & Continue' : 'Send OTP'),
                     ),
-                  const SizedBox(height: 12),
-                  FilledButton(
-                    onPressed: loading ? null : _continue,
-                    child: loading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(sent ? 'Verify & Continue' : 'Send OTP'),
-                  ),
-                  if (sent) ...[
-                    const SizedBox(height: 16),
-                    const Text(
-                      'By continuing you agree to our Terms & Privacy Policy.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.muted, fontSize: 11.5),
-                    ),
+                    if (sent) ...[
+                      const SizedBox(height: 16),
+                      const Text(
+                        'By continuing you agree to our Terms & Privacy Policy.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     ),
   );
@@ -246,6 +276,7 @@ class _PhoneForm extends StatelessWidget {
             Expanded(
               child: TextField(
                 controller: controller,
+                autofocus: true,
                 keyboardType: TextInputType.phone,
                 maxLength: 10,
                 decoration: InputDecoration(
@@ -330,6 +361,7 @@ class _VerificationForm extends StatelessWidget {
                   child: TextField(
                     controller: controllers[index],
                     focusNode: focusNodes[index],
+                    autofocus: index == 0,
                     onChanged: (value) {
                       if (value.isNotEmpty && index < controllers.length - 1) {
                         focusNodes[index + 1].requestFocus();

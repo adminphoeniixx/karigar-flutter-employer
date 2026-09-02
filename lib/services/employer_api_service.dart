@@ -8,6 +8,10 @@ class EmployerApiService {
   const EmployerApiService(this.client);
   final ApiClient client;
 
+  Json _data(Json response) => response['data'] is Map
+      ? Map<String, dynamic>.from(response['data'] as Map)
+      : const {};
+
   Future<Json> sendOtp(String phone) =>
       client.post(ApiConstants.otpSend, body: {'phone': phone});
 
@@ -41,10 +45,10 @@ class EmployerApiService {
       DashboardData.fromJson(await client.get(ApiConstants.dashboard));
 
   Future<EmployerProfile> profile() async =>
-      EmployerProfile.fromJson(await client.get(ApiConstants.profile));
+      EmployerProfile.fromJson(_data(await client.get(ApiConstants.profile)));
   Future<EmployerProfile> updateProfile(Json values) async =>
       EmployerProfile.fromJson(
-        await client.put(ApiConstants.profile, body: values),
+        _data(await client.put(ApiConstants.profile, body: values)),
       );
   Future<String> uploadLogo(File logo) async =>
       '${(await client.multipart(ApiConstants.profileLogo, fields: {}, files: {'logo': logo}))['logo_url']}';
@@ -66,7 +70,25 @@ class EmployerApiService {
   }
 
   Future<EmployerJob> job(int id) async =>
-      EmployerJob.fromJson(await client.get(ApiConstants.job(id)));
+      EmployerJob.fromJson(_data(await client.get(ApiConstants.job(id))));
+  Future<List<String>> suggestJobDescription({
+    required String title,
+    String? category,
+    String? city,
+    String? state,
+    List<String> skills = const [],
+  }) async => asStrings(
+    (await client.get(
+      ApiConstants.suggestJobDescription,
+      query: {
+        'title': title,
+        'category': category,
+        'city': city,
+        'state': state,
+        'skills': skills,
+      },
+    ))['suggestions'],
+  );
   Future<EmployerJob> createJob(Json values) async {
     final response = await client.post(ApiConstants.jobs, body: values);
     return EmployerJob.fromJson(
@@ -89,7 +111,7 @@ class EmployerApiService {
   Future<Json> invite(int jobId, int workerId, {String? message}) =>
       client.post(
         '/employer/jobs/$jobId/invite',
-        body: {'worker_id': workerId, if (message != null) 'message': message},
+        body: {'worker_id': workerId, 'message': ?message},
       );
   Future<Json> rescore(int jobId, {bool force = false}) => client.post(
     '/employer/jobs/$jobId/rescore',
@@ -106,7 +128,9 @@ class EmployerApiService {
     query: {'stage': stage, 'sort': sort, 'page': page},
   );
   Future<Applicant> applicant(int id) async =>
-      Applicant.fromJson(await client.get('/employer/applicants/$id'));
+      Applicant.fromJson(_data(await client.get(ApiConstants.applicant(id))));
+  Future<Json> shortlisted({int page = 1}) =>
+      client.get(ApiConstants.shortlisted, query: {'page': page});
   Future<Json> applicantStatus(
     int id,
     String status, {
@@ -117,9 +141,9 @@ class EmployerApiService {
     '/employer/applicants/$id/status',
     body: {
       'status': status,
-      if (offeredWage != null) 'offered_wage': offeredWage,
-      if (startDate != null) 'start_date': startDate,
-      if (message != null) 'message': message,
+      'offered_wage': ?offeredWage,
+      'start_date': ?startDate,
+      'message': ?message,
     },
   );
   Future<Json> shortlist(int id) =>
@@ -132,18 +156,31 @@ class EmployerApiService {
     String? note,
   }) => client.post(
     '/employer/applicants/$id/interview',
-    body: {
-      'interview_at': interviewAt,
-      'mode': mode,
-      if (note != null) 'note': note,
-    },
+    body: {'interview_at': interviewAt, 'mode': mode, 'note': ?note},
   );
   Future<Json> cancelInterview(int id) =>
-      client.delete('/employer/applicants/$id/interview');
+      client.delete(ApiConstants.applicantInterview(id));
+  Future<BinaryResponse> applicantResume(int id) =>
+      client.download(ApiConstants.applicantResume(id));
+  Future<Json> screeningCalls(int applicantId, {bool transcript = false}) =>
+      client.get(
+        ApiConstants.applicantScreeningCalls(applicantId),
+        query: {'with_transcript': transcript ? 1 : null},
+      );
+  Future<Json> placeScreeningCall(int applicantId) =>
+      client.post(ApiConstants.applicantScreeningCalls(applicantId));
+  Future<Json> confirmScreeningCall(
+    int callId, {
+    String? interviewAt,
+    String? mode,
+  }) => client.post(
+    ApiConstants.confirmScreeningCall(callId),
+    body: {'interview_at': ?interviewAt, 'mode': ?mode},
+  );
   Future<Json> reviewWorker(int id, int rating, {String? comment}) =>
       client.post(
         '/employer/applicants/$id/review',
-        body: {'rating': rating, if (comment != null) 'comment': comment},
+        body: {'rating': rating, 'comment': ?comment},
       );
 
   Future<Json> workers(Map<String, dynamic> filters) =>
@@ -159,10 +196,7 @@ class EmployerApiService {
   }) => client.multipart(
     '/employer/kyc',
     fields: {'gstin': gstin, 'pan_number': pan},
-    files: {
-      if (gstDoc != null) 'gst_doc': gstDoc,
-      if (panDoc != null) 'pan_doc': panDoc,
-    },
+    files: {'gst_doc': ?gstDoc, 'pan_doc': ?panDoc},
   );
 
   Future<Json> notifications({int page = 1}) =>
@@ -201,11 +235,7 @@ class EmployerApiService {
     String? body,
   }) => client.post(
     '/conversations',
-    body: {
-      'worker_id': workerId,
-      if (jobId != null) 'job_id': jobId,
-      if (body != null) 'body': body,
-    },
+    body: {'worker_id': workerId, 'job_id': ?jobId, 'body': ?body},
   );
   Future<Json> conversation(int id, {int page = 1}) =>
       client.get('/conversations/$id', query: {'page': page});
@@ -217,7 +247,7 @@ class EmployerApiService {
   Future<Json> plans() => client.get('/employer/plans');
   Future<Json> subscribe(int planId, {String? coupon}) => client.post(
     '/employer/plans/$planId/subscribe',
-    body: {if (coupon != null) 'coupon': coupon},
+    body: {'coupon': ?coupon},
   );
   Future<Json> subscriptionCallback(Json payment) =>
       client.post('/employer/plans/callback', body: payment);
@@ -225,6 +255,8 @@ class EmployerApiService {
       client.post('/employer/credits/top-up', body: {'pack': pack});
   Future<Json> topUpCallback(Json payment) =>
       client.post('/employer/credits/callback', body: payment);
+  Future<Json> invoice(int subscriptionId) =>
+      client.get(ApiConstants.invoice(subscriptionId));
 
   Future<Json> preferences() => client.get('/preferences');
   Future<Json> updatePreferences(Json values) =>

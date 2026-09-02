@@ -15,7 +15,7 @@ class RegistrationScreen extends StatefulWidget {
 
 class _RegistrationScreenState extends State<RegistrationScreen> {
   int step = 0;
-  String hiringAs = 'Business / Company';
+  String hiringAs = 'business';
   String companySize = '11\u201350';
   final selectedTrades = <String>{};
   final nameController = TextEditingController();
@@ -32,6 +32,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   List<String> states = const [];
   List<String> cities = const [];
   List<String> availableTrades = trades;
+  List<String> hiringAsOptions = const ['business', 'contractor', 'individual'];
+  List<String> companySizes = const [
+    '1\u201310',
+    '11\u201350',
+    '51\u2013200',
+    '200+',
+  ];
+
+  String _hiringAsLabel(String value) => switch (value) {
+    'business' => 'Business / Company',
+    'contractor' => 'Contractor',
+    'individual' => 'Individual / Household',
+    _ => value,
+  };
 
   static const trades = [
     'Plumbing',
@@ -83,6 +97,24 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               .where((e) => e.isNotEmpty),
         );
         if (skills.isNotEmpty) availableTrades = skills;
+        final remoteHiringAs = List<String>.from(
+          (response['hiring_as'] as List? ?? const []).map((e) => '$e'),
+        );
+        final remoteCompanySizes = List<String>.from(
+          (response['company_sizes'] as List? ?? const []).map((e) => '$e'),
+        );
+        if (remoteHiringAs.isNotEmpty) {
+          hiringAsOptions = remoteHiringAs;
+          if (!hiringAsOptions.contains(hiringAs)) {
+            hiringAs = hiringAsOptions.first;
+          }
+        }
+        if (remoteCompanySizes.isNotEmpty) {
+          companySizes = remoteCompanySizes;
+          if (!companySizes.contains(companySize)) {
+            companySize = companySizes.first;
+          }
+        }
       });
     } catch (_) {
       // The form remains usable with its bundled fallback choices.
@@ -148,11 +180,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     final success = await AppScope.of(context).profile.save({
       'name': nameController.text.trim(),
       'company_name': companyController.text.trim(),
-      'hiring_as': {
-        'Business / Company': 'business',
-        'Contractor': 'contractor',
-        'Individual / Household': 'individual',
-      }[hiringAs],
+      'hiring_as': hiringAs,
       'industry': industry,
       'company_size': companySize,
       'hiring_categories': selectedTrades.toList(),
@@ -192,46 +220,52 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      leading: step == 0
-          ? const SizedBox.shrink()
-          : IconButton(
-              onPressed: _back,
-              icon: const Icon(LucideIcons.arrowLeft),
+  Widget build(BuildContext context) => PopScope(
+    canPop: step == 0,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) _back();
+    },
+    child: Scaffold(
+      appBar: AppBar(
+        leading: step == 0
+            ? const SizedBox.shrink()
+            : IconButton(
+                onPressed: _back,
+                icon: const Icon(LucideIcons.arrowLeft),
+              ),
+        leadingWidth: 44,
+        title: const Text('Set up your business'),
+        actions: [
+          Center(
+            child: Text(
+              '${step + 1}/5',
+              style: const TextStyle(fontSize: 12, color: AppColors.muted),
             ),
-      leadingWidth: 44,
-      title: const Text('Set up your business'),
-      actions: [
-        Center(
-          child: Text(
-            '${step + 1}/5',
-            style: const TextStyle(fontSize: 12, color: AppColors.muted),
           ),
-        ),
-        const SizedBox(width: 16),
-      ],
-      bottom: PreferredSize(
-        preferredSize: const Size.fromHeight(4),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: FractionallySizedBox(
-            widthFactor: (step + 1) / 5,
-            child: Container(height: 4, color: AppColors.primary),
+          const SizedBox(width: 16),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(4),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: (step + 1) / 5,
+              child: Container(height: 4, color: AppColors.primary),
+            ),
           ),
         ),
       ),
-    ),
-    body: Column(
-      children: [
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 24, 16, 28),
-            children: [_stepContent()],
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 28),
+              children: [_stepContent()],
+            ),
           ),
-        ),
-        _bottomBar(),
-      ],
+          _bottomBar(),
+        ],
+      ),
     ),
   );
 
@@ -249,16 +283,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children:
-                  ['Business / Company', 'Contractor', 'Individual / Household']
-                      .map(
-                        (item) => _SelectChip(
-                          text: item,
-                          selected: hiringAs == item,
-                          onTap: () => setState(() => hiringAs = item),
-                        ),
-                      )
-                      .toList(),
+              children: hiringAsOptions
+                  .map(
+                    (item) => _SelectChip(
+                      text: _hiringAsLabel(item),
+                      selected: hiringAs == item,
+                      onTap: () => setState(() => hiringAs = item),
+                    ),
+                  )
+                  .toList(),
             ),
           ],
         );
@@ -287,7 +320,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: ['1\u201310', '11\u201350', '51\u2013200', '200+']
+              children: companySizes
                   .map(
                     (item) => _SelectChip(
                       text: item,
@@ -486,7 +519,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
             ),
           ),
-          if (titleTrailing != null) titleTrailing,
+          ?titleTrailing,
         ],
       ),
       const SizedBox(height: 7),

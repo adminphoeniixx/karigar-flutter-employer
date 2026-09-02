@@ -98,6 +98,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Future<void> _pickLogo() async {
+    final api = AppScope.of(context).api;
     final result = await FilePicker.pickFiles(
       type: FileType.image,
       allowMultiple: false,
@@ -115,7 +116,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
     setState(() => uploadingLogo = true);
     try {
-      await AppScope.of(context).api.uploadLogo(file);
+      await api.uploadLogo(file);
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,

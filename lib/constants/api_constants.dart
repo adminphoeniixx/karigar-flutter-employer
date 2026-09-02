@@ -17,7 +17,10 @@ class ApiConstants {
   static const profile = '/employer/profile';
   static const profileLogo = '/employer/profile/logo';
   static const jobs = '/employer/jobs';
+  static const suggestJobDescription = '/employer/jobs/suggest-description';
   static const applicants = '/employer/applicants';
+  static const shortlisted = '/employer/shortlisted';
+  static const screeningCalls = '/employer/screening-calls';
   static const workers = '/employer/workers';
   static const kyc = '/employer/kyc';
   static const notifications = '/notifications';
@@ -30,6 +33,7 @@ class ApiConstants {
   static const plansCallback = '/employer/plans/callback';
   static const creditsTopUp = '/employer/credits/top-up';
   static const creditsCallback = '/employer/credits/callback';
+  static const invoices = '/employer/invoices';
   static const preferences = '/preferences';
   static const sessions = '/auth/sessions';
 
@@ -46,6 +50,10 @@ class ApiConstants {
   static String applicantUnlock(int id) => '${applicant(id)}/unlock';
   static String applicantReview(int id) => '${applicant(id)}/review';
   static String applicantInterview(int id) => '${applicant(id)}/interview';
+  static String applicantResume(int id) => '${applicant(id)}/resume';
+  static String applicantScreeningCalls(int id) =>
+      '${applicant(id)}/screening-calls';
+  static String confirmScreeningCall(int id) => '$screeningCalls/$id/confirm';
   static String worker(int id) => '$workers/$id';
   static String notificationRead(String id) => '$notifications/$id/read';
   static String teamMember(int id) => '$team/$id';
@@ -53,5 +61,6 @@ class ApiConstants {
   static String conversationMessages(int id) => '${conversation(id)}/messages';
   static String conversationRead(int id) => '${conversation(id)}/read';
   static String subscribePlan(int id) => '$plans/$id/subscribe';
+  static String invoice(int subscriptionId) => '$invoices/$subscriptionId';
   static String session(int id) => '$sessions/$id';
 }

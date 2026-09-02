@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/auth/onboarding_screen.dart';
+import 'package:employer_kariger_app/screens/profile/account_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -15,6 +16,7 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool darkTheme = false;
   bool applicantAlerts = true;
+  bool messageAlerts = true;
   String language = 'English';
   bool loaded = false;
 
@@ -35,6 +37,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() {
         darkTheme = preferences['theme'] == 'dark';
         applicantAlerts = preferences['applicant_alerts'] != false;
+        messageAlerts = preferences['message_alerts'] != false;
       });
     } catch (_) {}
   }
@@ -94,16 +97,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
         ),
+        _SettingsRow(
+          icon: LucideIcons.messageSquare,
+          title: 'Message alerts',
+          subtitle: 'Get notified about worker messages',
+          trailing: _CompactSwitch(
+            value: messageAlerts,
+            onChanged: (value) {
+              setState(() => messageAlerts = value);
+              _updatePreference({'message_alerts': value});
+            },
+          ),
+        ),
         const _SectionHeader('Account & Security'),
-        const _SettingsRow(
+        _SettingsRow(
           icon: LucideIcons.lockKeyhole,
           title: 'Login & security',
           subtitle: 'OTP · device sessions',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const DeviceSessionsScreen()),
+          ),
         ),
-        const _SettingsRow(
+        _SettingsRow(
           icon: LucideIcons.usersRound,
           title: 'Team members',
           subtitle: 'Add recruiters to your account',
+          onTap: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const TeamMembersScreen()),
+          ),
         ),
         const _SettingsRow(
           icon: LucideIcons.fileText,
@@ -140,7 +163,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         const SizedBox(height: 16),
         const Text(
-          'Karigar for Employers · v1.0.0',
+          'Super Karigar Employer · v1.0.0',
           textAlign: TextAlign.center,
           style: TextStyle(color: AppColors.muted, fontSize: 11.5),
         ),
@@ -150,6 +173,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   );
 
   Future<void> _showLanguageSheet() async {
+    final api = AppScope.of(context).api;
     final selected = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.card,
@@ -205,7 +229,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }[selected];
       if (locale != null) {
         try {
-          await AppScope.of(context).api.setLocale(locale);
+          await api.setLocale(locale);
           if (mounted) setState(() => language = selected);
         } catch (exception) {
           if (mounted) {

@@ -6,7 +6,10 @@ class DashboardController extends BaseController {
   DashboardController(this.api);
   final EmployerApiService api;
   DashboardData? data;
-  Future<void> load() async => data = await run(api.dashboard);
+  Future<void> load() async {
+    data = await run(api.dashboard);
+    notifyListeners();
+  }
 }
 
 class JobsController extends BaseController {
@@ -19,6 +22,7 @@ class JobsController extends BaseController {
     status = nextStatus ?? status;
     final result = await run(() => api.jobs(status: status));
     if (result != null) items = result;
+    notifyListeners();
   }
 
   Future<bool> create(Json values) async {
@@ -48,6 +52,7 @@ class WorkersController extends BaseController {
     access = response['access'] is Map
         ? Map<String, dynamic>.from(response['access'])
         : {};
+    notifyListeners();
   }
 }
 
@@ -55,11 +60,16 @@ class ProfileController extends BaseController {
   ProfileController(this.api);
   final EmployerApiService api;
   EmployerProfile? profile;
-  Future<void> load() async => profile = await run(api.profile);
+  Future<void> load() async {
+    profile = await run(api.profile);
+    notifyListeners();
+  }
+
   Future<bool> save(Json values) async {
     final value = await run(() => api.updateProfile(values));
     if (value == null) return false;
     profile = value;
+    notifyListeners();
     return true;
   }
 }

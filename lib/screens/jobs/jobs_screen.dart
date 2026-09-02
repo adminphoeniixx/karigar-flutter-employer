@@ -61,10 +61,13 @@ class _JobsScreenState extends State<JobsScreen> {
         Padding(
           padding: const EdgeInsets.only(right: 16),
           child: IconButton(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PostJobScreen()),
-            ),
+            onPressed: () async {
+              final created = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(builder: (_) => const PostJobScreen()),
+              );
+              if (created == true && mounted) await controller.load();
+            },
             icon: const Icon(LucideIcons.plus),
           ),
         ),

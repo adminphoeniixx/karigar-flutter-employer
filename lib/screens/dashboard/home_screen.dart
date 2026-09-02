@@ -110,6 +110,15 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<String?> _unlockForProfile(int applicantId) async {
+    final response = await AppScope.of(context).api.unlock(applicantId);
+    final applicant = response['applicant'];
+    final worker = applicant is Map ? applicant['worker'] : null;
+    final phone = worker is Map ? worker['phone']?.toString() : null;
+    await controller.load();
+    return phone;
+  }
+
   @override
   void dispose() {
     if (_loaded) controller.removeListener(_refresh);
@@ -185,10 +194,13 @@ class _HomeScreenState extends State<HomeScreen> {
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
         children: [
           _PostJobBanner(
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PostJobScreen()),
-            ),
+            onTap: () async {
+              final created = await Navigator.push<bool>(
+                context,
+                MaterialPageRoute(builder: (_) => const PostJobScreen()),
+              );
+              if (created == true && mounted) await controller.load();
+            },
           ),
           const SizedBox(height: 16),
           Row(
@@ -296,7 +308,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (_) => WorkerProfileScreen(worker: worker),
+                    builder: (_) => WorkerProfileScreen(
+                      worker: worker,
+                      profileId: profile.id,
+                      workerUserId: profile.userId,
+                      jobId: (applicant.job?['id'] as num?)?.toInt(),
+                      phone: profile.phone,
+                      contactUnlocked: applicant.contactUnlocked,
+                      canMessage: true,
+                      onUnlock: applicant.contactUnlocked
+                          ? null
+                          : () => _unlockForProfile(applicant.id),
+                    ),
                   ),
                 ),
               ),

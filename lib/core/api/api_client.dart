@@ -9,6 +9,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../constants/api_constants.dart';
 import 'api_exception.dart';
 
+class BinaryResponse {
+  const BinaryResponse({required this.bytes, this.filename, this.contentType});
+
+  final List<int> bytes;
+  final String? filename;
+  final String? contentType;
+}
+
 class ApiClient {
   ApiClient({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
@@ -71,6 +79,46 @@ class ApiClient {
 
   Future<Map<String, dynamic>> delete(String path, {Object? body}) =>
       _send('DELETE', path, body: body);
+
+  Future<BinaryResponse> download(String path) async {
+    final uri = _uri(path);
+    final request = http.Request('GET', uri)
+      ..headers.addAll(_headers(json: false));
+    _logRequest('GET', uri);
+    try {
+      final streamed = await _client.send(request);
+      final bytes = await streamed.stream.toBytes();
+      final response = http.Response.bytes(
+        bytes,
+        streamed.statusCode,
+        headers: streamed.headers,
+        request: request,
+      );
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        _decode(response);
+      }
+      final disposition = response.headers['content-disposition'];
+      final filename = disposition == null
+          ? null
+          : RegExp(
+              r'''filename\*?=(?:UTF-8''|["'])?([^"';]+)''',
+              caseSensitive: false,
+            ).firstMatch(disposition)?.group(1);
+      return BinaryResponse(
+        bytes: bytes,
+        filename: filename == null ? null : Uri.decodeComponent(filename),
+        contentType: response.headers[HttpHeaders.contentTypeHeader],
+      );
+    } on SocketException catch (error) {
+      _logNetworkError('GET', uri, error);
+      throw const ApiException(
+        'Could not connect to the server. Check your internet connection and API URL.',
+      );
+    } on http.ClientException catch (error) {
+      _logNetworkError('GET', uri, error);
+      throw const ApiException('The download could not be completed.');
+    }
+  }
 
   Future<Map<String, dynamic>> multipart(
     String path, {

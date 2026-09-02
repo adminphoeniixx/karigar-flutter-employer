@@ -36,7 +36,10 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
     jobs = JobsController(api);
     workers = WorkersController(api);
     profile = ProfileController(api);
-    auth.restore().whenComplete(() {
+    Future.wait<void>([
+      auth.restore(),
+      Future<void>.delayed(const Duration(milliseconds: 1400)),
+    ]).whenComplete(() {
       if (mounted) setState(() => ready = true);
     });
   }
@@ -70,10 +73,89 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
         child: child!,
       ),
       home: !ready
-          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          ? const _AppSplash()
           : auth.authenticated
           ? const MainShell()
           : const OnboardingScreen(),
+    ),
+  );
+}
+
+class _AppSplash extends StatelessWidget {
+  const _AppSplash();
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    body: Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.brand400,
+            AppColors.primary,
+            AppColors.gradientEnd,
+          ],
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            const Spacer(flex: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Image.asset(
+                  'assets/icon/super_karigar_logo.png',
+                  width: double.infinity,
+                  height: 180,
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            const SizedBox(height: 22),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  'Super Karigar Employer',
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -.6,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 7),
+            const Text(
+              'Kaam. Hunar. Bharosa.',
+              style: TextStyle(
+                color: AppColors.brand100,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                letterSpacing: .4,
+              ),
+            ),
+            const Spacer(flex: 3),
+            const SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 34),
+          ],
+        ),
+      ),
     ),
   );
 }
