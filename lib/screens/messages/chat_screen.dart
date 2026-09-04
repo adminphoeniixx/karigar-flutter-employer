@@ -15,13 +15,19 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final controller = TextEditingController();
   final messages = <Map<String, dynamic>>[];
-  bool loading = false;
+  late bool loading;
   bool sending = false;
+
+  @override
+  void initState() {
+    super.initState();
+    loading = widget.conversationId != null;
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (widget.conversationId != null && messages.isEmpty && !loading) _load();
+    if (widget.conversationId != null && messages.isEmpty) _load();
   }
 
   Future<void> _load() async {
@@ -117,89 +123,97 @@ class _ChatScreenState extends State<ChatScreen> {
         ],
       ),
     ),
-    body: Column(
-      children: [
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(14),
-            itemCount: messages.length,
-            itemBuilder: (_, i) {
-              final message = messages[i];
-              final me = message['sent_by_me'] == true;
-              return Align(
-                alignment: me ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 7),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 13,
-                    vertical: 9,
-                  ),
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-                  ),
-                  decoration: BoxDecoration(
-                    color: me ? AppColors.primary : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: me ? null : Border.all(color: AppColors.line),
-                  ),
-                  child: Text(
-                    '${message['body'] ?? ''}',
-                    style: TextStyle(
-                      color: me ? Colors.white : AppColors.foreground,
-                      fontSize: 14,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-        SizedBox(
-          height: 39,
-          child: ListView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            children:
-                ['Can you join tomorrow?', 'Share your location', 'Call me']
-                    .map(
-                      (e) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ActionChip(
-                          label: Text(e),
-                          onPressed: sending ? null : () => _send(e),
+    body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(14),
+                  itemCount: messages.length,
+                  itemBuilder: (_, i) {
+                    final message = messages[i];
+                    final me = message['sent_by_me'] == true;
+                    return Align(
+                      alignment: me
+                          ? Alignment.centerRight
+                          : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 7),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 13,
+                          vertical: 9,
+                        ),
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+                        ),
+                        decoration: BoxDecoration(
+                          color: me ? AppColors.primary : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: me ? null : Border.all(color: AppColors.line),
+                        ),
+                        child: Text(
+                          '${message['body'] ?? ''}',
+                          style: TextStyle(
+                            color: me ? Colors.white : AppColors.foreground,
+                            fontSize: 14,
+                            height: 1.4,
+                          ),
                         ),
                       ),
-                    )
-                    .toList(),
-          ),
-        ),
-        SafeArea(
-          top: false,
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            color: AppColors.card,
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller,
-                    decoration: const InputDecoration(
-                      hintText: 'Type a message...',
-                      isDense: true,
-                    ),
+                    );
+                  },
+                ),
+              ),
+              SizedBox(
+                height: 39,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  children:
+                      [
+                            'Can you join tomorrow?',
+                            'Share your location',
+                            'Call me',
+                          ]
+                          .map(
+                            (e) => Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ActionChip(
+                                label: Text(e),
+                                onPressed: sending ? null : () => _send(e),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                ),
+              ),
+              SafeArea(
+                top: false,
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  color: AppColors.card,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: controller,
+                          decoration: const InputDecoration(
+                            hintText: 'Type a message...',
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton.filled(
+                        onPressed: sending ? null : _send,
+                        icon: const Icon(LucideIcons.send),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                IconButton.filled(
-                  onPressed: sending ? null : _send,
-                  icon: const Icon(LucideIcons.send),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ),
-      ],
-    ),
   );
 }

@@ -100,7 +100,8 @@ class _JobsScreenState extends State<JobsScreen> {
           ),
         ),
         Expanded(
-          child: controller.loading && liveJobs.isEmpty
+          child:
+              !controller.hasLoaded || (controller.loading && liveJobs.isEmpty)
               ? const Center(child: CircularProgressIndicator())
               : controller.error != null && liveJobs.isEmpty
               ? _JobsMessage(

@@ -130,131 +130,142 @@ class _WorkersScreenState extends State<WorkersScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          Container(
-            color: AppColors.card,
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-            child: Column(
+      body: !controller.hasLoaded
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: [
-                SizedBox(
-                  height: 44,
-                  child: TextField(
-                    onChanged: (value) => query = value,
-                    onSubmitted: (_) => _search(),
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(
-                        LucideIcons.search,
-                        size: 18,
-                        color: AppColors.muted,
+                Container(
+                  color: AppColors.card,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        height: 44,
+                        child: TextField(
+                          onChanged: (value) => query = value,
+                          onSubmitted: (_) => _search(),
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(
+                              LucideIcons.search,
+                              size: 18,
+                              color: AppColors.muted,
+                            ),
+                            hintText: 'Search skill, trade, name...',
+                            hintStyle: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.muted,
+                            ),
+                            fillColor: AppColors.background,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
                       ),
-                      hintText: 'Search skill, trade, name...',
-                      hintStyle: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.muted,
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 32,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: categories.length,
+                          separatorBuilder: (_, _) => const SizedBox(width: 8),
+                          itemBuilder: (_, index) {
+                            final item = categories[index];
+                            final selected = category == item;
+                            return InkWell(
+                              onTap: () {
+                                setState(() => category = item);
+                                _search();
+                              },
+                              borderRadius: BorderRadius.circular(20),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 13,
+                                ),
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: selected
+                                      ? AppColors.primary
+                                      : Colors.white,
+                                  border: Border.all(
+                                    color: selected
+                                        ? AppColors.primary
+                                        : AppColors.line,
+                                  ),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  item,
+                                  style: TextStyle(
+                                    color: selected
+                                        ? Colors.white
+                                        : AppColors.muted,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                      fillColor: AppColors.background,
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  height: 32,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: categories.length,
-                    separatorBuilder: (_, _) => const SizedBox(width: 8),
-                    itemBuilder: (_, index) {
-                      final item = categories[index];
-                      final selected = category == item;
-                      return InkWell(
-                        onTap: () {
-                          setState(() => category = item);
-                          _search();
-                        },
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 13),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: selected ? AppColors.primary : Colors.white,
-                            border: Border.all(
-                              color: selected
-                                  ? AppColors.primary
-                                  : AppColors.line,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
+                    children: [
+                      if (controller.loading && visible.isEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(32),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
+                      if (controller.error != null && visible.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            children: [
+                              Text(
+                                controller.error!,
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton(
+                                onPressed: _search,
+                                child: const Text('Retry'),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            item,
-                            style: TextStyle(
-                              color: selected ? Colors.white : AppColors.muted,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
+                        ),
+                      Text(
+                        '${query.isEmpty && category == 'All' ? 8 : visible.length} workers available · Chennai, TN',
+                        style: const TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                      const SizedBox(height: 11),
+                      ...visible.map(
+                        (item) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _WorkerResultCard(
+                            data: item,
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => WorkerProfileScreen(
+                                  worker: item.worker,
+                                  profileId: item.profileId,
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      );
-                    },
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-              children: [
-                if (controller.loading && visible.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(32),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                if (controller.error != null && visible.isEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      children: [
-                        Text(controller.error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 8),
-                        OutlinedButton(
-                          onPressed: _search,
-                          child: const Text('Retry'),
-                        ),
-                      ],
-                    ),
-                  ),
-                Text(
-                  '${query.isEmpty && category == 'All' ? 8 : visible.length} workers available · Chennai, TN',
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 11.5,
-                  ),
-                ),
-                const SizedBox(height: 11),
-                ...visible.map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _WorkerResultCard(
-                      data: item,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => WorkerProfileScreen(
-                            worker: item.worker,
-                            profileId: item.profileId,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 

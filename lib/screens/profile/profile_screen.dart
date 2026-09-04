@@ -76,7 +76,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
           ],
         ),
-        body: controller.loading && profile == null
+        body: !controller.hasLoaded || (controller.loading && profile == null)
             ? const Center(child: CircularProgressIndicator())
             : controller.error != null && profile == null
             ? Center(

@@ -63,6 +63,10 @@ android {
         release {
             if (hasReleaseSigningConfig) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Keep locally shared release APKs installable until a production
+                // keystore is configured through android/key.properties.
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }

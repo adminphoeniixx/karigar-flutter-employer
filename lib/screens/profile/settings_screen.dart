@@ -19,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool messageAlerts = true;
   String language = 'English';
   bool loaded = false;
+  bool loading = true;
 
   @override
   void didChangeDependencies() {
@@ -39,7 +40,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         applicantAlerts = preferences['applicant_alerts'] != false;
         messageAlerts = preferences['message_alerts'] != false;
       });
-    } catch (_) {}
+    } catch (_) {
+      // Keep the current defaults if preferences cannot be fetched.
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
   }
 
   Future<void> _updatePreference(Map<String, dynamic> values) async {
@@ -63,113 +68,119 @@ class _SettingsScreenState extends State<SettingsScreen> {
         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       ),
     ),
-    body: ListView(
-      padding: EdgeInsets.zero,
-      children: [
-        const _SectionHeader('Preferences'),
-        _SettingsRow(
-          icon: LucideIcons.globe2,
-          title: 'Language',
-          subtitle: language,
-          onTap: _showLanguageSheet,
-        ),
-        _SettingsRow(
-          icon: LucideIcons.moon,
-          title: 'Dark theme',
-          subtitle: 'Switch to a darker screen',
-          trailing: _CompactSwitch(
-            value: darkTheme,
-            onChanged: (value) {
-              setState(() => darkTheme = value);
-              _updatePreference({'theme': value ? 'dark' : 'light'});
-            },
-          ),
-        ),
-        _SettingsRow(
-          icon: LucideIcons.bell,
-          title: 'Applicant alerts',
-          subtitle: 'Get notified on new applications',
-          trailing: _CompactSwitch(
-            value: applicantAlerts,
-            onChanged: (value) {
-              setState(() => applicantAlerts = value);
-              _updatePreference({'applicant_alerts': value});
-            },
-          ),
-        ),
-        _SettingsRow(
-          icon: LucideIcons.messageSquare,
-          title: 'Message alerts',
-          subtitle: 'Get notified about worker messages',
-          trailing: _CompactSwitch(
-            value: messageAlerts,
-            onChanged: (value) {
-              setState(() => messageAlerts = value);
-              _updatePreference({'message_alerts': value});
-            },
-          ),
-        ),
-        const _SectionHeader('Account & Security'),
-        _SettingsRow(
-          icon: LucideIcons.lockKeyhole,
-          title: 'Login & security',
-          subtitle: 'OTP · device sessions',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const DeviceSessionsScreen()),
-          ),
-        ),
-        _SettingsRow(
-          icon: LucideIcons.usersRound,
-          title: 'Team members',
-          subtitle: 'Add recruiters to your account',
-          onTap: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const TeamMembersScreen()),
-          ),
-        ),
-        const _SettingsRow(
-          icon: LucideIcons.fileText,
-          title: 'Terms & Privacy',
-        ),
-        const _SettingsRow(
-          icon: LucideIcons.circleHelp,
-          title: 'Help & Support',
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
-          child: OutlinedButton.icon(
-            onPressed: () async {
-              await AppScope.of(context).auth.logout();
-              if (!context.mounted) return;
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-                (_) => false,
-              );
-            },
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-              backgroundColor: AppColors.card,
-              foregroundColor: const Color(0xFFE11D48),
-              side: const BorderSide(color: Color(0xFFFFE4E6)),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+    body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              const _SectionHeader('Preferences'),
+              _SettingsRow(
+                icon: LucideIcons.globe2,
+                title: 'Language',
+                subtitle: language,
+                onTap: _showLanguageSheet,
               ),
-            ),
-            icon: const Icon(LucideIcons.logOut, size: 19),
-            label: const Text('Log out'),
+              _SettingsRow(
+                icon: LucideIcons.moon,
+                title: 'Dark theme',
+                subtitle: 'Switch to a darker screen',
+                trailing: _CompactSwitch(
+                  value: darkTheme,
+                  onChanged: (value) {
+                    setState(() => darkTheme = value);
+                    _updatePreference({'theme': value ? 'dark' : 'light'});
+                  },
+                ),
+              ),
+              _SettingsRow(
+                icon: LucideIcons.bell,
+                title: 'Applicant alerts',
+                subtitle: 'Get notified on new applications',
+                trailing: _CompactSwitch(
+                  value: applicantAlerts,
+                  onChanged: (value) {
+                    setState(() => applicantAlerts = value);
+                    _updatePreference({'applicant_alerts': value});
+                  },
+                ),
+              ),
+              _SettingsRow(
+                icon: LucideIcons.messageSquare,
+                title: 'Message alerts',
+                subtitle: 'Get notified about worker messages',
+                trailing: _CompactSwitch(
+                  value: messageAlerts,
+                  onChanged: (value) {
+                    setState(() => messageAlerts = value);
+                    _updatePreference({'message_alerts': value});
+                  },
+                ),
+              ),
+              const _SectionHeader('Account & Security'),
+              _SettingsRow(
+                icon: LucideIcons.lockKeyhole,
+                title: 'Login & security',
+                subtitle: 'OTP · device sessions',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DeviceSessionsScreen(),
+                  ),
+                ),
+              ),
+              _SettingsRow(
+                icon: LucideIcons.usersRound,
+                title: 'Team members',
+                subtitle: 'Add recruiters to your account',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TeamMembersScreen()),
+                ),
+              ),
+              const _SettingsRow(
+                icon: LucideIcons.fileText,
+                title: 'Terms & Privacy',
+              ),
+              const _SettingsRow(
+                icon: LucideIcons.circleHelp,
+                title: 'Help & Support',
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    await AppScope.of(context).auth.logout();
+                    if (!context.mounted) return;
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const OnboardingScreen(),
+                      ),
+                      (_) => false,
+                    );
+                  },
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(48),
+                    backgroundColor: AppColors.card,
+                    foregroundColor: const Color(0xFFE11D48),
+                    side: const BorderSide(color: Color(0xFFFFE4E6)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(LucideIcons.logOut, size: 19),
+                  label: const Text('Log out'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Super Karigar Employer · v1.0.0',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: AppColors.muted, fontSize: 11.5),
+              ),
+              const SizedBox(height: 28),
+            ],
           ),
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'Super Karigar Employer · v1.0.0',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.muted, fontSize: 11.5),
-        ),
-        const SizedBox(height: 28),
-      ],
-    ),
   );
 
   Future<void> _showLanguageSheet() async {

@@ -22,6 +22,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
   String? state;
   String? city;
   bool loading = false;
+  bool referenceLoading = true;
   bool suggesting = false;
   bool _referenceLoaded = false;
   List<String> categories = const [];
@@ -72,6 +73,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
       });
     } catch (_) {
       // Bundled options keep this form usable while reference data is offline.
+    } finally {
+      if (mounted) setState(() => referenceLoading = false);
     }
   }
 
@@ -242,265 +245,274 @@ class _PostJobScreenState extends State<PostJobScreen> {
     appBar: AppBar(
       title: const Text('Post a Job', style: TextStyle(fontSize: 16)),
     ),
-    body: Column(
-      children: [
-        Expanded(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+    body: referenceLoading
+        ? const Center(child: CircularProgressIndicator())
+        : Column(
             children: [
-              const _Label('Job title'),
-              _Input(
-                hint: 'e.g. Plumber for apartment project',
-                controller: titleController,
-              ),
-              const SizedBox(height: 14),
-              const _Label('Category'),
-              _Select(
-                category ?? 'Select category',
-                onTap: () => _choose(
-                  'Select category',
-                  categories,
-                  (value) => setState(() => category = value),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                  children: [
+                    const _Label('Job title'),
+                    _Input(
+                      hint: 'e.g. Plumber for apartment project',
+                      controller: titleController,
+                    ),
+                    const SizedBox(height: 14),
+                    const _Label('Category'),
+                    _Select(
+                      category ?? 'Select category',
+                      onTap: () => _choose(
+                        'Select category',
+                        categories,
+                        (value) => setState(() => category = value),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const _Label('Skills required'),
+                    _chips(skills, selectedSkills, multi: true),
+                    const _Hint(
+                      'Tap to add. Workers with these skills are matched first.',
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _Label('Openings'),
+                              _Input(
+                                hint: '3',
+                                controller: openingsController,
+                                number: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _Label('Min experience'),
+                              _Input(
+                                hint: '1',
+                                suffix: 'yrs',
+                                controller: experienceController,
+                                number: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const _SectionLabel('Wage'),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 390;
+                        final amountFields = <Widget>[
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Label('Min ₹'),
+                                _Input(
+                                  hint: '800',
+                                  prefix: '₹',
+                                  controller: wageMinController,
+                                  number: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Label('Max ₹'),
+                                _Input(
+                                  hint: '1000',
+                                  prefix: '₹',
+                                  controller: wageMaxController,
+                                  number: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ];
+                        final periodField = SizedBox(
+                          width: compact ? double.infinity : 88,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _Label('Per'),
+                              _Select(
+                                wageType,
+                                onTap: () => _choose('Wage type', const [
+                                  'hourly',
+                                  'daily',
+                                  'monthly',
+                                ], (value) => setState(() => wageType = value)),
+                              ),
+                            ],
+                          ),
+                        );
+                        if (compact) {
+                          return Column(
+                            children: [
+                              Row(children: amountFields),
+                              const SizedBox(height: 10),
+                              periodField,
+                            ],
+                          );
+                        }
+                        return Row(
+                          children: [
+                            ...amountFields,
+                            const SizedBox(width: 10),
+                            periodField,
+                          ],
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    const _Label('Shift'),
+                    _singleChips(
+                      ['Day', 'Night', 'Rotational', 'Flexible'],
+                      shift,
+                      (value) {
+                        setState(() => shift = value);
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    const _Label('Perks & benefits'),
+                    _chips(perks, selectedPerks, multi: true),
+                    const SizedBox(height: 14),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const _Label('Job description'),
+                        TextButton.icon(
+                          onPressed: suggesting ? null : _suggestDescription,
+                          icon: suggesting
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(LucideIcons.sparkles, size: 16),
+                          label: const Text('Suggest with AI'),
+                        ),
+                      ],
+                    ),
+                    _Input(
+                      hint:
+                          'Describe the work, site details, duration, tools provided…',
+                      lines: 4,
+                      controller: descriptionController,
+                    ),
+                    const _SectionLabel('Location'),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _Label('State'),
+                              _Select(
+                                state ?? 'Select',
+                                onTap: () => _choose(
+                                  'Select state',
+                                  states,
+                                  _loadCities,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const _Label('City'),
+                              _Select(
+                                city ?? 'Select',
+                                onTap: () {
+                                  if (state == null) {
+                                    _message('Select a state first.');
+                                  } else {
+                                    _choose(
+                                      'Select city',
+                                      cities,
+                                      (value) => setState(() => city = value),
+                                    );
+                                  }
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    const _Label('Pin the job location'),
+                    const SizedBox(height: 150, child: LocationMap()),
+                    const SizedBox(height: 14),
+                    const _Label('How should workers reach you?'),
+                    _singleChips(
+                      ['Apply + Call', 'Apply only', 'Call only'],
+                      contact,
+                      (value) => setState(() => contact = value),
+                    ),
+                    if (contact != 'Apply only') ...[
+                      const SizedBox(height: 14),
+                      const _Label('Contact phone'),
+                      _Input(
+                        hint: '9876543210',
+                        controller: contactPhoneController,
+                        number: true,
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              const SizedBox(height: 14),
-              const _Label('Skills required'),
-              _chips(skills, selectedSkills, multi: true),
-              const _Hint(
-                'Tap to add. Workers with these skills are matched first.',
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _Label('Openings'),
-                        _Input(
-                          hint: '3',
-                          controller: openingsController,
-                          number: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _Label('Min experience'),
-                        _Input(
-                          hint: '1',
-                          suffix: 'yrs',
-                          controller: experienceController,
-                          number: true,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const _SectionLabel('Wage'),
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final compact = constraints.maxWidth < 390;
-                  final amountFields = <Widget>[
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 11, 16, 20),
+                decoration: const BoxDecoration(
+                  color: AppColors.card,
+                  border: Border(top: BorderSide(color: AppColors.line)),
+                ),
+                child: Row(
+                  children: [
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const _Label('Min ₹'),
-                          _Input(
-                            hint: '800',
-                            prefix: '₹',
-                            controller: wageMinController,
-                            number: true,
-                          ),
-                        ],
+                      child: OutlinedButton(
+                        onPressed: loading ? null : () => _submit('draft'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                          foregroundColor: AppColors.foreground,
+                          side: const BorderSide(color: AppColors.line),
+                        ),
+                        child: const Text('Save draft'),
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const _Label('Max ₹'),
-                          _Input(
-                            hint: '1000',
-                            prefix: '₹',
-                            controller: wageMaxController,
-                            number: true,
-                          ),
-                        ],
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: loading ? null : () => _submit('active'),
+                        child: Text(loading ? 'Saving...' : 'Publish Job'),
                       ),
                     ),
-                  ];
-                  final periodField = SizedBox(
-                    width: compact ? double.infinity : 88,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _Label('Per'),
-                        _Select(
-                          wageType,
-                          onTap: () => _choose('Wage type', const [
-                            'hourly',
-                            'daily',
-                            'monthly',
-                          ], (value) => setState(() => wageType = value)),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (compact) {
-                    return Column(
-                      children: [
-                        Row(children: amountFields),
-                        const SizedBox(height: 10),
-                        periodField,
-                      ],
-                    );
-                  }
-                  return Row(
-                    children: [
-                      ...amountFields,
-                      const SizedBox(width: 10),
-                      periodField,
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 14),
-              const _Label('Shift'),
-              _singleChips(['Day', 'Night', 'Rotational', 'Flexible'], shift, (
-                value,
-              ) {
-                setState(() => shift = value);
-              }),
-              const SizedBox(height: 14),
-              const _Label('Perks & benefits'),
-              _chips(perks, selectedPerks, multi: true),
-              const SizedBox(height: 14),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const _Label('Job description'),
-                  TextButton.icon(
-                    onPressed: suggesting ? null : _suggestDescription,
-                    icon: suggesting
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(LucideIcons.sparkles, size: 16),
-                    label: const Text('Suggest with AI'),
-                  ),
-                ],
-              ),
-              _Input(
-                hint:
-                    'Describe the work, site details, duration, tools provided…',
-                lines: 4,
-                controller: descriptionController,
-              ),
-              const _SectionLabel('Location'),
-              Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _Label('State'),
-                        _Select(
-                          state ?? 'Select',
-                          onTap: () =>
-                              _choose('Select state', states, _loadCities),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const _Label('City'),
-                        _Select(
-                          city ?? 'Select',
-                          onTap: () {
-                            if (state == null) {
-                              _message('Select a state first.');
-                            } else {
-                              _choose(
-                                'Select city',
-                                cities,
-                                (value) => setState(() => city = value),
-                              );
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              const _Label('Pin the job location'),
-              const SizedBox(height: 150, child: LocationMap()),
-              const SizedBox(height: 14),
-              const _Label('How should workers reach you?'),
-              _singleChips(
-                ['Apply + Call', 'Apply only', 'Call only'],
-                contact,
-                (value) => setState(() => contact = value),
-              ),
-              if (contact != 'Apply only') ...[
-                const SizedBox(height: 14),
-                const _Label('Contact phone'),
-                _Input(
-                  hint: '9876543210',
-                  controller: contactPhoneController,
-                  number: true,
-                ),
-              ],
-            ],
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 11, 16, 20),
-          decoration: const BoxDecoration(
-            color: AppColors.card,
-            border: Border(top: BorderSide(color: AppColors.line)),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: loading ? null : () => _submit('draft'),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
-                    foregroundColor: AppColors.foreground,
-                    side: const BorderSide(color: AppColors.line),
-                  ),
-                  child: const Text('Save draft'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 2,
-                child: FilledButton(
-                  onPressed: loading ? null : () => _submit('active'),
-                  child: Text(loading ? 'Saving...' : 'Publish Job'),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-      ],
-    ),
   );
 
   Widget _chips(

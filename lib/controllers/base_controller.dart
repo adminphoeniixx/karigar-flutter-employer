@@ -4,6 +4,7 @@ import '../core/api/api_exception.dart';
 
 abstract class BaseController extends ChangeNotifier {
   bool loading = false;
+  bool hasLoaded = false;
   String? error;
 
   Future<T?> run<T>(Future<T> Function() action) async {
@@ -30,6 +31,7 @@ abstract class BaseController extends ChangeNotifier {
       return null;
     } finally {
       loading = false;
+      hasLoaded = true;
       notifyListeners();
     }
   }

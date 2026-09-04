@@ -190,180 +190,186 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(width: 12),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-        children: [
-          _PostJobBanner(
-            onTap: () async {
-              final created = await Navigator.push<bool>(
-                context,
-                MaterialPageRoute(builder: (_) => const PostJobScreen()),
-              );
-              if (created == true && mounted) await controller.load();
-            },
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  icon: LucideIcons.briefcaseBusiness,
-                  value: '${stats['active_jobs'] ?? 0}',
-                  label: 'Active Jobs',
-                  iconColor: AppColors.primary,
-                  iconBackground: AppColors.brand50,
-                ),
+      body: !controller.hasLoaded
+          ? const Center(child: CircularProgressIndicator())
+          : controller.error != null && data == null
+          ? Center(
+              child: OutlinedButton(
+                onPressed: controller.load,
+                child: const Text('Retry'),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
-                  icon: LucideIcons.usersRound,
-                  value: '${stats['total_applicants'] ?? 0}',
-                  label: 'Total Applicants',
-                  iconColor: AppColors.indigo,
-                  iconBackground: AppColors.indigoBg,
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+              children: [
+                _PostJobBanner(
+                  onTap: () async {
+                    final created = await Navigator.push<bool>(
+                      context,
+                      MaterialPageRoute(builder: (_) => const PostJobScreen()),
+                    );
+                    if (created == true && mounted) await controller.load();
+                  },
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  icon: LucideIcons.star,
-                  value: '${stats['shortlisted'] ?? 0}',
-                  label: 'Shortlisted',
-                  iconColor: AppColors.amber,
-                  iconBackground: AppColors.amberBg,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _StatCard(
-                  icon: LucideIcons.check,
-                  value: '${stats['hired'] ?? 0}',
-                  label: 'Hired',
-                  iconColor: AppColors.green,
-                  iconBackground: AppColors.greenBg,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _CreditsCard(
-            balance: data?.credits.balance ?? 0,
-            label: data?.credits.planLabel ?? '',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const PlansScreen()),
-            ),
-          ),
-          if (data?.verificationEnabled == true &&
-              data?.profile?.verified != true) ...[
-            const SizedBox(height: 16),
-            _VerifyCard(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const KycScreen()),
-              ),
-            ),
-          ],
-          const SizedBox(height: 22),
-          _ListHeading(
-            'Recent applicants',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const JobsScreen()),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...(data?.applicants ?? const []).map((applicant) {
-            final profile = applicant.worker;
-            final worker = Worker(
-              profile.name,
-              profile.skills.isEmpty ? 'Worker' : profile.skills.first,
-              profile.experienceYears,
-              profile.rating.average,
-              profile.distanceKm ?? 0,
-              profile.expectedWage,
-              profile.skills,
-              status: applicant.statusLabel,
-            );
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: _ApplicantCard(
-                worker: worker,
-                displayName: profile.name,
-                status: applicant.statusLabel,
-                skills: profile.skills,
-                contactUnlocked: applicant.contactUnlocked,
-                onUnlock: () => _applicantAction(applicant.id, 'unlock'),
-                onPrimary: () => _applicantAction(
-                  applicant.id,
-                  applicant.shortlisted ? 'interview' : 'shortlist',
-                ),
-                onHire: () => _applicantAction(applicant.id, 'hire'),
-                onReject: () => _applicantAction(applicant.id, 'reject'),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => WorkerProfileScreen(
-                      worker: worker,
-                      profileId: profile.id,
-                      workerUserId: profile.userId,
-                      jobId: (applicant.job?['id'] as num?)?.toInt(),
-                      phone: profile.phone,
-                      contactUnlocked: applicant.contactUnlocked,
-                      canMessage: true,
-                      onUnlock: applicant.contactUnlocked
-                          ? null
-                          : () => _unlockForProfile(applicant.id),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatCard(
+                        icon: LucideIcons.briefcaseBusiness,
+                        value: '${stats['active_jobs'] ?? 0}',
+                        label: 'Active Jobs',
+                        iconColor: AppColors.primary,
+                        iconBackground: AppColors.brand50,
+                      ),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _StatCard(
+                        icon: LucideIcons.usersRound,
+                        value: '${stats['total_applicants'] ?? 0}',
+                        label: 'Total Applicants',
+                        iconColor: AppColors.indigo,
+                        iconBackground: AppColors.indigoBg,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _StatCard(
+                        icon: LucideIcons.star,
+                        value: '${stats['shortlisted'] ?? 0}',
+                        label: 'Shortlisted',
+                        iconColor: AppColors.amber,
+                        iconBackground: AppColors.amberBg,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _StatCard(
+                        icon: LucideIcons.check,
+                        value: '${stats['hired'] ?? 0}',
+                        label: 'Hired',
+                        iconColor: AppColors.green,
+                        iconBackground: AppColors.greenBg,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _CreditsCard(
+                  balance: data?.credits.balance ?? 0,
+                  label: data?.credits.planLabel ?? '',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const PlansScreen()),
                   ),
                 ),
-              ),
-            );
-          }),
-          const SizedBox(height: 22),
-          _ListHeading(
-            'Your active jobs',
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const JobsScreen()),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...(data?.jobs ?? const []).take(2).map((item) {
-            final job = Job(
-              item.title,
-              item.category,
-              item.wageLabel,
-              item.vacancies,
-              item.stats['applicants'] as int? ?? 0,
-              item.stats['shortlisted'] as int? ?? 0,
-              item.stats['hired'] as int? ?? 0,
-              item.status,
-              id: item.id,
-            );
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: jobCard(
-                job,
-                () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => JobManageScreen(job: job)),
+                if (data?.verificationEnabled == true &&
+                    data?.profile?.verified != true) ...[
+                  const SizedBox(height: 16),
+                  _VerifyCard(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const KycScreen()),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 22),
+                _ListHeading(
+                  'Recent applicants',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const JobsScreen()),
+                  ),
                 ),
-              ),
-            );
-          }),
-          if (controller.loading && data == null)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
+                const SizedBox(height: 12),
+                ...(data?.applicants ?? const []).map((applicant) {
+                  final profile = applicant.worker;
+                  final worker = Worker(
+                    profile.name,
+                    profile.skills.isEmpty ? 'Worker' : profile.skills.first,
+                    profile.experienceYears,
+                    profile.rating.average,
+                    profile.distanceKm ?? 0,
+                    profile.expectedWage,
+                    profile.skills,
+                    status: applicant.statusLabel,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _ApplicantCard(
+                      worker: worker,
+                      displayName: profile.name,
+                      status: applicant.statusLabel,
+                      skills: profile.skills,
+                      contactUnlocked: applicant.contactUnlocked,
+                      onUnlock: () => _applicantAction(applicant.id, 'unlock'),
+                      onPrimary: () => _applicantAction(
+                        applicant.id,
+                        applicant.shortlisted ? 'interview' : 'shortlist',
+                      ),
+                      onHire: () => _applicantAction(applicant.id, 'hire'),
+                      onReject: () => _applicantAction(applicant.id, 'reject'),
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WorkerProfileScreen(
+                            worker: worker,
+                            profileId: profile.id,
+                            workerUserId: profile.userId,
+                            jobId: (applicant.job?['id'] as num?)?.toInt(),
+                            phone: profile.phone,
+                            contactUnlocked: applicant.contactUnlocked,
+                            canMessage: true,
+                            onUnlock: applicant.contactUnlocked
+                                ? null
+                                : () => _unlockForProfile(applicant.id),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+                const SizedBox(height: 22),
+                _ListHeading(
+                  'Your active jobs',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const JobsScreen()),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ...(data?.jobs ?? const []).take(2).map((item) {
+                  final job = Job(
+                    item.title,
+                    item.category,
+                    item.wageLabel,
+                    item.vacancies,
+                    item.stats['applicants'] as int? ?? 0,
+                    item.stats['shortlisted'] as int? ?? 0,
+                    item.stats['hired'] as int? ?? 0,
+                    item.status,
+                    id: item.id,
+                  );
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: jobCard(
+                      job,
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => JobManageScreen(job: job),
+                        ),
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ),
-        ],
-      ),
     );
   }
 }
