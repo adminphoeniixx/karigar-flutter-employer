@@ -2,7 +2,6 @@
 <resources>
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowSplashScreenBackground">#BF3A16</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">#FFFFFF</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_logo_android12</item>
     </style>
 </resources>

@@ -206,11 +206,7 @@ class _OtpScreenState extends State<OtpScreen> {
                     FilledButton(
                       onPressed: loading ? null : _continue,
                       child: loading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
+                          ? Text(sent ? 'Please wait' : 'Processing')
                           : Text(sent ? 'Verify & Continue' : 'Send OTP'),
                     ),
                     if (sent) ...[

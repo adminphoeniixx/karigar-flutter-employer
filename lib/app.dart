@@ -105,13 +105,16 @@ class _AppSplash extends StatelessWidget {
             const Spacer(flex: 4),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Image.asset(
-                  'assets/icon/super_karigar_logo.png',
-                  width: double.infinity,
+              child: ClipOval(
+                child: Container(
+                  width: 180,
                   height: 180,
-                  fit: BoxFit.contain,
+                  color: Colors.white,
+                  padding: const EdgeInsets.all(12),
+                  child: Image.asset(
+                    'assets/icon/super_karigar_logo.png',
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
