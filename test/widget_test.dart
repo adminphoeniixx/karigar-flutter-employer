@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:employer_kariger_app/app.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/core/data.dart';
@@ -7,6 +9,32 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('original splash stays visible while initialization is pending', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({});
+    final initialization = Completer<void>();
+    var started = false;
+    await tester.pumpWidget(
+      KarigarEmployerApp(
+        onInitialize: () {
+          started = true;
+          return initialization.future;
+        },
+      ),
+    );
+    expect(started, isTrue);
+    expect(find.text('Super Karigar Employer'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text('Super Karigar Employer'), findsOneWidget);
+    expect(find.text('Get Started'), findsNothing);
+    initialization.complete();
+    await tester.pumpAndSettle();
+    expect(find.text('Get Started'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('shows employer onboarding', (tester) async {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const KarigarEmployerApp());

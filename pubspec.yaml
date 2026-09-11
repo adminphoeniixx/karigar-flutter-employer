@@ -35,6 +35,9 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/icon/karigar_employer_launcher.png
+  adaptive_icon_background: "#F4F1EC"
+  adaptive_icon_foreground: assets/icon/karigar_employer_launcher.png
+  adaptive_icon_foreground_inset: 20
   min_sdk_android: 21
   remove_alpha_ios: true
   web:
