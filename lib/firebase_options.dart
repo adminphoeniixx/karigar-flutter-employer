@@ -52,12 +52,11 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCGv623hEb-k0ryUzmaXSTI2i9hOwFSJpU',
-    appId: '1:1046076081470:android:eda7ae70617510f668186f',
+    appId: '1:1046076081470:android:2095a9d44c43304b68186f',
     messagingSenderId: '1046076081470',
     projectId: 'kariger-da3ac',
     storageBucket: 'kariger-da3ac.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyDd-HX_ofJVl9KLHNiCrVsneEGRAlNrxIw',
     appId: '1:1046076081470:ios:cc6fea113a90d1e568186f',
@@ -66,7 +65,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'kariger-da3ac.firebasestorage.app',
     iosBundleId: 'com.example.employerKarigerApp',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyDd-HX_ofJVl9KLHNiCrVsneEGRAlNrxIw',
     appId: '1:1046076081470:ios:cc6fea113a90d1e568186f',

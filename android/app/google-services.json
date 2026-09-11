@@ -42,6 +42,44 @@
           "other_platform_oauth_client": []
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1046076081470:android:2095a9d44c43304b68186f",
+        "android_client_info": {
+          "package_name": "com.superkarigar.employerapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGv623hEb-k0ryUzmaXSTI2i9hOwFSJpU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1046076081470:android:982eb72c727060bd68186f",
+        "android_client_info": {
+          "package_name": "com.superkarigar.workerapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCGv623hEb-k0ryUzmaXSTI2i9hOwFSJpU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
     }
   ],
   "configuration_version": "1"

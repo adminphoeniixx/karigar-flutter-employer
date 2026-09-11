@@ -14,7 +14,7 @@ plugins {
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    FileInputStream(keystorePropertiesFile).use { keystoreProperties.load(it) }
 }
 val hasReleaseSigningConfig = listOf(
     "keyAlias",
@@ -24,7 +24,7 @@ val hasReleaseSigningConfig = listOf(
 ).all { !keystoreProperties.getProperty(it).isNullOrBlank() }
 
 android {
-    namespace = "com.example.employer_kariger_app"
+    namespace = "com.superkarigar.employerapp"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -39,7 +39,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.employer_kariger_app"
+        applicationId = "com.superkarigar.employerapp"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
