@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:employer_kariger_app/app.dart';
+import 'package:employer_kariger_app/screens/splash_screen.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
@@ -9,6 +10,34 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  for (final size in [
+    const Size(320, 568),
+    const Size(390, 844),
+    const Size(412, 915),
+    const Size(768, 1024),
+    const Size(844, 390),
+  ]) {
+    testWidgets('splash fits $size', (tester) async {
+      tester.view.physicalSize = size;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      expect(tester.getSize(find.byType(SplashScreen)), size);
+      final image = tester.widget<Image>(find.byType(Image));
+      final fitted = applyBoxFit(image.fit!, const Size(1080, 1920), size);
+      final visibleArtwork = Alignment.center.inscribe(
+        fitted.source,
+        const Rect.fromLTWH(0, 0, 1080, 1920),
+      );
+      // The actual logo, Employer title and tagline must survive any crop.
+      expect(visibleArtwork.contains(const Offset(260, 1030)), isTrue);
+      expect(visibleArtwork.contains(const Offset(820, 1445)), isTrue);
+    });
+  }
+
   testWidgets('original splash stays visible while initialization is pending', (
     tester,
   ) async {
@@ -24,10 +53,16 @@ void main() {
       ),
     );
     expect(started, isTrue);
-    expect(find.text('Super Karigar Employer'), findsOneWidget);
-    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Super Karigar Employer. Kaam. Hunar. Bharosa.'),
+      findsOneWidget,
+    );
+    expect(find.byType(CircularProgressIndicator), findsNothing);
     await tester.pump(const Duration(seconds: 2));
-    expect(find.text('Super Karigar Employer'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Super Karigar Employer. Kaam. Hunar. Bharosa.'),
+      findsOneWidget,
+    );
     expect(find.text('Get Started'), findsNothing);
     initialization.complete();
     await tester.pumpAndSettle();
@@ -40,8 +75,10 @@ void main() {
     await tester.pumpWidget(const KarigarEmployerApp());
     await tester.pump();
 
-    expect(find.text('Super Karigar Employer'), findsOneWidget);
-    expect(find.text('Kaam. Hunar. Bharosa.'), findsOneWidget);
+    expect(
+      find.bySemanticsLabel('Super Karigar Employer. Kaam. Hunar. Bharosa.'),
+      findsOneWidget,
+    );
 
     await tester.pump(const Duration(milliseconds: 1500));
 
@@ -76,6 +113,7 @@ void main() {
 
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const KarigarEmployerApp());
+    await tester.pump(const Duration(milliseconds: 1500));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
