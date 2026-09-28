@@ -12,6 +12,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   for (final size in [
     const Size(320, 568),
+    const Size(360, 640),
+    const Size(360, 800),
+    const Size(430, 932),
     const Size(390, 844),
     const Size(412, 915),
     const Size(768, 1024),
@@ -20,21 +23,38 @@ void main() {
     testWidgets('splash fits $size', (tester) async {
       tester.view.physicalSize = size;
       tester.view.devicePixelRatio = 1;
+      tester.view.padding = const FakeViewPadding(top: 44, bottom: 34);
+      addTearDown(tester.view.resetPadding);
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(const MaterialApp(home: SplashScreen()));
+      await tester.runAsync(() async {
+        await precacheImage(
+          const AssetImage('assets/splash.png'),
+          tester.element(find.byType(SplashScreen)),
+        );
+      });
       await tester.pumpAndSettle();
       expect(tester.takeException(), isNull);
       expect(tester.getSize(find.byType(SplashScreen)), size);
       final image = tester.widget<Image>(find.byType(Image));
-      final fitted = applyBoxFit(image.fit!, const Size(1080, 1920), size);
-      final visibleArtwork = Alignment.center.inscribe(
-        fitted.source,
-        const Rect.fromLTWH(0, 0, 1080, 1920),
+      final fitted = applyBoxFit(
+        image.fit!,
+        const Size(1080, 1920),
+        tester.getSize(find.byType(Image)),
       );
-      // The actual logo, Employer title and tagline must survive any crop.
-      expect(visibleArtwork.contains(const Offset(260, 1030)), isTrue);
-      expect(visibleArtwork.contains(const Offset(820, 1445)), isTrue);
+      // The artwork fills the display, including behind both system bars.
+      expect(fitted.destination.width, closeTo(size.width, .001));
+      expect(fitted.destination.height, closeTo(size.height, .001));
+      expect(tester.getRect(find.byType(Image)), Offset.zero & size);
+      if (size.width / size.height < .65) {
+        final visible = Alignment.center.inscribe(
+          fitted.source,
+          const Rect.fromLTWH(0, 0, 1080, 1920),
+        );
+        expect(visible.contains(const Offset(210, 1040)), isTrue);
+        expect(visible.contains(const Offset(870, 1530)), isTrue);
+      }
     });
   }
 

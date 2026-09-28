@@ -27,6 +27,7 @@ class _MainShellState extends State<MainShell> {
   ];
   void _selectTab(int nextIndex) {
     if (nextIndex == index) return;
+
     setState(() {
       _tabHistory.remove(nextIndex);
       _tabHistory.add(nextIndex);

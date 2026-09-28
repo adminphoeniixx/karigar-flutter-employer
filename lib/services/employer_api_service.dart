@@ -1,3 +1,5 @@
+import 'dart:async';
+import '../core/analytics/meta_analytics.dart';
 import 'dart:io';
 
 import '../constants/api_constants.dart';
@@ -5,8 +7,23 @@ import '../core/api/api_client.dart';
 import '../models/api_models.dart';
 
 class EmployerApiService {
-  const EmployerApiService(this.client);
+  const EmployerApiService(this.client, {MetaAnalytics? analytics})
+    : _analytics = analytics;
+  final MetaAnalytics? _analytics;
+  MetaAnalytics get analytics => _analytics ?? MetaAnalytics.instance;
   final ApiClient client;
+
+  Future<Json> _tracked(
+    Future<Json> Function() action,
+    String? event, {
+    Json parameters = const {},
+  }) async {
+    final response = await action();
+    if (event != null) {
+      unawaited(analytics.event(event, parameters: parameters));
+    }
+    return response;
+  }
 
   Json _data(Json response) => response['data'] is Map
       ? Map<String, dynamic>.from(response['data'] as Map)
@@ -14,7 +31,6 @@ class EmployerApiService {
 
   Future<Json> sendOtp(String phone) =>
       client.post(ApiConstants.otpSend, body: {'phone': phone});
-
   Future<Json> verifyOtp(String phone, String otp, {String? deviceName}) =>
       client.post(
         ApiConstants.otpVerify,
@@ -69,8 +85,13 @@ class EmployerApiService {
         .toList();
   }
 
-  Future<EmployerJob> job(int id) async =>
-      EmployerJob.fromJson(_data(await client.get(ApiConstants.job(id))));
+  Future<EmployerJob> job(int id) async {
+    final response = await client.get(ApiConstants.job(id));
+    return EmployerJob.fromJson(
+      response['job'] is Map ? Json.from(response['job']) : _data(response),
+    );
+  }
+
   Future<List<String>> suggestJobDescription({
     required String title,
     String? category,
@@ -90,18 +111,43 @@ class EmployerApiService {
     ))['suggestions'],
   );
   Future<EmployerJob> createJob(Json values) async {
-    final response = await client.post(ApiConstants.jobs, body: values);
+    final response = await saveJob(values);
     return EmployerJob.fromJson(
       Map<String, dynamic>.from(response['job'] as Map),
     );
   }
 
   Future<EmployerJob> updateJob(int id, Json values) async {
-    final response = await client.patch(ApiConstants.job(id), body: values);
+    final response = await saveJob(values, id: id);
     return EmployerJob.fromJson(
       Map<String, dynamic>.from(response['job'] as Map),
     );
   }
+
+  Future<Json> saveJob(Json values, {int? id}) async {
+    final response = id == null
+        ? await client.post(ApiConstants.jobs, body: values)
+        : await client.put(ApiConstants.job(id), body: values);
+    final raw = response['job'];
+    final job = raw is Map ? Json.from(raw) : <String, dynamic>{};
+    final status = job['status'] ?? values['status'];
+    if (status == 'active' &&
+        (id == null || response['message'] == 'Job posted.')) {
+      unawaited(
+        analytics.event(
+          'job_published',
+          parameters: {
+            'fb_content_id': '${job['id'] ?? id ?? ''}',
+            'fb_content_type': 'job',
+          },
+        ),
+      );
+    }
+    return response;
+  }
+
+  Future<BinaryResponse> invoicePdf(int id, {String? url}) =>
+      client.download(url ?? '${ApiConstants.invoice(id)}/pdf');
 
   Future<void> deleteJob(int id) => client.delete(ApiConstants.job(id));
   Future<Json> closeJob(int id) => client.post('/employer/jobs/$id/close');
@@ -137,18 +183,25 @@ class EmployerApiService {
     num? offeredWage,
     String? startDate,
     String? message,
-  }) => client.patch(
-    '/employer/applicants/$id/status',
-    body: {
-      'status': status,
-      'offered_wage': ?offeredWage,
-      'start_date': ?startDate,
-      'message': ?message,
-    },
+  }) => _tracked(
+    () => client.patch(
+      '/employer/applicants/$id/status',
+      body: {
+        'status': status,
+        'offered_wage': ?offeredWage,
+        'start_date': ?startDate,
+        'message': ?message,
+      },
+    ),
+    status == 'hired' ? 'worker_hired' : null,
+    parameters: {'status': status},
   );
   Future<Json> shortlist(int id) =>
       client.post('/employer/applicants/$id/shortlist');
-  Future<Json> unlock(int id) => client.post('/employer/applicants/$id/unlock');
+  Future<Json> unlock(int id) => _tracked(
+    () => client.post('/employer/applicants/$id/unlock'),
+    'worker_contact_unlocked',
+  );
   Future<Json> scheduleInterview(
     int id, {
     required String interviewAt,
@@ -185,7 +238,10 @@ class EmployerApiService {
 
   Future<Json> workers(Map<String, dynamic> filters) =>
       client.get('/employer/workers', query: filters);
-  Future<Json> worker(int id) => client.get('/employer/workers/$id');
+  Future<Json> worker(int id) async {
+    final response = await client.get('/employer/workers/$id');
+    return response;
+  }
 
   Future<Json> kyc() => client.get('/employer/kyc');
   Future<Json> submitKyc({
@@ -245,16 +301,71 @@ class EmployerApiService {
       client.post('/conversations/$id/read');
 
   Future<Json> plans() => client.get('/employer/plans');
-  Future<Json> subscribe(int planId, {String? coupon}) => client.post(
-    '/employer/plans/$planId/subscribe',
-    body: {'coupon': ?coupon},
-  );
-  Future<Json> subscriptionCallback(Json payment) =>
-      client.post('/employer/plans/callback', body: payment);
-  Future<Json> topUp(String pack) =>
-      client.post('/employer/credits/top-up', body: {'pack': pack});
-  Future<Json> topUpCallback(Json payment) =>
-      client.post('/employer/credits/callback', body: payment);
+  Future<Json> subscribe(int planId, {String? coupon}) async {
+    final response = await client.post(
+      '/employer/plans/$planId/subscribe',
+      body: {'coupon': ?coupon},
+    );
+    final amounts = response['amounts'];
+    final rawId =
+        response['razorpay_subscription_id'] ?? response['subscription_id'];
+    if (rawId is String && rawId.startsWith('sub_')) {
+      await analytics.rememberCheckout(
+        checkoutId: rawId,
+        kind: 'subscription',
+        contentId: '$planId',
+        amount: amounts is Map ? double.tryParse('${amounts['total']}') : null,
+        currency: '${response['currency'] ?? 'INR'}',
+      );
+    }
+    return response;
+  }
+
+  Future<Json> subscriptionCallback(Json payment) async {
+    final response = await client.post(
+      '/employer/plans/callback',
+      body: payment,
+    );
+    final paymentId = payment['razorpay_payment_id']?.toString();
+    final checkoutId = payment['razorpay_subscription_id']?.toString();
+    if (paymentId != null && checkoutId != null) {
+      unawaited(analytics.verifiedPayment(paymentId, checkoutId));
+    }
+    return response;
+  }
+
+  Future<Json> topUp(String pack) async {
+    final response = await client.post(
+      '/employer/credits/top-up',
+      body: {'pack': pack},
+    );
+    final id = response['razorpay_order_id']?.toString();
+    final amounts = response['amounts'];
+    if (id != null) {
+      await analytics.rememberCheckout(
+        checkoutId: id,
+        kind: 'credit_pack',
+        contentId: pack,
+        amount: amounts is Map ? double.tryParse('${amounts['total']}') : null,
+        currency: '${response['currency'] ?? 'INR'}',
+      );
+    }
+    return response;
+  }
+
+  Future<Json> topUpCallback(Json payment) async {
+    final response = await client.post(
+      '/employer/credits/callback',
+      body: payment,
+    );
+    final paymentId = payment['razorpay_payment_id']?.toString();
+    final checkoutId = payment['razorpay_order_id']?.toString();
+    if (paymentId != null && checkoutId != null) {
+      unawaited(analytics.verifiedPayment(paymentId, checkoutId));
+    }
+    return response;
+  }
+
   Future<Json> invoice(int subscriptionId) =>
       client.get(ApiConstants.invoice(subscriptionId));
 

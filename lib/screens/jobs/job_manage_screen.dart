@@ -1,3 +1,4 @@
+import 'post_job_screen.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -345,6 +346,11 @@ class _JobManageScreenState extends State<JobManageScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              leading: const Icon(Icons.edit),
+              title: const Text('Edit job'),
+              onTap: () => Navigator.pop(context, 'edit'),
+            ),
+            ListTile(
               leading: const Icon(LucideIcons.zap),
               title: const Text('Boost job'),
               onTap: () => Navigator.pop(context, 'boost'),
@@ -369,7 +375,15 @@ class _JobManageScreenState extends State<JobManageScreen> {
     );
     if (action == null || !mounted) return;
     try {
-      if (action == 'boost') {
+      if (action == 'edit') {
+        final details = await AppScope.of(context).api.job(job.id);
+        if (!mounted) return;
+        final changed = await Navigator.push<bool>(
+          context,
+          MaterialPageRoute(builder: (_) => PostJobScreen(job: details)),
+        );
+        if (changed == true && mounted) Navigator.pop(context, true);
+      } else if (action == 'boost') {
         await _boostJob();
       } else if (action == 'share') {
         final details = await AppScope.of(context).api.job(job.id);

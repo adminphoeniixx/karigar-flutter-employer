@@ -53,7 +53,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
     super.dispose();
   }
 
-  Future<void> _search() {
+  Future<void> _search() async {
     final filters = <String, dynamic>{
       if (query.trim().isNotEmpty) 'q': query.trim(),
       if (category != 'All') 'skill': category,
@@ -75,7 +75,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
         );
       }
     }
-    return controller.search(filters);
+    await controller.search(filters);
   }
 
   @override

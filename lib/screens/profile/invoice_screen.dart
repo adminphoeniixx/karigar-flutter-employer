@@ -1,3 +1,7 @@
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:file_picker/file_picker.dart';
+import '../../core/billing/billing.dart';
 import 'package:flutter/material.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -13,6 +17,8 @@ class InvoiceScreen extends StatefulWidget {
 
 class _InvoiceScreenState extends State<InvoiceScreen> {
   bool loading = true;
+  bool downloading = false;
+  String? pdfUrl;
   String? error;
   Map<String, dynamic> invoice = const {};
   Map<String, dynamic> seller = const {};
@@ -25,12 +31,17 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   }
 
   Future<void> _load() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
     try {
       final response = await AppScope.of(
         context,
       ).api.invoice(widget.subscriptionId);
       if (!mounted) return;
       setState(() {
+        pdfUrl = response['pdf_url']?.toString();
         invoice = _map(response['invoice']);
         seller = _map(response['seller']);
         buyer = _map(response['buyer']);
@@ -39,6 +50,51 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       if (mounted) setState(() => error = '$exception');
     } finally {
       if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> _download() async {
+    if (downloading) return;
+    setState(() => downloading = true);
+    try {
+      final file = await AppScope.of(
+        context,
+      ).api.invoicePdf(widget.subscriptionId, url: pdfUrl);
+      if (!mounted) return;
+      if (file.bytes.length < 5 ||
+          String.fromCharCodes(file.bytes.take(5)) != '%PDF-') {
+        throw const FormatException(
+          'The server did not return a PDF. Please try again.',
+        );
+      }
+      final name = (file.filename ?? 'Invoice-${widget.subscriptionId}.pdf')
+          .split(RegExp(r'[/\\]'))
+          .last;
+      final path = await FilePicker.saveFile(
+        dialogTitle: 'Save invoice PDF',
+        fileName: name,
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+        bytes: Uint8List.fromList(file.bytes),
+      );
+      if (path == null) return;
+      if (!Platform.isAndroid && !Platform.isIOS) {
+        await File(path).writeAsBytes(file.bytes, flush: true);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Invoice saved.')));
+      }
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$exception')));
+      }
+    } finally {
+      if (mounted) setState(() => downloading = false);
     }
   }
 
@@ -74,6 +130,12 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                   '${invoice['date'] ?? ''}',
                   style: const TextStyle(color: AppColors.muted),
                 ),
+                const SizedBox(height: 12),
+                FilledButton.icon(
+                  onPressed: downloading ? null : _download,
+                  icon: const Icon(Icons.download),
+                  label: Text(downloading ? 'Downloading...' : 'Download PDF'),
+                ),
                 const SizedBox(height: 20),
                 _Party(title: 'Seller', values: seller),
                 const SizedBox(height: 12),
@@ -92,9 +154,17 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                         _line('Subtotal', '₹${invoice['subtotal'] ?? 0}'),
                         if (invoice['discount'] != null)
                           _line('Discount', '-₹${invoice['discount']}'),
+                        ...taxLines(
+                          invoice,
+                          invoice: true,
+                        ).map((line) => _line(line.label, money(line.amount))),
                         _line(
-                          'GST (${invoice['gst_percent'] ?? 0}%)',
-                          '₹${invoice['gst_amount'] ?? 0}',
+                          'Place of supply',
+                          '${invoice['place_of_supply'] ?? 'Not available'}',
+                        ),
+                        _line(
+                          'SAC',
+                          '${invoice['sac'] ?? seller['sac'] ?? 'Not available'}',
                         ),
                         const Divider(),
                         _line(
@@ -116,11 +186,14 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
+        Expanded(child: Text(label)),
+        const SizedBox(width: 12),
+        Flexible(
+          child: Text(
+            value,
+            style: TextStyle(
+              fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
+            ),
           ),
         ),
       ],

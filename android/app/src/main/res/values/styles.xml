@@ -1,13 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <style name="StartupWindowTheme" parent="@android:style/Theme.Light.NoTitleBar">
-        <item name="android:windowBackground">#F4F3EF</item>
-        <item name="android:statusBarColor">#F4F3EF</item>
-        <item name="android:navigationBarColor">#F4F3EF</item>
+        <item name="android:windowBackground">#FFFFFF</item>
+        <item name="android:statusBarColor">#FFFFFF</item>
+        <item name="android:navigationBarColor">#FFFFFF</item>
         <item name="android:windowLightStatusBar">true</item>
     </style>
-    <!-- FlutterActivity keeps its first draw pending until SplashScreen is ready.
-         Disable the separate system preview on every API level, including 31+. -->
     <style name="LaunchTheme" parent="StartupWindowTheme">
         <item name="android:windowDisablePreview">true</item>
     </style>

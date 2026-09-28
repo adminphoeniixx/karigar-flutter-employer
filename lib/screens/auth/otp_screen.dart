@@ -110,6 +110,7 @@ class _OtpScreenState extends State<OtpScreen> {
         (user is Map &&
             (user['company_name'] == null ||
                 user['company_name'].toString().trim().isEmpty));
+
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(

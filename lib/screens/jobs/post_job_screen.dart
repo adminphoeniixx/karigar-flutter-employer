@@ -1,3 +1,6 @@
+import '../../models/api_models.dart';
+import '../../core/api/api_exception.dart';
+import '../profile/plans_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -6,14 +9,19 @@ import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/widgets/location_map.dart';
 
 class PostJobScreen extends StatefulWidget {
-  const PostJobScreen({super.key});
+  const PostJobScreen({super.key, this.job});
+  final EmployerJob? job;
 
   @override
   State<PostJobScreen> createState() => _PostJobScreenState();
 }
 
 class _PostJobScreenState extends State<PostJobScreen> {
-  final selectedSkills = <String>{'Pipe Fitting'};
+  final selectedSkills = <String>{};
+  String liveStatus = 'active';
+  bool get editingDraft =>
+      widget.job?.isDraft == true || widget.job?.status == 'draft';
+  bool get canDraft => widget.job == null || editingDraft;
   final selectedPerks = <String>{};
   String shift = 'Day';
   String contact = 'Apply + Call';
@@ -51,6 +59,38 @@ class _PostJobScreenState extends State<PostJobScreen> {
   final contactPhoneController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+
+    final job = widget.job;
+    if (job == null) return;
+    titleController.text = job.title;
+    descriptionController.text = job.description;
+    openingsController.text = job.vacancies > 0 ? '${job.vacancies}' : '';
+    experienceController.text = '${job.experienceMin}';
+    wageMinController.text = job.wageMin > 0 ? '${job.wageMin}' : '';
+    wageMaxController.text = job.wageMax > 0 ? '${job.wageMax}' : '';
+    contactPhoneController.text = job.contactPhone ?? '';
+    category = job.category.isEmpty ? null : job.category;
+    state = job.state.isEmpty ? null : job.state;
+    city = job.city.isEmpty ? null : job.city;
+    selectedSkills.addAll(job.skills);
+    selectedPerks.addAll(job.perks);
+    wageType = job.wageType;
+    if (job.shift.isNotEmpty) {
+      shift = '${job.shift[0].toUpperCase()}${job.shift.substring(1)}';
+    }
+    contact =
+        {
+          'both': 'Apply + Call',
+          'call': 'Call only',
+          'apply': 'Apply only',
+        }[job.contactMode] ??
+        'Apply only';
+    liveStatus = job.status == 'closed' ? 'closed' : 'active';
+  }
+
+  @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_referenceLoaded) {
@@ -68,8 +108,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
         final apiSkills = _names(response['skills']);
         final apiPerks = _names(response['perks']);
         states = _names(response['states']);
-        if (apiSkills.isNotEmpty) skills = apiSkills;
-        if (apiPerks.isNotEmpty) perks = apiPerks;
+        if (city != null) cities = [city!];
+        skills = {...apiSkills, ...selectedSkills}.toList();
+        perks = {...apiPerks, ...selectedPerks}.toList();
       });
     } catch (_) {
       // Bundled options keep this form usable while reference data is offline.
@@ -113,54 +154,119 @@ class _PostJobScreenState extends State<PostJobScreen> {
       'Apply only': 'apply',
       'Call only': 'call',
     }[contact]!;
-    if (title.isEmpty ||
-        description.isEmpty ||
-        category == null ||
-        state == null ||
-        city == null ||
-        vacancies == null ||
-        vacancies < 1 ||
-        wageMin == null) {
+    final draft = status == 'draft';
+    if (title.isEmpty) {
+      _message('Enter a job title.');
+      return;
+    }
+    if (!draft &&
+        (description.isEmpty ||
+            category == null ||
+            state == null ||
+            city == null ||
+            vacancies == null ||
+            vacancies < 1 ||
+            wageMin == null ||
+            wageMin < 0)) {
       _message('Complete all required job details.');
       return;
     }
-    if (wageMax != null && wageMax < wageMin) {
+    if (!draft && wageMax != null && wageMin != null && wageMax < wageMin) {
       _message('Maximum wage cannot be lower than minimum wage.');
       return;
     }
-    if (contactMode != 'apply' &&
+    if (!draft &&
+        contactMode != 'apply' &&
         !RegExp(r'^[6-9]\d{9}$').hasMatch(contactPhoneController.text.trim())) {
       _message('Enter a valid 10-digit contact number.');
       return;
     }
-    setState(() => loading = true);
-    final success = await AppScope.of(context).jobs.create({
+    final values = <String, dynamic>{
       'title': title,
-      'description': description,
-      'category': category,
+      if (description.isNotEmpty) 'description': description,
+      'category': ?category,
       'skills': selectedSkills.toList(),
-      'wage_min': wageMin,
-      'wage_max': ?wageMax,
+      if (wageMin != null && wageMin >= 0) 'wage_min': wageMin,
+      if (wageMax != null && wageMax >= (wageMin ?? 0)) 'wage_max': wageMax,
       'wage_type': wageType,
-      'city': city,
-      'state': state,
-      'vacancies': vacancies,
-      'experience_min': experience ?? 0,
+      'city': ?city,
+      'state': ?state,
+      if (vacancies != null && vacancies > 0) 'vacancies': vacancies,
+      'experience_min': experience != null && experience >= 0 ? experience : 0,
       'shift': shift.toLowerCase(),
       'perks': selectedPerks.toList(),
-      'contact_mode': contactMode,
-      if (contactMode != 'apply')
+      'contact_mode':
+          draft &&
+              !RegExp(
+                r'^[6-9]\d{9}$',
+              ).hasMatch(contactPhoneController.text.trim())
+          ? 'apply'
+          : contactMode,
+      if (contactMode != 'apply' &&
+          RegExp(r'^[6-9]\d{9}$').hasMatch(contactPhoneController.text.trim()))
         'contact_phone': contactPhoneController.text.trim(),
-      'requires_worker_fee': false,
+      'requires_worker_fee': widget.job?.requiresWorkerFee ?? false,
+      'worker_fee_amount': ?widget.job?.workerFeeAmount,
       'status': status,
-    });
-    if (!mounted) return;
-    setState(() => loading = false);
-    if (!success) {
-      _message(AppScope.of(context).jobs.error ?? 'Could not save the job.');
-      return;
+    };
+    setState(() => loading = true);
+    try {
+      final response = await AppScope.of(
+        context,
+      ).api.saveJob(values, id: widget.job?.id);
+      if (!mounted) return;
+      _message(
+        '${response['message'] ?? (draft ? 'Draft saved.' : 'Job posted.')}',
+      );
+      Navigator.pop(context, true);
+    } on ApiException catch (exception) {
+      if (!mounted) return;
+      if (!draft &&
+          canDraft &&
+          exception.statusCode == 422 &&
+          (exception.message.contains('job posts') ||
+              exception.message.contains('Subscribe to a plan'))) {
+        final action = await showModalBottomSheet<String>(
+          context: context,
+          showDragHandle: true,
+          builder: (context) => SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(exception.message),
+                  const SizedBox(height: 16),
+                  OutlinedButton(
+                    onPressed: () => Navigator.pop(context, 'draft'),
+                    child: const Text('Save as draft'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.pop(context, 'plans'),
+                    child: const Text('See plans'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+        if (!mounted) return;
+        setState(() => loading = false);
+        if (action == 'draft') await _submit('draft');
+        if (action == 'plans' && mounted) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const PlansScreen()),
+          );
+        }
+      } else {
+        _message(exception.message);
+      }
+    } catch (exception) {
+      if (mounted) _message('$exception');
+    } finally {
+      if (mounted) setState(() => loading = false);
     }
-    Navigator.pop(context, true);
   }
 
   Future<void> _suggestDescription() async {
@@ -243,7 +349,14 @@ class _PostJobScreenState extends State<PostJobScreen> {
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
-      title: const Text('Post a Job', style: TextStyle(fontSize: 16)),
+      title: Text(
+        widget.job == null
+            ? 'Post a Job'
+            : editingDraft
+            ? 'Edit draft'
+            : 'Edit job',
+        style: const TextStyle(fontSize: 16),
+      ),
     ),
     body: referenceLoading
         ? const Center(child: CircularProgressIndicator())
@@ -253,6 +366,15 @@ class _PostJobScreenState extends State<PostJobScreen> {
                 child: ListView(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                   children: [
+                    if (!canDraft) ...[
+                      const _Label('Status'),
+                      _singleChips(
+                        ['active', 'closed'],
+                        liveStatus,
+                        (value) => setState(() => liveStatus = value),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
                     const _Label('Job title'),
                     _Input(
                       hint: 'e.g. Plumber for apartment project',
@@ -489,23 +611,36 @@ class _PostJobScreenState extends State<PostJobScreen> {
                 ),
                 child: Row(
                   children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: loading ? null : () => _submit('draft'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
-                          foregroundColor: AppColors.foreground,
-                          side: const BorderSide(color: AppColors.line),
+                    if (canDraft)
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: loading ? null : () => _submit('draft'),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(50),
+                            foregroundColor: AppColors.foreground,
+                            side: const BorderSide(color: AppColors.line),
+                          ),
+                          child: Text(
+                            widget.job == null ? 'Save as draft' : 'Save draft',
+                          ),
                         ),
-                        child: const Text('Save draft'),
                       ),
-                    ),
-                    const SizedBox(width: 10),
+                    if (canDraft) const SizedBox(width: 10),
                     Expanded(
                       flex: 2,
                       child: FilledButton(
-                        onPressed: loading ? null : () => _submit('active'),
-                        child: Text(loading ? 'Saving...' : 'Publish Job'),
+                        onPressed: loading
+                            ? null
+                            : () => _submit(canDraft ? 'active' : liveStatus),
+                        child: Text(
+                          loading
+                              ? 'Saving...'
+                              : widget.job == null
+                              ? 'Post job'
+                              : editingDraft
+                              ? 'Publish'
+                              : 'Save changes',
+                        ),
                       ),
                     ),
                   ],

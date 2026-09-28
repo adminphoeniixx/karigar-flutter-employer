@@ -19,6 +19,8 @@ class ProfileEditScreen extends StatefulWidget {
 
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
   LatLng _siteLocation = const LatLng(13.0827, 80.2707);
+  final emailController = TextEditingController();
+  final gstinController = TextEditingController();
   final companyController = TextEditingController();
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
@@ -49,6 +51,10 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     if (!mounted) return;
     if (profile != null) {
       companyController.text = profile.companyName;
+      emailController.text = (profile.email ?? '').endsWith('@phone.karigar')
+          ? ''
+          : profile.email ?? '';
+      gstinController.text = profile.gstin ?? '';
       nameController.text = profile.name;
       phoneController.text = profile.phone ?? '';
       industryController.text = profile.industry ?? '';
@@ -73,9 +79,26 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       );
       return;
     }
+    final email = emailController.text.trim();
+    if (email.isNotEmpty &&
+        (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email) ||
+            email.endsWith('@phone.karigar'))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Enter a valid email address for invoices.'),
+        ),
+      );
+      return;
+    }
     setState(() => saving = true);
     final profile = AppScope.of(context).profile;
     final success = await profile.save({
+      'email': emailController.text.trim().isEmpty
+          ? null
+          : emailController.text.trim(),
+      'gstin': gstinController.text.trim().isEmpty
+          ? null
+          : gstinController.text.trim().toUpperCase(),
       'company_name': companyController.text.trim(),
       'name': nameController.text.trim(),
       'phone': phoneController.text.replaceAll(RegExp(r'\D'), ''),
@@ -94,6 +117,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       );
       return;
     }
+
     Navigator.pop(context, true);
   }
 
@@ -136,6 +160,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   @override
   void dispose() {
     for (final controller in [
+      emailController,
+      gstinController,
       companyController,
       nameController,
       phoneController,
@@ -220,6 +246,21 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   hint: '+91 98765 43210',
                   keyboardType: TextInputType.phone,
                   controller: phoneController,
+                ),
+                const Text(
+                  'Add your email to receive PDF invoices. Add GSTIN and state for correct GST on your invoices.',
+                ),
+                const SizedBox(height: 12),
+                LabeledField(
+                  'Email for invoices',
+                  hint: 'name@company.com',
+                  keyboardType: TextInputType.emailAddress,
+                  controller: emailController,
+                ),
+                LabeledField(
+                  'GSTIN (optional)',
+                  hint: 'Business GSTIN',
+                  controller: gstinController,
                 ),
                 LabeledField(
                   'Industry',

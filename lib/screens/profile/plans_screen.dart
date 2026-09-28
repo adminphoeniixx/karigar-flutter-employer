@@ -1,3 +1,8 @@
+import 'dart:async';
+import 'package:employer_kariger_app/core/analytics/meta_analytics.dart';
+import '../../core/billing/billing.dart';
+import '../../models/api_models.dart';
+import 'profile_edit_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -22,25 +27,38 @@ class _PlansScreenState extends State<PlansScreen> {
   List<Map<String, dynamic>> plans = const [];
   List<Map<String, dynamic>> packs = const [];
   List<Map<String, dynamic>> invoices = const [];
+  Json payment = {};
+  Json? jobPosts;
+  bool checkingOut = false;
+  bool verifyingPayment = false;
   String? pendingSubscriptionId;
   String? pendingOrderId;
 
   @override
   void initState() {
     super.initState();
+    unawaited(
+      MetaAnalytics.instance.viewContent('plan_catalog', 'employer_plans'),
+    );
     _initializeRazorpay();
   }
 
   Future<void> _initializeRazorpay() async {
     try {
-      await const MethodChannel(
+      final recovered = await const MethodChannel(
         'razorpay_flutter',
-      ).invokeMethod<void>('resync');
+      ).invokeMapMethod<String, dynamic>('resync');
       if (!mounted) return;
       razorpay = Razorpay()
         ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _paymentSuccess)
         ..on(Razorpay.EVENT_PAYMENT_ERROR, _paymentError)
         ..on(Razorpay.EVENT_EXTERNAL_WALLET, _externalWallet);
+      final recoveredData = recovered?['data'];
+      if (recovered?['type'] == 0 && recoveredData is Map) {
+        await _paymentSuccess(PaymentSuccessResponse.fromMap(recoveredData));
+      } else if (recovered?['type'] == 1 && recoveredData is Map) {
+        _paymentError(PaymentFailureResponse.fromMap(recoveredData));
+      }
     } on MissingPluginException {
       // A full restart registers newly added native plugins.
     } on PlatformException {
@@ -72,6 +90,12 @@ class _PlansScreenState extends State<PlansScreen> {
         credits = response['credits'] is Map
             ? Map<String, dynamic>.from(response['credits'])
             : {};
+        payment = response['payment'] is Map
+            ? Json.from(response['payment'])
+            : {};
+        jobPosts = response['job_posts'] is Map
+            ? Json.from(response['job_posts'])
+            : null;
         plans = _maps(response['plans']);
         packs = _maps(response['credit_packs']);
         invoices = _maps(response['invoices']);
@@ -90,18 +114,39 @@ class _PlansScreenState extends State<PlansScreen> {
           .toList();
 
   Future<void> _subscribe(Map<String, dynamic> plan) async {
+    if (checkingOut ||
+        pendingSubscriptionId != null ||
+        pendingOrderId != null) {
+      return;
+    }
     final checkout = razorpay;
     if (checkout == null) {
       _checkoutUnavailable();
       return;
     }
     try {
+      setState(() => checkingOut = true);
       final response = await AppScope.of(
         context,
       ).api.subscribe((plan['id'] as num).toInt());
       if (!mounted) return;
+      if (!await _confirmCheckout(response) || !mounted) {
+        return;
+      }
+      final subscriptionId =
+          response['razorpay_subscription_id'] ?? response['subscription_id'];
+      if (subscriptionId is! String ||
+          !subscriptionId.startsWith('sub_') ||
+          response['razorpay_key'] == null) {
+        throw const FormatException(
+          'Payment details are missing. Please try again.',
+        );
+      }
       pendingOrderId = null;
-      pendingSubscriptionId = '${response['razorpay_subscription_id']}';
+      pendingSubscriptionId = subscriptionId;
+      unawaited(
+        AppScope.of(context).api.analytics.checkoutStarted(subscriptionId),
+      );
       checkout.open({
         'key': response['razorpay_key'],
         'subscription_id': pendingSubscriptionId,
@@ -115,20 +160,86 @@ class _PlansScreenState extends State<PlansScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text('$exception')));
       }
+    } finally {
+      if (mounted) setState(() => checkingOut = false);
     }
   }
 
+  Future<bool> _confirmCheckout(Json response) async {
+    final raw = response['amounts'];
+    if (raw is! Map || raw['total'] == null) {
+      throw const FormatException(
+        'Checkout amount is unavailable. Please try again.',
+      );
+    }
+    final amounts = Json.from(raw);
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Confirm payment'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (asDouble(amounts['discount']) > 0)
+                    Text('Discount: −${money(amounts['discount'])}'),
+                  Text('Taxable subtotal: ${money(amounts['subtotal'])}'),
+                  ...taxLines(
+                    amounts,
+                  ).map((line) => Text('${line.label}: ${money(line.amount)}')),
+                  if (amounts['place_of_supply'] != null)
+                    Text('Place of supply: ${amounts['place_of_supply']}'),
+                  const Divider(),
+                  Text(
+                    'Total payable: ${money(amounts['total'])}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Continue to payment'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  String _usageLabel(BuildContext context) {
+    final usage = jobPosts!;
+    final reset = DateTime.tryParse('${usage['resets_at'] ?? ''}');
+    return '${usage['used'] ?? 0} of ${usage['limit'] ?? 0} job posts used this month'
+        '${reset == null ? '' : ' · resets ${MaterialLocalizations.of(context).formatShortDate(reset.toLocal())}'}';
+  }
+
   Future<void> _topUp(Map<String, dynamic> pack) async {
+    if (checkingOut ||
+        pendingSubscriptionId != null ||
+        pendingOrderId != null) {
+      return;
+    }
     final checkout = razorpay;
     if (checkout == null) {
       _checkoutUnavailable();
       return;
     }
     try {
+      setState(() => checkingOut = true);
       final response = await AppScope.of(context).api.topUp('${pack['key']}');
       if (!mounted) return;
       pendingSubscriptionId = null;
       pendingOrderId = '${response['razorpay_order_id']}';
+      unawaited(
+        AppScope.of(context).api.analytics.checkoutStarted(pendingOrderId!),
+      );
       checkout.open({
         'key': response['razorpay_key'],
         'order_id': pendingOrderId,
@@ -142,6 +253,8 @@ class _PlansScreenState extends State<PlansScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text('$exception')));
       }
+    } finally {
+      if (mounted) setState(() => checkingOut = false);
     }
   }
 
@@ -156,7 +269,19 @@ class _PlansScreenState extends State<PlansScreen> {
   }
 
   Future<void> _paymentSuccess(PaymentSuccessResponse response) async {
+    if (!mounted || verifyingPayment) return;
+    verifyingPayment = true;
+    pendingSubscriptionId ??= response.data?['razorpay_subscription_id']
+        ?.toString();
+    if (pendingSubscriptionId == null) pendingOrderId ??= response.orderId;
     try {
+      if (response.paymentId == null ||
+          response.signature == null ||
+          (pendingSubscriptionId == null && pendingOrderId == null)) {
+        throw const FormatException(
+          'Payment details are incomplete. Refresh plans to check payment status.',
+        );
+      }
       if (pendingSubscriptionId != null) {
         await AppScope.of(context).api.subscriptionCallback({
           'razorpay_payment_id': response.paymentId,
@@ -182,6 +307,7 @@ class _PlansScreenState extends State<PlansScreen> {
         ).showSnackBar(SnackBar(content: Text('$exception')));
       }
     } finally {
+      verifyingPayment = false;
       pendingSubscriptionId = null;
       pendingOrderId = null;
     }
@@ -261,6 +387,25 @@ class _PlansScreenState extends State<PlansScreen> {
                     ],
                   ),
                 ),
+                if (jobPosts != null && jobPosts!['unlimited'] != true)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(_usageLabel(context)),
+                  ),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Billing profile'),
+                  subtitle: const Text(
+                    'Add GSTIN and state for correct GST, and your email to receive invoices.',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProfileEditScreen(),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 26),
                 const Text(
                   'Choose a plan',
@@ -272,7 +417,8 @@ class _PlansScreenState extends State<PlansScreen> {
                     padding: const EdgeInsets.only(bottom: 14),
                     child: _Plan(
                       plan: plan,
-                      onChoose: plan['purchasable'] == true
+                      gstPercent: asDouble(payment['gst_percent']),
+                      onChoose: plan['purchasable'] == true && !checkingOut
                           ? () => _subscribe(plan)
                           : null,
                     ),
@@ -312,7 +458,9 @@ class _PlansScreenState extends State<PlansScreen> {
                             ),
                             const SizedBox(width: 12),
                             FilledButton(
-                              onPressed: () => _topUp(pack),
+                              onPressed: checkingOut
+                                  ? null
+                                  : () => _topUp(pack),
                               style: FilledButton.styleFrom(
                                 minimumSize: const Size(64, 44),
                                 padding: const EdgeInsets.symmetric(
@@ -363,22 +511,19 @@ class _PlansScreenState extends State<PlansScreen> {
 }
 
 class _Plan extends StatelessWidget {
-  const _Plan({required this.plan, required this.onChoose});
+  const _Plan({
+    required this.plan,
+    required this.onChoose,
+    required this.gstPercent,
+  });
+  final double gstPercent;
   final Map<String, dynamic> plan;
   final VoidCallback? onChoose;
 
   @override
   Widget build(BuildContext context) {
-    final features = plan['features'] is Map
-        ? Map<String, dynamic>.from(plan['features'])
-        : const <String, dynamic>{};
-    final featureLabels = features.entries
-        .where(
-          (item) =>
-              item.value == true || item.value is num || item.value is String,
-        )
-        .map((item) => item.key.replaceAll('_', ' '))
-        .toList();
+    final featureLabels = (plan['feature_list'] as List? ?? const [])
+        .whereType<String>();
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -394,6 +539,8 @@ class _Plan extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (plan['recommended'] == true)
+            const Chip(label: Text('Recommended')),
           if (plan['is_current'] == true)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -414,11 +561,13 @@ class _Plan extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${plan['name'] ?? ''}',
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Text(
+                  '${plan['name'] ?? ''}',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               Text(
@@ -434,6 +583,11 @@ class _Plan extends StatelessWidget {
             '${plan['interval'] ?? ''}',
             style: const TextStyle(color: AppColors.muted),
           ),
+          if (gstPercent > 0 &&
+              asDouble(plan['price_with_gst']) > asDouble(plan['price']))
+            Text(
+              '+ ${percent(gstPercent)}% GST · ${money(plan['price_with_gst'])} total',
+            ),
           const SizedBox(height: 12),
           ...featureLabels.map(
             (feature) => Padding(
@@ -446,7 +600,7 @@ class _Plan extends StatelessWidget {
                     color: AppColors.green,
                   ),
                   const SizedBox(width: 8),
-                  Text(feature),
+                  Expanded(child: Text(feature)),
                 ],
               ),
             ),

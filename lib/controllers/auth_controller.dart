@@ -36,6 +36,7 @@ class AuthController extends BaseController {
     await run(api.logout);
     await api.client.setToken(null);
     user = null;
+
     notifyListeners();
   }
 }

@@ -83,7 +83,10 @@ class ApiClient {
   Future<BinaryResponse> download(String path) async {
     final uri = _uri(path);
     final request = http.Request('GET', uri)
-      ..headers.addAll(_headers(json: false));
+      ..headers.addAll(_headers(json: false))
+      ..headers[HttpHeaders.acceptHeader] =
+          'application/pdf, application/octet-stream'
+      ..followRedirects = false;
     _logRequest('GET', uri);
     try {
       final streamed = await _client.send(request);
@@ -187,7 +190,18 @@ class ApiClient {
   }
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
-    final uri = Uri.parse('$baseUrl/${path.replaceFirst(RegExp(r'^/'), '')}');
+    final base = Uri.parse(baseUrl);
+    final supplied = Uri.parse(path);
+    final uri = supplied.hasScheme
+        ? supplied
+        : path.startsWith('${base.path}/')
+        ? base.replace(path: supplied.path, query: supplied.query)
+        : Uri.parse('$baseUrl/${path.replaceFirst(RegExp(r'^/'), '')}');
+    if (uri.origin != base.origin) {
+      throw const ApiException(
+        'The download URL does not belong to this server.',
+      );
+    }
     if (query == null) return uri;
     final values = <String, List<String>>{};
     query.forEach((key, value) {

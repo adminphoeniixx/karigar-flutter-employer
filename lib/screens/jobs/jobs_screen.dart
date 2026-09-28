@@ -54,6 +54,30 @@ class _JobsScreenState extends State<JobsScreen> {
     },
   );
 
+  Future<void> _openJob(Job job) async {
+    try {
+      final draft = job.status.toLowerCase() == 'draft'
+          ? await AppScope.of(context).api.job(job.id)
+          : null;
+      if (!mounted) return;
+      final changed = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => draft == null
+              ? JobManageScreen(job: job)
+              : PostJobScreen(job: draft),
+        ),
+      );
+      if (changed == true && mounted) await controller.load();
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$exception')));
+      }
+    }
+  }
+
   Widget _content(BuildContext context, List<Job> liveJobs) => Scaffold(
     appBar: AppBar(
       title: const Text('My Jobs'),
@@ -116,15 +140,7 @@ class _JobsScreenState extends State<JobsScreen> {
                         .map(
                           (j) => Padding(
                             padding: const EdgeInsets.only(bottom: 12),
-                            child: jobCard(
-                              j,
-                              () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => JobManageScreen(job: j),
-                                ),
-                              ),
-                            ),
+                            child: jobCard(j, () => _openJob(j)),
                           ),
                         )
                         .toList(),

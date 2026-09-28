@@ -32,6 +32,7 @@ class EmployerProfile {
     this.companySize,
     this.hiringCategories = const [],
     this.gstin,
+    this.email,
     this.phone,
     this.about,
     this.address,
@@ -53,6 +54,7 @@ class EmployerProfile {
     companySize: json['company_size']?.toString(),
     hiringCategories: asStrings(json['hiring_categories']),
     gstin: json['gstin']?.toString(),
+    email: json['email']?.toString(),
     phone: json['phone']?.toString(),
     about: json['about']?.toString(),
     address: json['address']?.toString(),
@@ -72,6 +74,7 @@ class EmployerProfile {
       industry,
       companySize,
       gstin,
+      email,
       phone,
       about,
       address,
@@ -130,6 +133,8 @@ class EmployerJob {
     required this.category,
     required this.status,
     required this.wageLabel,
+    this.isDraft = false,
+    this.publishedAt,
     this.description = '',
     this.skills = const [],
     this.locationLabel = '',
@@ -157,6 +162,10 @@ class EmployerJob {
     category: '${json['category'] ?? ''}',
     status: '${json['status'] ?? ''}',
     wageLabel: '${json['wage_label'] ?? ''}',
+    isDraft:
+        json['is_draft'] == true ||
+        (json['is_draft'] == null && json['status'] == 'draft'),
+    publishedAt: DateTime.tryParse('${json['published_at'] ?? ''}'),
     description: '${json['description'] ?? ''}',
     skills: asStrings(json['skills']),
     locationLabel: '${json['location_label'] ?? ''}',
@@ -191,6 +200,8 @@ class EmployerJob {
   final String city, state, wageType, shift, contactMode, createdAgo, shareUrl;
   final String? contactPhone;
   final List<String> skills, perks;
+  final bool isDraft;
+  final DateTime? publishedAt;
   final bool requiresWorkerFee;
   final Json stats, boost;
 }

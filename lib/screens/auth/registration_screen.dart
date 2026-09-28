@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:employer_kariger_app/core/analytics/meta_analytics.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -199,6 +201,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       );
       return;
     }
+    unawaited(MetaAnalytics.instance.registrationCompleted());
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const MainShell()),
