@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../widgets/contact_actions.dart';
+import '../profile/plans_screen.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -60,12 +62,14 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       final worker = response['worker'];
       if (worker is! Map || !mounted) return;
       final values = Map<String, dynamic>.from(worker);
-      values['rating'] = response['rating'];
+      if (response['rating'] != null) values['rating'] = response['rating'];
       final loaded = WorkerProfile.fromJson(values);
       setState(() {
         profile = loaded;
         phone = loaded.phone;
-        unlocked = loaded.phone?.isNotEmpty == true;
+        unlocked =
+            loaded.contactUnlocked ||
+            (!loaded.locked && loaded.phone?.isNotEmpty == true);
       });
     } catch (exception) {
       if (mounted) {
@@ -80,21 +84,28 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
 
   Future<void> _unlock() async {
     final action = widget.onUnlock;
-    if (action == null || busy) return;
+    if (busy || (action == null && widget.profileId == null)) return;
     setState(() => busy = true);
     try {
-      final value = await action();
+      String? value;
+      if (action != null) {
+        value = await action();
+      } else {
+        final result = await AppScope.of(
+          context,
+        ).api.unlockWorker(widget.profileId!);
+        value = (result['worker'] as Map?)?['phone']?.toString();
+      }
       if (mounted) {
         setState(() {
-          unlocked = true;
+          unlocked = value?.isNotEmpty == true;
           phone = value ?? phone;
         });
       }
+      if (mounted) await AppScope.of(context).dashboard.load();
     } catch (exception) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        await showContactError(context, exception);
       }
     } finally {
       if (mounted) setState(() => busy = false);
@@ -102,7 +113,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   }
 
   Future<void> _message() async {
-    final workerUserId = widget.workerUserId;
+    final workerUserId = profile?.userId ?? widget.workerUserId;
     if (workerUserId == null || busy) return;
     setState(() => busy = true);
     try {
@@ -215,9 +226,9 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          if (details?.verified != false)
+                          if (details?.verified == true)
                             const StatusPill('Verified'),
-                          if (details?.available != false)
+                          if (details?.available == true)
                             const BrandChip('● Available'),
                           BrandChip('₹${w.wage}/day'),
                         ],
@@ -271,7 +282,8 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   ],
                                 ),
                               ),
-                              if (widget.onUnlock != null)
+                              if (widget.onUnlock != null ||
+                                  details?.canUnlock == true)
                                 TextButton(
                                   onPressed: unlocked || busy ? null : _unlock,
                                   child: Text(
@@ -282,6 +294,20 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                           ),
                         ),
                       ),
+                      if (unlocked)
+                        ContactActions(phone: phone, email: details?.email),
+                      if (!unlocked &&
+                          widget.onUnlock == null &&
+                          details?.canUnlock != true)
+                        OutlinedButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PlansScreen(),
+                            ),
+                          ),
+                          child: const Text('View plans to access contacts'),
+                        ),
                       const SectionTitle('About'),
                       Text(
                         details?.bio.isNotEmpty == true
@@ -302,43 +328,11 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                             .map((value) => BrandChip(value, neutral: true))
                             .toList(),
                       ),
-                      const SectionTitle('Recent ratings'),
-                      const Card(
-                        child: Padding(
-                          padding: EdgeInsets.all(14),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                mainAxisAlignment:
-                                    MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(
-                                    'Kumar Interiors',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    '★★★★★',
-                                    style: TextStyle(color: Color(0xFFFBBF24)),
-                                  ),
-                                ],
-                              ),
-                              SizedBox(height: 6),
-                              Text(
-                                'Neat work and finished ahead of time. Reliable.',
-                                style: TextStyle(fontSize: 12.5),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: 18),
                       if (widget.canMessage || unlocked)
                         Row(
                           children: [
-                            if (widget.canMessage)
+                            if (widget.canMessage || unlocked)
                               Expanded(
                                 child: OutlinedButton.icon(
                                   onPressed: busy ? null : _message,
@@ -346,8 +340,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   label: const Text('Message'),
                                 ),
                               ),
-                            if (widget.canMessage && unlocked)
-                              const SizedBox(width: 8),
+                            if (unlocked) const SizedBox(width: 8),
                             if (unlocked)
                               Expanded(
                                 child: FilledButton.icon(

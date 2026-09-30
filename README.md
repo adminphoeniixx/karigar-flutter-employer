@@ -2,7 +2,11 @@
 
 ## API setup
 
-The complete backend contract is included in [API.md](API.md). The API base URL
+The latest supplied backend contract is included in [docs/employer-app-api.md](docs/employer-app-api.md).
+Contact unlocks, contact lists and plan changes are described in
+[docs/employer-app-contacts-and-plans.md](docs/employer-app-contacts-and-plans.md).
+Import [the Postman collection](docs/karigar-employer-app.postman_collection.json) to exercise these endpoints.
+The supplied release notes mark the new contact lists and plan updates as dependent on the next server deployment. The API base URL
 and endpoint paths are centralized in
 `lib/constants/api_constants.dart`. The configured backend is
 `https://projects-karigar.rmsiry.easypanel.host/api/v1`.
@@ -27,3 +31,10 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter development, view the
 [online documentation](https://docs.flutter.dev/), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+## Verification
+
+Run `flutter pub get`, `flutter analyze`, and `flutter test`. Contact actions use
+`url_launcher`, so rebuild and restart the native app after updating dependencies.
+Call, WhatsApp, email and Razorpay checkout should also be tested on a signed-in
+device with the corresponding apps/payment configuration available.

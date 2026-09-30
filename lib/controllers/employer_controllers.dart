@@ -39,11 +39,17 @@ class WorkersController extends BaseController {
   final EmployerApiService api;
   List<WorkerProfile> items = [];
   Json access = {};
+  Json contactCounts = {};
+  int total = 0;
 
   Future<void> search([Map<String, dynamic> filters = const {}]) async {
     final response = await run(() => api.workers(filters));
     if (response == null) return;
+    contactCounts = response['contact_counts'] is Map
+        ? Json.from(response['contact_counts'])
+        : {};
     final wrapper = response['workers'];
+    total = wrapper is Map ? asInt(wrapper['total']) : 0;
     final rows = wrapper is Map ? wrapper['data'] as List? : null;
     items = (rows ?? const [])
         .whereType<Map>()

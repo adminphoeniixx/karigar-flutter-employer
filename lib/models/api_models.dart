@@ -99,6 +99,7 @@ class CreditSummary {
     this.unmetered = false,
     this.plan = '',
     this.planLabel = '',
+    this.unlocksResetAt,
   });
   factory CreditSummary.fromJson(dynamic value) {
     final json = value is Map
@@ -110,6 +111,7 @@ class CreditSummary {
       planRemaining: asInt(json['plan_remaining']),
       planLimit: asInt(json['plan_limit']),
       unlocksUsed: asInt(json['unlocks_used']),
+      unlocksResetAt: DateTime.tryParse('${json['unlocks_reset_at'] ?? ''}'),
       directoryQuota: asInt(json['directory_quota']),
       unmetered: json['unmetered'] == true,
       plan: '${json['plan'] ?? ''}',
@@ -124,6 +126,7 @@ class CreditSummary {
       directoryQuota;
   final bool unmetered;
   final String plan, planLabel;
+  final DateTime? unlocksResetAt;
 }
 
 class EmployerJob {
@@ -149,6 +152,8 @@ class EmployerJob {
     this.perks = const [],
     this.contactMode = 'apply',
     this.contactPhone,
+    this.latitude,
+    this.longitude,
     this.requiresWorkerFee = false,
     this.workerFeeAmount,
     this.createdAgo = '',
@@ -175,6 +180,8 @@ class EmployerJob {
     wageMax: asDouble(json['wage_max']),
     wageType: '${json['wage_type'] ?? 'daily'}',
     vacancies: asInt(json['vacancies']),
+    latitude: json['latitude'] == null ? null : asDouble(json['latitude']),
+    longitude: json['longitude'] == null ? null : asDouble(json['longitude']),
     experienceMin: asInt(json['experience_min']),
     shift: '${json['shift'] ?? ''}',
     perks: asStrings(json['perks']),
@@ -195,7 +202,7 @@ class EmployerJob {
   );
   final int id, vacancies, experienceMin;
   final double wageMin, wageMax;
-  final double? workerFeeAmount;
+  final double? workerFeeAmount, latitude, longitude;
   final String title, category, status, wageLabel, description, locationLabel;
   final String city, state, wageType, shift, contactMode, createdAgo, shareUrl;
   final String? contactPhone;
@@ -222,6 +229,8 @@ class WorkerProfile {
     this.available = false,
     this.verified = false,
     this.locked = true,
+    this.canUnlock = false,
+    this.contactUnlocked = false,
     this.phone,
     this.email,
     this.avatarUrl,
@@ -244,6 +253,8 @@ class WorkerProfile {
     available: json['available'] == true,
     verified: json['verified'] == true,
     locked: json['locked'] == true || json['contact_unlocked'] == false,
+    canUnlock: json['can_unlock'] == true,
+    contactUnlocked: json['contact_unlocked'] == true,
     phone: json['phone']?.toString(),
     email: json['email']?.toString(),
     avatarUrl: json['avatar_url']?.toString(),
@@ -257,7 +268,7 @@ class WorkerProfile {
   final String name, bio, city, state, wageType;
   final String? phone, email, avatarUrl, education;
   final List<String> skills, languages;
-  final bool available, verified, locked;
+  final bool available, verified, locked, canUnlock, contactUnlocked;
   final double? distanceKm;
   final Rating rating;
 }

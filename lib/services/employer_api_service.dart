@@ -238,6 +238,12 @@ class EmployerApiService {
 
   Future<Json> workers(Map<String, dynamic> filters) =>
       client.get('/employer/workers', query: filters);
+  Future<Json> unlockWorker(int profileId) =>
+      client.post('/employer/workers/$profileId/unlock');
+
+  Future<Json> contacts(String source, Map<String, dynamic> filters) =>
+      client.get('/employer/contacts/$source', query: filters);
+
   Future<Json> worker(int id) async {
     final response = await client.get('/employer/workers/$id');
     return response;

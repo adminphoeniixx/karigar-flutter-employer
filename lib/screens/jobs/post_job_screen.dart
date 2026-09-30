@@ -2,6 +2,7 @@ import '../../models/api_models.dart';
 import '../../core/api/api_exception.dart';
 import '../profile/plans_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -48,6 +49,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
     'Overtime pay',
     'Weekly off',
   ];
+  LatLng? selectedLocation;
   List<String> states = const [];
   List<String> cities = const [];
   final titleController = TextEditingController();
@@ -64,6 +66,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
 
     final job = widget.job;
     if (job == null) return;
+    if (job.latitude != null && job.longitude != null) {
+      selectedLocation = LatLng(job.latitude!, job.longitude!);
+    }
     titleController.text = job.title;
     descriptionController.text = job.description;
     openingsController.text = job.vacancies > 0 ? '${job.vacancies}' : '';
@@ -131,11 +136,12 @@ class _PostJobScreenState extends State<PostJobScreen> {
     setState(() {
       state = value;
       city = null;
+      selectedLocation = null;
       cities = const [];
     });
     try {
       final result = await AppScope.of(context).api.cities(value);
-      if (mounted) setState(() => cities = result);
+      if (mounted && state == value) setState(() => cities = result);
     } catch (_) {
       _message('Could not load cities.');
     }
@@ -191,6 +197,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
       'wage_type': wageType,
       'city': ?city,
       'state': ?state,
+      'latitude': selectedLocation?.latitude,
+      'longitude': selectedLocation?.longitude,
       if (vacancies != null && vacancies > 0) 'vacancies': vacancies,
       'experience_min': experience != null && experience >= 0 ? experience : 0,
       'shift': shift.toLowerCase(),
@@ -224,23 +232,35 @@ class _PostJobScreenState extends State<PostJobScreen> {
       if (!draft &&
           canDraft &&
           exception.statusCode == 422 &&
-          (exception.message.contains('job posts') ||
+          (exception.code == 'no_plan' ||
+              exception.code == 'job_limit_reached' ||
+              exception.message.contains('job posts') ||
               exception.message.contains('Subscribe to a plan'))) {
         final action = await showModalBottomSheet<String>(
           context: context,
           showDragHandle: true,
+          isScrollControlled: true,
+          useSafeArea: true,
+          constraints: const BoxConstraints(maxWidth: 640),
           builder: (context) => SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const Text(
+                    "Choose a plan to continue",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 8),
                   Text(exception.message),
                   const SizedBox(height: 16),
                   OutlinedButton(
                     onPressed: () => Navigator.pop(context, 'draft'),
                     child: const Text('Save as draft'),
                   ),
+                  const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => Navigator.pop(context, 'plans'),
                     child: const Text('See plans'),
@@ -571,7 +591,10 @@ class _PostJobScreenState extends State<PostJobScreen> {
                                     _choose(
                                       'Select city',
                                       cities,
-                                      (value) => setState(() => city = value),
+                                      (value) => setState(() {
+                                        city = value;
+                                        selectedLocation = null;
+                                      }),
                                     );
                                   }
                                 },
@@ -583,7 +606,21 @@ class _PostJobScreenState extends State<PostJobScreen> {
                     ),
                     const SizedBox(height: 14),
                     const _Label('Pin the job location'),
-                    const SizedBox(height: 150, child: LocationMap()),
+                    SizedBox(
+                      height: 190,
+                      child: LocationMap(
+                        key: ValueKey('$state/$city'),
+                        initialLocation:
+                            selectedLocation ?? const LatLng(22.5937, 78.9629),
+                        initialZoom: selectedLocation == null ? 4 : 13,
+                        hasSelection: selectedLocation != null,
+                        onLocationChanged: (point) => selectedLocation = point,
+                      ),
+                    ),
+                    const Text(
+                      'Move the map or tap to pin the exact work site.',
+                      style: TextStyle(fontSize: 12, color: AppColors.muted),
+                    ),
                     const SizedBox(height: 14),
                     const _Label('How should workers reach you?'),
                     _singleChips(

@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../core/api/api_exception.dart';
 import 'package:employer_kariger_app/core/analytics/meta_analytics.dart';
 import '../../core/billing/billing.dart';
 import '../../models/api_models.dart';
@@ -56,8 +57,6 @@ class _PlansScreenState extends State<PlansScreen> {
       final recoveredData = recovered?['data'];
       if (recovered?['type'] == 0 && recoveredData is Map) {
         await _paymentSuccess(PaymentSuccessResponse.fromMap(recoveredData));
-      } else if (recovered?['type'] == 1 && recoveredData is Map) {
-        _paymentError(PaymentFailureResponse.fromMap(recoveredData));
       }
     } on MissingPluginException {
       // A full restart registers newly added native plugins.
@@ -155,6 +154,8 @@ class _PlansScreenState extends State<PlansScreen> {
         'theme': {'color': '#F97316'},
       });
     } catch (exception) {
+      pendingSubscriptionId = null;
+      pendingOrderId = null;
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -248,6 +249,8 @@ class _PlansScreenState extends State<PlansScreen> {
         'theme': {'color': '#F97316'},
       });
     } catch (exception) {
+      pendingSubscriptionId = null;
+      pendingOrderId = null;
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -318,7 +321,14 @@ class _PlansScreenState extends State<PlansScreen> {
     pendingOrderId = null;
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(response.message ?? 'Payment failed.')),
+        SnackBar(
+          content: Text(
+            readableMessage(
+              response.message,
+              fallback: 'Payment was not completed. Please try again.',
+            ),
+          ),
+        ),
       );
     }
   }
@@ -344,7 +354,12 @@ class _PlansScreenState extends State<PlansScreen> {
             onRefresh: _load,
             child: ListView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
+              padding: EdgeInsets.fromLTRB(
+                16,
+                16,
+                16,
+                24 + MediaQuery.paddingOf(context).bottom,
+              ),
               children: [
                 Container(
                   padding: const EdgeInsets.all(18),
@@ -367,7 +382,9 @@ class _PlansScreenState extends State<PlansScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '${credits['balance'] ?? 0} credits',
+                              credits['unmetered'] == true
+                                  ? 'Unlimited unlocks'
+                                  : '${credits['balance'] ?? 0} credits',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 24,
@@ -387,6 +404,14 @@ class _PlansScreenState extends State<PlansScreen> {
                     ],
                   ),
                 ),
+                if (DateTime.tryParse('${credits['unlocks_reset_at'] ?? ''}')
+                    case final DateTime reset)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Text(
+                      'Contact unlocks renew on ${MaterialLocalizations.of(context).formatMediumDate(reset.toLocal())}',
+                    ),
+                  ),
                 if (jobPosts != null && jobPosts!['unlimited'] != true)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
@@ -458,7 +483,8 @@ class _PlansScreenState extends State<PlansScreen> {
                             ),
                             const SizedBox(width: 12),
                             FilledButton(
-                              onPressed: checkingOut
+                              onPressed:
+                                  checkingOut || payment['configured'] != true
                                   ? null
                                   : () => _topUp(pack),
                               style: FilledButton.styleFrom(

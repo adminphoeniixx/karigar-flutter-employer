@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import '../../widgets/contact_actions.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -224,7 +225,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
       await _load();
       _message('Contact unlocked.');
     } catch (exception) {
-      _message('$exception');
+      if (mounted) await showContactError(context, exception);
     }
   }
 

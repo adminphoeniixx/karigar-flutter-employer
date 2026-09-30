@@ -247,8 +247,11 @@ class ApiClient {
     _logResponse(response, elapsed: elapsed, payload: data);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException(
-        data['message']?.toString() ??
-            'Request failed (${response.statusCode})',
+        readableMessage(
+          data['message']?.toString(),
+          fallback:
+              'Request failed (${response.statusCode}). Please try again.',
+        ),
         statusCode: response.statusCode,
         code: data['code']?.toString(),
         errors: data['errors'] is Map

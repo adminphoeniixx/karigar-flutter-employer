@@ -10,9 +10,13 @@ class LocationMap extends StatefulWidget {
     super.key,
     this.initialLocation = const LatLng(13.0827, 80.2707),
     this.onLocationChanged,
+    this.initialZoom = 13,
+    this.hasSelection = true,
   });
 
   final LatLng initialLocation;
+  final double initialZoom;
+  final bool hasSelection;
   final ValueChanged<LatLng>? onLocationChanged;
 
   @override
@@ -22,18 +26,30 @@ class LocationMap extends StatefulWidget {
 class _LocationMapState extends State<LocationMap> {
   final MapController _controller = MapController();
   late LatLng _selectedLocation;
-  double _zoom = 13;
+  late double _zoom;
+  late bool _hasSelection;
   bool _mapReady = false;
 
   @override
   void initState() {
     super.initState();
     _selectedLocation = widget.initialLocation;
+    _zoom = widget.initialZoom;
+    _hasSelection = widget.hasSelection;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   void _select(LatLng point) {
     _controller.move(point, _zoom);
-    setState(() => _selectedLocation = point);
+    setState(() {
+      _selectedLocation = point;
+      _hasSelection = true;
+    });
     widget.onLocationChanged?.call(point);
   }
 
@@ -66,6 +82,7 @@ class _LocationMapState extends State<LocationMap> {
                         _zoom = camera.zoom;
                         if (hasGesture) {
                           _selectedLocation = camera.center;
+                          _hasSelection = true;
                           widget.onLocationChanged?.call(camera.center);
                           setState(() {});
                         }
@@ -139,8 +156,10 @@ class _LocationMapState extends State<LocationMap> {
         ),
         const SizedBox(height: 7),
         Text(
-          'Selected: ${_selectedLocation.latitude.toStringAsFixed(5)}, '
-          '${_selectedLocation.longitude.toStringAsFixed(5)}',
+          !_hasSelection
+              ? 'Tap the map to select a location'
+              : 'Selected: ${_selectedLocation.latitude.toStringAsFixed(5)}, '
+                    '${_selectedLocation.longitude.toStringAsFixed(5)}',
           style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
         ),
       ],

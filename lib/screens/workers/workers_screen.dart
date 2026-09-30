@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../widgets/contact_actions.dart';
+import '../../models/api_models.dart';
+import 'contacts_view.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -15,6 +18,9 @@ class WorkersScreen extends StatefulWidget {
 }
 
 class _WorkersScreenState extends State<WorkersScreen> {
+  int tab = 0;
+  Json contactCounts = {};
+  int? unlocking;
   String query = '';
   String category = 'All';
   Map<String, dynamic> advancedFilters = {};
@@ -44,7 +50,11 @@ class _WorkersScreenState extends State<WorkersScreen> {
   }
 
   void _refresh() {
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        contactCounts = {...contactCounts, ...controller.contactCounts};
+      });
+    }
   }
 
   @override
@@ -84,6 +94,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
         .map(
           (item) => _WorkerView(
             profileId: item.id,
+            profile: item,
             worker: Worker(
               item.name,
               item.skills.isEmpty ? 'Worker' : item.skills.first,
@@ -112,25 +123,61 @@ class _WorkersScreenState extends State<WorkersScreen> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: InkWell(
-              onTap: () => _showFilters(context),
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.line),
-                  borderRadius: BorderRadius.circular(12),
+          if (tab == 0)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: InkWell(
+                onTap: () => _showFilters(context),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.line),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(LucideIcons.listFilter, size: 20),
                 ),
-                child: const Icon(LucideIcons.listFilter, size: 20),
+              ),
+            ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.all(8),
+              child: Row(
+                children: [
+                  for (final entry in [
+                    'Find karigars',
+                    'Database contacts (${contactCounts['database_total'] ?? 0})',
+                    'Applicant contacts (${contactCounts['applicants_total'] ?? 0})',
+                  ].asMap().entries)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(entry.value),
+                        selected: tab == entry.key,
+                        onSelected: (_) => setState(() => tab = entry.key),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
-      body: !controller.hasLoaded
+      body: tab != 0
+          ? ContactsView(
+              key: ValueKey(tab),
+              source: tab == 1 ? 'database' : 'applicants',
+              onUsage: (usage) {
+                if (mounted) setState(() => contactCounts = usage);
+              },
+            )
+          : !controller.hasLoaded
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
@@ -237,7 +284,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
                           ),
                         ),
                       Text(
-                        '${query.isEmpty && category == 'All' ? 8 : visible.length} workers available · Chennai, TN',
+                        '${controller.total == 0 ? visible.length : controller.total} workers found',
                         style: const TextStyle(
                           color: AppColors.muted,
                           fontSize: 11.5,
@@ -249,12 +296,18 @@ class _WorkersScreenState extends State<WorkersScreen> {
                           padding: const EdgeInsets.only(bottom: 12),
                           child: _WorkerResultCard(
                             data: item,
+                            busy: unlocking == item.profileId,
+                            onUnlock: () => _unlock(item.profile),
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (_) => WorkerProfileScreen(
                                   worker: item.worker,
                                   profileId: item.profileId,
+                                  workerUserId: item.profile.userId,
+                                  phone: item.profile.phone,
+                                  contactUnlocked: item.profile.contactUnlocked,
+                                  canMessage: item.profile.contactUnlocked,
                                 ),
                               ),
                             ),
@@ -267,6 +320,21 @@ class _WorkersScreenState extends State<WorkersScreen> {
               ],
             ),
     );
+  }
+
+  Future<void> _unlock(WorkerProfile profile) async {
+    if (unlocking != null) return;
+    setState(() => unlocking = profile.id);
+    try {
+      await AppScope.of(context).api.unlockWorker(profile.id);
+      if (!mounted) return;
+      await _search();
+      if (mounted) await AppScope.of(context).dashboard.load();
+    } catch (error) {
+      if (mounted) await showContactError(context, error);
+    } finally {
+      if (mounted) setState(() => unlocking = null);
+    }
   }
 
   Future<void> _showFilters(BuildContext context) async {
@@ -287,6 +355,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
 class _WorkerView {
   const _WorkerView({
     required this.profileId,
+    required this.profile,
     required this.worker,
     required this.name,
     required this.experience,
@@ -297,6 +366,7 @@ class _WorkerView {
     required this.skills,
   });
 
+  final WorkerProfile profile;
   final Worker worker;
   final int profileId;
   final String name;
@@ -309,7 +379,14 @@ class _WorkerView {
 }
 
 class _WorkerResultCard extends StatelessWidget {
-  const _WorkerResultCard({required this.data, required this.onTap});
+  const _WorkerResultCard({
+    required this.data,
+    required this.onTap,
+    required this.onUnlock,
+    required this.busy,
+  });
+  final VoidCallback onUnlock;
+  final bool busy;
   final _WorkerView data;
   final VoidCallback onTap;
 
@@ -330,7 +407,7 @@ class _WorkerResultCard extends StatelessWidget {
                   radius: 22,
                   backgroundColor: AppColors.brand100,
                   child: Text(
-                    data.name.split(' ').map((word) => word[0]).take(2).join(),
+                    data.worker.initials,
                     style: const TextStyle(
                       color: AppColors.brandDark,
                       fontWeight: FontWeight.w700,
@@ -354,11 +431,12 @@ class _WorkerResultCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 5),
-                          const Icon(
-                            LucideIcons.badgeCheck,
-                            size: 15,
-                            color: AppColors.green,
-                          ),
+                          if (data.profile.verified)
+                            const Icon(
+                              LucideIcons.badgeCheck,
+                              size: 15,
+                              color: AppColors.green,
+                            ),
                         ],
                       ),
                       Text(
@@ -395,14 +473,15 @@ class _WorkerResultCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            '● Available',
-                            style: TextStyle(
-                              color: AppColors.green,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                          if (data.profile.available)
+                            const Text(
+                              '● Available',
+                              style: TextStyle(
+                                color: AppColors.green,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
                         ],
                       ),
                     ],
@@ -418,6 +497,21 @@ class _WorkerResultCard extends StatelessWidget {
                   .map((skill) => BrandChip(skill, neutral: true))
                   .toList(),
             ),
+            const SizedBox(height: 10),
+            if (data.profile.contactUnlocked) ...[
+              Text(data.profile.phone ?? 'Contact unlocked'),
+              ContactActions(
+                phone: data.profile.phone,
+                email: data.profile.email,
+              ),
+            ] else if (data.profile.canUnlock)
+              FilledButton.icon(
+                onPressed: busy ? null : onUnlock,
+                icon: const Icon(Icons.lock_open, size: 18),
+                label: Text(busy ? 'Unlocking…' : 'Unlock contact · 1 credit'),
+              )
+            else
+              const Text('Contact locked · view profile for plan access'),
           ],
         ),
       ),

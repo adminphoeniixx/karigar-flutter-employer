@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../widgets/contact_actions.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -106,7 +107,7 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       await controller.load();
     } catch (exception) {
-      _message('$exception');
+      if (mounted) await showContactError(context, exception);
     }
   }
 
@@ -262,7 +263,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 16),
                 _CreditsCard(
                   balance: data?.credits.balance ?? 0,
-                  label: data?.credits.planLabel ?? '',
+                  label: [
+                    data?.credits.planLabel ?? '',
+                    if (data?.credits.unlocksResetAt case final DateTime reset)
+                      'Unlocks renew ${MaterialLocalizations.of(context).formatMediumDate(reset.toLocal())}',
+                  ].where((text) => text.isNotEmpty).join(' · '),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const PlansScreen()),
@@ -804,6 +809,7 @@ class _ApplicantCard extends StatelessWidget {
               alignment: Alignment.centerLeft,
               child: Wrap(
                 spacing: 7,
+                runSpacing: 8,
                 children: skills
                     .map((e) => BrandChip(e, neutral: true))
                     .toList(),

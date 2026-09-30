@@ -43,7 +43,13 @@ class Worker {
   final double distance;
   final List<String> skills;
 
-  String get initials => name.split(' ').map((e) => e[0]).take(2).join();
+  String get initials => name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((e) => e.isNotEmpty)
+      .map((e) => e[0])
+      .take(2)
+      .join();
 }
 
 const jobs = [
