@@ -1,7 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
+import 'package:employer_kariger_app/core/app_language.dart';
+import 'package:employer_kariger_app/core/app_strings.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/auth/onboarding_screen.dart';
 import 'package:employer_kariger_app/screens/profile/account_management_screen.dart';
@@ -17,7 +20,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool darkTheme = false;
   bool applicantAlerts = true;
   bool messageAlerts = true;
-  String language = 'English';
+  List<String> languageCodes = const ['en', 'hi', 'ta', 'te', 'bn', 'mr'];
   bool loaded = false;
   bool loading = true;
 
@@ -32,13 +35,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _load() async {
     try {
-      final response = await AppScope.of(context).api.preferences();
+      final api = AppScope.of(context).api;
+      final results = await Future.wait([api.preferences(), api.reference()]);
+      final response = results.first;
       final preferences = response['preferences'];
-      if (!mounted || preferences is! Map) return;
+      final reference = results.last;
+      if (!mounted) return;
       setState(() {
-        darkTheme = preferences['theme'] == 'dark';
-        applicantAlerts = preferences['applicant_alerts'] != false;
-        messageAlerts = preferences['message_alerts'] != false;
+        if (preferences is Map) {
+          darkTheme = preferences['theme'] == 'dark';
+          applicantAlerts = preferences['applicant_alerts'] != false;
+          messageAlerts = preferences['message_alerts'] != false;
+        }
+        final serverCodes = (reference['app_languages'] as List? ?? const [])
+            .whereType<Map>()
+            .map((item) => '${item['code']}')
+            .where((code) => code.isNotEmpty)
+            .toList();
+        if (serverCodes.isNotEmpty) languageCodes = serverCodes;
       });
     } catch (_) {
       // Keep the current defaults if preferences cannot be fetched.
@@ -63,128 +77,136 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
       toolbarHeight: 58,
-      title: const Text(
-        'Settings',
+      title: Text(
+        context.tr('Settings'),
         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
       ),
     ),
-    body: loading
-        ? const Center(child: CircularProgressIndicator())
-        : ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              const _SectionHeader('Preferences'),
-              _SettingsRow(
-                icon: LucideIcons.globe2,
-                title: 'Language',
-                subtitle: language,
-                onTap: _showLanguageSheet,
-              ),
-              _SettingsRow(
-                icon: LucideIcons.moon,
-                title: 'Dark theme',
-                subtitle: 'Switch to a darker screen',
-                trailing: _CompactSwitch(
-                  value: darkTheme,
-                  onChanged: (value) {
-                    setState(() => darkTheme = value);
-                    _updatePreference({'theme': value ? 'dark' : 'light'});
-                  },
+    body: AnimatedBuilder(
+      animation: AppScope.of(context).appLanguage,
+      builder: (context, _) => loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _SectionHeader(context.tr('Preferences')),
+                _SettingsRow(
+                  icon: LucideIcons.globe2,
+                  title: context.tr('Language'),
+                  subtitle: AppLanguage.label(
+                    AppScope.of(context).appLanguage.locale.languageCode,
+                  ),
+                  onTap: _showLanguageSheet,
                 ),
-              ),
-              _SettingsRow(
-                icon: LucideIcons.bell,
-                title: 'Applicant alerts',
-                subtitle: 'Get notified on new applications',
-                trailing: _CompactSwitch(
-                  value: applicantAlerts,
-                  onChanged: (value) {
-                    setState(() => applicantAlerts = value);
-                    _updatePreference({'applicant_alerts': value});
-                  },
-                ),
-              ),
-              _SettingsRow(
-                icon: LucideIcons.messageSquare,
-                title: 'Message alerts',
-                subtitle: 'Get notified about worker messages',
-                trailing: _CompactSwitch(
-                  value: messageAlerts,
-                  onChanged: (value) {
-                    setState(() => messageAlerts = value);
-                    _updatePreference({'message_alerts': value});
-                  },
-                ),
-              ),
-              const _SectionHeader('Account & Security'),
-              _SettingsRow(
-                icon: LucideIcons.lockKeyhole,
-                title: 'Login & security',
-                subtitle: 'OTP · device sessions',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DeviceSessionsScreen(),
+                _SettingsRow(
+                  icon: LucideIcons.moon,
+                  title: context.tr('Dark theme'),
+                  subtitle: context.tr('Switch to a darker screen'),
+                  trailing: _CompactSwitch(
+                    value: darkTheme,
+                    onChanged: (value) {
+                      setState(() => darkTheme = value);
+                      _updatePreference({'theme': value ? 'dark' : 'light'});
+                    },
                   ),
                 ),
-              ),
-              _SettingsRow(
-                icon: LucideIcons.usersRound,
-                title: 'Team members',
-                subtitle: 'Add recruiters to your account',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const TeamMembersScreen()),
+                _SettingsRow(
+                  icon: LucideIcons.bell,
+                  title: context.tr('Applicant alerts'),
+                  subtitle: context.tr('Get notified on new applications'),
+                  trailing: _CompactSwitch(
+                    value: applicantAlerts,
+                    onChanged: (value) {
+                      setState(() => applicantAlerts = value);
+                      _updatePreference({'applicant_alerts': value});
+                    },
+                  ),
                 ),
-              ),
-              const _SettingsRow(
-                icon: LucideIcons.fileText,
-                title: 'Terms & Privacy',
-              ),
-              const _SettingsRow(
-                icon: LucideIcons.circleHelp,
-                title: 'Help & Support',
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    await AppScope.of(context).auth.logout();
-                    if (!context.mounted) return;
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const OnboardingScreen(),
-                      ),
-                      (_) => false,
-                    );
-                  },
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(48),
-                    backgroundColor: AppColors.card,
-                    foregroundColor: const Color(0xFFE11D48),
-                    side: const BorderSide(color: Color(0xFFFFE4E6)),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                _SettingsRow(
+                  icon: LucideIcons.messageSquare,
+                  title: context.tr('Message alerts'),
+                  subtitle: context.tr('Get notified about worker messages'),
+                  trailing: _CompactSwitch(
+                    value: messageAlerts,
+                    onChanged: (value) {
+                      setState(() => messageAlerts = value);
+                      _updatePreference({'message_alerts': value});
+                    },
+                  ),
+                ),
+                _SectionHeader(context.tr('Account & Security')),
+                _SettingsRow(
+                  icon: LucideIcons.lockKeyhole,
+                  title: context.tr('Login & security'),
+                  subtitle: context.tr('OTP · device sessions'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const DeviceSessionsScreen(),
                     ),
                   ),
-                  icon: const Icon(LucideIcons.logOut, size: 19),
-                  label: const Text('Log out'),
                 ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Super Karigar Employer · v1.0.0',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.muted, fontSize: 11.5),
-              ),
-              const SizedBox(height: 28),
-            ],
-          ),
+                _SettingsRow(
+                  icon: LucideIcons.usersRound,
+                  title: context.tr('Team members'),
+                  subtitle: context.tr('Add recruiters to your account'),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const TeamMembersScreen(),
+                    ),
+                  ),
+                ),
+                _SettingsRow(
+                  icon: LucideIcons.fileText,
+                  title: context.tr('Terms & Privacy'),
+                ),
+                _SettingsRow(
+                  icon: LucideIcons.circleHelp,
+                  title: context.tr('Help & Support'),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await AppScope.of(context).auth.logout();
+                      if (!context.mounted) return;
+                      Navigator.pushAndRemoveUntil(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const OnboardingScreen(),
+                        ),
+                        (_) => false,
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size.fromHeight(48),
+                      backgroundColor: AppColors.card,
+                      foregroundColor: const Color(0xFFE11D48),
+                      side: const BorderSide(color: Color(0xFFFFE4E6)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: const Icon(LucideIcons.logOut, size: 19),
+                    label: Text(context.tr('Log out')),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  context.tr('Super Karigar Employer · v1.0.0'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.muted, fontSize: 11.5),
+                ),
+                const SizedBox(height: 28),
+              ],
+            ),
+    ),
   );
 
   Future<void> _showLanguageSheet() async {
     final api = AppScope.of(context).api;
+    final appLanguage = AppScope.of(context).appLanguage;
     final selected = await showModalBottomSheet<String>(
       context: context,
       backgroundColor: AppColors.card,
@@ -210,19 +232,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
-              const Text(
-                'Choose language',
+              Text(
+                context.tr('Choose language'),
                 style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 12),
-              ...['English', 'हिन्दी', 'தமிழ்', 'తెలుగు', 'ಕನ್ನಡ'].map(
-                (item) => ListTile(
+              ...languageCodes.map(
+                (code) => ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text(item),
-                  trailing: item == language
+                  title: Text(AppLanguage.label(code)),
+                  trailing: code == appLanguage.locale.languageCode
                       ? const Icon(LucideIcons.check, color: AppColors.primary)
                       : null,
-                  onTap: () => Navigator.pop(context, item),
+                  onTap: () => Navigator.pop(context, code),
                 ),
               ),
             ],
@@ -231,23 +253,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
     );
     if (selected != null) {
-      final locale = {
-        'English': 'en',
-        'हिन्दी': 'hi',
-        'தமிழ்': 'ta',
-        'తెలుగు': 'te',
-        'ಕನ್ನಡ': 'kn',
-      }[selected];
-      if (locale != null) {
-        try {
-          await api.setLocale(locale);
-          if (mounted) setState(() => language = selected);
-        } catch (exception) {
-          if (mounted) {
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('$exception')));
-          }
+      try {
+        await api.setLocale(selected);
+        await appLanguage.select(selected);
+      } catch (exception) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$exception')));
         }
       }
     }

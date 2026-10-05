@@ -52,6 +52,21 @@ class Worker {
       .join();
 }
 
+String monthlyWage(num? amount) {
+  if (amount == null || amount <= 0) return '—';
+  final value = amount.round().toString();
+  if (value.length <= 3) return '₹$value/month';
+  final tail = value.substring(value.length - 3);
+  var head = value.substring(0, value.length - 3);
+  final groups = <String>[];
+  while (head.length > 2) {
+    groups.insert(0, head.substring(head.length - 2));
+    head = head.substring(0, head.length - 2);
+  }
+  if (head.isNotEmpty) groups.insert(0, head);
+  return '₹${groups.join(',')},$tail/month';
+}
+
 const jobs = [
   Job(
     'Plumber for Apartment Project',

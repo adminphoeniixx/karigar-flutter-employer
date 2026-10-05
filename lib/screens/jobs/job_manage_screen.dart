@@ -2,7 +2,8 @@ import 'post_job_screen.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -110,7 +111,10 @@ class _JobManageScreenState extends State<JobManageScreen> {
               TextField(
                 controller: wage,
                 keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Offered wage'),
+                decoration: const InputDecoration(
+                  labelText: 'Offered wage (₹ / month)',
+                  hintText: 'e.g. 23400',
+                ),
               ),
               const SizedBox(height: 12),
               TextField(

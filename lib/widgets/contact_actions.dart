@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import 'localized_text.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/api/api_exception.dart';
 import '../screens/profile/plans_screen.dart';

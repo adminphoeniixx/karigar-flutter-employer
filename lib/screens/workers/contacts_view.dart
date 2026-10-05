@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import '../../core/app_scope.dart';
 import '../../core/data.dart';
 import '../../models/api_models.dart';

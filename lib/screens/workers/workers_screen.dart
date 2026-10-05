@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
 import '../../models/api_models.dart';
 import 'contacts_view.dart';
@@ -27,15 +28,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
   late final controller = AppScope.of(context).workers;
   bool _loaded = false;
 
-  static const categories = [
-    'All',
-    'Plumbing',
-    'Electrical',
-    'Carpentry',
-    'Painting',
-    'Masonry',
-    'AC Repair',
-  ];
+  List<String> categories = const ['All'];
 
   @override
   void didChangeDependencies() {
@@ -44,9 +37,24 @@ class _WorkersScreenState extends State<WorkersScreen> {
       _loaded = true;
       controller.addListener(_refresh);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) controller.search();
+        if (mounted) _initializeDirectory();
       });
     }
+  }
+
+  Future<void> _initializeDirectory() async {
+    try {
+      final reference = await AppScope.of(context).api.reference();
+      final values = (reference['job_categories'] as List? ?? const [])
+          .map((item) => '$item')
+          .where((item) => item.isNotEmpty)
+          .toList();
+      if (mounted && values.isNotEmpty)
+        setState(() => categories = ['All', ...values]);
+    } catch (_) {
+      // The directory remains searchable even if reference options are offline.
+    }
+    if (mounted) await _search();
   }
 
   void _refresh() {
@@ -63,19 +71,27 @@ class _WorkersScreenState extends State<WorkersScreen> {
     super.dispose();
   }
 
-  Future<void> _search() async {
+  Future<void> _search({String? selectedCategory}) async {
+    final activeCategory = selectedCategory ?? category;
     final filters = <String, dynamic>{
       if (query.trim().isNotEmpty) 'q': query.trim(),
-      if (category != 'All') 'skill': category,
+      if (activeCategory != 'All') 'skill': activeCategory,
       ...advancedFilters,
     };
-    if (filters['radius_km'] != null) {
-      final profile = AppScope.of(context).profile.profile;
+    final needsLocation =
+        filters['radius_km'] != null || filters['sort'] == 'nearest';
+    if (needsLocation) {
+      final profileController = AppScope.of(context).profile;
+      if (profileController.profile == null && !profileController.loading) {
+        await profileController.load();
+      }
+      final profile = profileController.profile;
       if (profile?.latitude != null && profile?.longitude != null) {
         filters['latitude'] = profile!.latitude;
         filters['longitude'] = profile.longitude;
       } else {
         filters.remove('radius_km');
+        if (filters['sort'] == 'nearest') filters['sort'] = 'best_match';
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
@@ -86,6 +102,12 @@ class _WorkersScreenState extends State<WorkersScreen> {
       }
     }
     await controller.search(filters);
+  }
+
+  Future<void> _selectCategory(String value) async {
+    if (category == value) return;
+    setState(() => category = value);
+    await _search(selectedCategory: value);
   }
 
   @override
@@ -136,7 +158,11 @@ class _WorkersScreenState extends State<WorkersScreen> {
                     border: Border.all(color: AppColors.line),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(LucideIcons.listFilter, size: 20),
+                  child: Icon(
+                    LucideIcons.listFilter,
+                    size: 20,
+                    color: advancedFilters.isEmpty ? null : AppColors.primary,
+                  ),
                 ),
               ),
             ),
@@ -217,38 +243,27 @@ class _WorkersScreenState extends State<WorkersScreen> {
                           itemBuilder: (_, index) {
                             final item = categories[index];
                             final selected = category == item;
-                            return InkWell(
-                              onTap: () {
-                                setState(() => category = item);
-                                _search();
-                              },
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 13,
-                                ),
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: selected
-                                      ? AppColors.primary
-                                      : Colors.white,
-                                  border: Border.all(
-                                    color: selected
-                                        ? AppColors.primary
-                                        : AppColors.line,
-                                  ),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  item,
-                                  style: TextStyle(
-                                    color: selected
-                                        ? Colors.white
-                                        : AppColors.muted,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
+                            return ChoiceChip(
+                              label: Text(item),
+                              selected: selected,
+                              onSelected: (_) => _selectCategory(item),
+                              showCheckmark: false,
+                              selectedColor: AppColors.primary,
+                              backgroundColor: Colors.white,
+                              side: BorderSide(
+                                color: selected
+                                    ? AppColors.primary
+                                    : AppColors.line,
+                              ),
+                              labelStyle: TextStyle(
+                                color: selected
+                                    ? Colors.white
+                                    : AppColors.muted,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 9,
                               ),
                             );
                           },
@@ -344,11 +359,20 @@ class _WorkersScreenState extends State<WorkersScreen> {
       useSafeArea: true,
       backgroundColor: Colors.transparent,
       barrierColor: Colors.black45,
-      builder: (_) => _WorkerFiltersSheet(initial: advancedFilters),
+      builder: (_) => _WorkerFiltersSheet(
+        initial: advancedFilters,
+        categories: categories,
+        initialCategory: category,
+      ),
     );
     if (result == null) return;
-    setState(() => advancedFilters = result);
-    await _search();
+    final filters = Map<String, dynamic>.from(result);
+    final selectedCategory = filters.remove('_category')?.toString() ?? 'All';
+    setState(() {
+      advancedFilters = filters;
+      category = selectedCategory;
+    });
+    await _search(selectedCategory: selectedCategory);
   }
 }
 
@@ -466,7 +490,7 @@ class _WorkerResultCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 12),
                           Text(
-                            '\u20B9${data.wage}/day',
+                            monthlyWage(data.wage),
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -520,8 +544,14 @@ class _WorkerResultCard extends StatelessWidget {
 }
 
 class _WorkerFiltersSheet extends StatefulWidget {
-  const _WorkerFiltersSheet({required this.initial});
+  const _WorkerFiltersSheet({
+    required this.initial,
+    required this.categories,
+    required this.initialCategory,
+  });
   final Map<String, dynamic> initial;
+  final List<String> categories;
+  final String initialCategory;
 
   @override
   State<_WorkerFiltersSheet> createState() => _WorkerFiltersSheetState();
@@ -529,19 +559,21 @@ class _WorkerFiltersSheet extends StatefulWidget {
 
 class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
   bool verifiedOnly = false;
-  bool availableNow = true;
+  bool availableNow = false;
   final selectedLanguages = <String>{};
   final minWageController = TextEditingController();
   final maxWageController = TextEditingController();
   int? experienceMin;
   int? radiusKm;
   String sort = 'best_match';
+  late String selectedCategory;
 
   @override
   void initState() {
     super.initState();
+    selectedCategory = widget.initialCategory;
     verifiedOnly = widget.initial['verified'] == 1;
-    availableNow = widget.initial['available'] != 0;
+    availableNow = widget.initial['available'] == 1;
     experienceMin = int.tryParse('${widget.initial['experience_min'] ?? ''}');
     radiusKm = int.tryParse('${widget.initial['radius_km'] ?? ''}');
     minWageController.text = '${widget.initial['wage_min'] ?? ''}';
@@ -596,7 +628,12 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
               padding: const EdgeInsets.symmetric(horizontal: 18),
               children: [
                 const _FilterLabel('Trade / Category'),
-                const _FilterSelect('Use category chips above'),
+                _FilterSelect(
+                  selectedCategory,
+                  onTap: () => _pick<String>('Trade / Category', {
+                    for (final value in widget.categories) value: value,
+                  }, (value) => setState(() => selectedCategory = value)),
+                ),
                 const SizedBox(height: 16),
                 const _FilterLabel('Minimum experience'),
                 _FilterSelect(
@@ -615,19 +652,19 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                const _FilterLabel('Expected wage (₹/day)'),
+                const _FilterLabel('Expected wage (₹/month)'),
                 Row(
                   children: [
                     Expanded(
                       child: _WageField(
-                        hint: 'Min 600',
+                        hint: 'Min 15000',
                         controller: minWageController,
                       ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
                       child: _WageField(
-                        hint: 'Max 1200',
+                        hint: 'Max 30000',
                         controller: maxWageController,
                       ),
                     ),
@@ -739,6 +776,7 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
                 Expanded(
                   child: OutlinedButton(
                     onPressed: () => setState(() {
+                      selectedCategory = 'All';
                       verifiedOnly = false;
                       availableNow = false;
                       selectedLanguages.clear();
@@ -763,6 +801,7 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
                 Expanded(
                   child: FilledButton(
                     onPressed: () => Navigator.pop(context, {
+                      '_category': selectedCategory,
                       if (experienceMin != null)
                         'experience_min': experienceMin,
                       if (num.tryParse(minWageController.text) != null)

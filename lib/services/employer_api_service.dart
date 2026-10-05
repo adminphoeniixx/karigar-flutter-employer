@@ -56,6 +56,7 @@ class EmployerApiService {
   Future<List<String>> jobCategories() async => asStrings(
     (await client.get(ApiConstants.jobCategories))['job_categories'],
   );
+  Future<Json> jobFormOptions() => client.get(ApiConstants.jobFormOptions);
 
   Future<DashboardData> dashboard() async =>
       DashboardData.fromJson(await client.get(ApiConstants.dashboard));
@@ -98,6 +99,7 @@ class EmployerApiService {
     String? city,
     String? state,
     List<String> skills = const [],
+    String language = 'en',
   }) async => asStrings(
     (await client.get(
       ApiConstants.suggestJobDescription,
@@ -107,6 +109,7 @@ class EmployerApiService {
         'city': city,
         'state': state,
         'skills': skills,
+        'language': language,
       },
     ))['suggestions'],
   );
@@ -151,6 +154,7 @@ class EmployerApiService {
 
   Future<void> deleteJob(int id) => client.delete(ApiConstants.job(id));
   Future<Json> closeJob(int id) => client.post('/employer/jobs/$id/close');
+  Future<Json> repostJob(int id) => client.post(ApiConstants.repostJob(id));
   Future<Json> boostJob(int id, String tier) =>
       client.post('/employer/jobs/$id/boost', body: {'tier': tier});
   Future<Json> matches(int id) => client.get('/employer/jobs/$id/matches');
@@ -251,15 +255,9 @@ class EmployerApiService {
 
   Future<Json> kyc() => client.get('/employer/kyc');
   Future<Json> submitKyc({
-    required String gstin,
-    required String pan,
-    File? gstDoc,
-    File? panDoc,
-  }) => client.multipart(
-    '/employer/kyc',
-    fields: {'gstin': gstin, 'pan_number': pan},
-    files: {'gst_doc': ?gstDoc, 'pan_doc': ?panDoc},
-  );
+    required Map<String, String> fields,
+    required Map<String, File> files,
+  }) => client.multipart('/employer/kyc', fields: fields, files: files);
 
   Future<Json> notifications({int page = 1}) =>
       client.get('/notifications', query: {'page': page});

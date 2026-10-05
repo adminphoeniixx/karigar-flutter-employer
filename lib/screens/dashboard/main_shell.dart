@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
+import 'package:employer_kariger_app/core/app_strings.dart';
 import 'package:employer_kariger_app/screens/dashboard/home_screen.dart';
 import 'package:employer_kariger_app/screens/dashboard/notifications_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/jobs_screen.dart';
@@ -136,7 +138,7 @@ class _BottomNav extends StatelessWidget {
                     ),
                   SizedBox(height: center ? 1 : 5),
                   Text(
-                    items[i].$2,
+                    context.tr(items[i].$2),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(

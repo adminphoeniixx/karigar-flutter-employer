@@ -145,13 +145,21 @@ class EmployerJob {
     this.state = '',
     this.wageMin = 0,
     this.wageMax = 0,
-    this.wageType = 'daily',
+    this.wageType = 'monthly',
     this.vacancies = 0,
     this.experienceMin = 0,
+    this.experienceMax,
+    this.experienceLabel,
     this.shift = '',
+    this.shiftStart,
+    this.shiftEnd,
+    this.shiftHoursLabel,
+    this.address,
     this.perks = const [],
     this.contactMode = 'apply',
     this.contactPhone,
+    this.contactName,
+    this.contactDesignation,
     this.latitude,
     this.longitude,
     this.requiresWorkerFee = false,
@@ -178,15 +186,25 @@ class EmployerJob {
     state: '${json['state'] ?? ''}',
     wageMin: asDouble(json['wage_min']),
     wageMax: asDouble(json['wage_max']),
-    wageType: '${json['wage_type'] ?? 'daily'}',
+    wageType: '${json['wage_type'] ?? 'monthly'}',
     vacancies: asInt(json['vacancies']),
     latitude: json['latitude'] == null ? null : asDouble(json['latitude']),
     longitude: json['longitude'] == null ? null : asDouble(json['longitude']),
     experienceMin: asInt(json['experience_min']),
+    experienceMax: json['experience_max'] == null
+        ? null
+        : asInt(json['experience_max']),
+    experienceLabel: json['experience_label']?.toString(),
     shift: '${json['shift'] ?? ''}',
+    shiftStart: json['shift_start']?.toString(),
+    shiftEnd: json['shift_end']?.toString(),
+    shiftHoursLabel: json['shift_hours_label']?.toString(),
+    address: json['address']?.toString(),
     perks: asStrings(json['perks']),
     contactMode: '${json['contact_mode'] ?? 'apply'}',
     contactPhone: json['contact_phone']?.toString(),
+    contactName: json['contact_name']?.toString(),
+    contactDesignation: json['contact_designation']?.toString(),
     requiresWorkerFee: json['requires_worker_fee'] == true,
     workerFeeAmount: json['worker_fee_amount'] == null
         ? null
@@ -201,11 +219,13 @@ class EmployerJob {
         : const {},
   );
   final int id, vacancies, experienceMin;
+  final int? experienceMax;
   final double wageMin, wageMax;
   final double? workerFeeAmount, latitude, longitude;
   final String title, category, status, wageLabel, description, locationLabel;
   final String city, state, wageType, shift, contactMode, createdAgo, shareUrl;
-  final String? contactPhone;
+  final String? experienceLabel, shiftStart, shiftEnd, shiftHoursLabel, address;
+  final String? contactPhone, contactName, contactDesignation;
   final List<String> skills, perks;
   final bool isDraft;
   final DateTime? publishedAt;
@@ -225,7 +245,7 @@ class WorkerProfile {
     this.state = '',
     this.experienceYears = 0,
     this.expectedWage = 0,
-    this.wageType = 'daily',
+    this.wageType = 'monthly',
     this.available = false,
     this.verified = false,
     this.locked = true,
@@ -244,12 +264,12 @@ class WorkerProfile {
     name: '${json['name'] ?? ''}',
     bio: '${json['bio'] ?? ''}',
     skills: asStrings(json['skills']),
-    languages: asStrings(json['spoken_languages']),
+    languages: asStrings(json['spoken_languages'] ?? json['languages']),
     city: '${json['city'] ?? ''}',
     state: '${json['state'] ?? ''}',
     experienceYears: asInt(json['experience_years']),
     expectedWage: asInt(json['expected_wage']),
-    wageType: '${json['wage_type'] ?? 'daily'}',
+    wageType: '${json['wage_type'] ?? 'monthly'}',
     available: json['available'] == true,
     verified: json['verified'] == true,
     locked: json['locked'] == true || json['contact_unlocked'] == false,

@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/employer_controllers.dart';
 import '../services/employer_api_service.dart';
+import 'app_language.dart';
 
 class AppScope extends InheritedWidget {
   const AppScope({
@@ -13,6 +14,7 @@ class AppScope extends InheritedWidget {
     required this.jobs,
     required this.workers,
     required this.profile,
+    this.language,
     required super.child,
   });
 
@@ -22,6 +24,8 @@ class AppScope extends InheritedWidget {
   final JobsController jobs;
   final WorkersController workers;
   final ProfileController profile;
+  final AppLanguage? language;
+  AppLanguage get appLanguage => language ?? AppLanguage.shared;
 
   static AppScope of(BuildContext context) {
     final scope = context.dependOnInheritedWidgetOfExactType<AppScope>();

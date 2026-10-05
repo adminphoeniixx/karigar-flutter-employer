@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
+import 'package:employer_kariger_app/core/app_strings.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
 import 'package:employer_kariger_app/screens/jobs/jobs_screen.dart';
@@ -53,8 +55,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return Scaffold(
         appBar: AppBar(
           toolbarHeight: 58,
-          title: const Text(
-            'Business Profile',
+          title: Text(
+            context.tr('Business Profile'),
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
           ),
           actions: [
@@ -82,7 +84,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? Center(
                 child: OutlinedButton(
                   onPressed: controller.load,
-                  child: const Text('Retry'),
+                  child: Text(context.tr('Retry')),
                 ),
               )
             : RefreshIndicator(
@@ -108,7 +110,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         ),
                         icon: const Icon(LucideIcons.pencil, size: 19),
-                        label: const Text('Edit Business Profile'),
+                        label: Text(context.tr('Edit Business Profile')),
                       ),
                     ),
                     Container(
@@ -141,7 +143,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(height: 8),
                     _ProfileRow(
                       icon: LucideIcons.briefcaseBusiness,
-                      title: 'My Job Posts',
+                      title: context.tr('My Jobs'),
                       subtitle: 'Active, closed & drafts',
                       trailing: '→',
                       onTap: () => _open(const JobsScreen()),
@@ -149,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (verificationEnabled)
                       _ProfileRow(
                         icon: LucideIcons.shield,
-                        title: 'Business Verification',
+                        title: context.tr('Business Verification'),
                         subtitle: profile?.verified == true
                             ? 'GST & PAN verified'
                             : 'Submit GST & PAN details',
@@ -158,14 +160,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     _ProfileRow(
                       icon: LucideIcons.star,
-                      title: 'Shortlisted Workers',
+                      title: context.tr('Shortlisted Workers'),
                       subtitle: 'Candidates saved across all jobs',
                       trailing: '→',
                       onTap: () => _open(const ShortlistedScreen()),
                     ),
                     _ProfileRow(
                       icon: LucideIcons.star,
-                      title: 'Reviews & Ratings',
+                      title: context.tr('Reviews & Ratings'),
                       subtitle: 'How workers rated you',
                       trailing:
                           '★ ${profile?.rating.average.toStringAsFixed(1) ?? '0.0'} →',
@@ -173,14 +175,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     _ProfileRow(
                       icon: LucideIcons.layers,
-                      title: 'Credits & Plans',
+                      title: context.tr('Credits & Plans'),
                       subtitle: 'Subscriptions and contact credits',
                       trailing: '→',
                       onTap: () => _open(const PlansScreen()),
                     ),
                     _ProfileRow(
                       icon: LucideIcons.slidersHorizontal,
-                      title: 'Settings',
+                      title: context.tr('Settings'),
                       subtitle: 'Language, security, theme',
                       trailing: '→',
                       onTap: () => _open(const SettingsScreen()),

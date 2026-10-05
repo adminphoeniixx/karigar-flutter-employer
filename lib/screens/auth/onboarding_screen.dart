@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/auth/otp_screen.dart';
@@ -72,15 +73,14 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                       const Spacer(),
                       const _Feature(
-                        LucideIcons.plus,
-                        'Post jobs in under a minute',
+                        LucideIcons.phoneCall,
+                        'AI-powered calls & interviews',
                       ),
                       const _Feature(
-                        LucideIcons.badgeCheck,
-                        'KYC-verified worker profiles',
+                        LucideIcons.calendarClock,
+                        'AI-assisted interview scheduling',
                       ),
-                      const _Feature(LucideIcons.phone, 'Call & hire directly'),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 24),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton(
@@ -134,6 +134,7 @@ class _Feature extends StatelessWidget {
   const _Feature(this.icon, this.text);
   final IconData icon;
   final String text;
+
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 6),

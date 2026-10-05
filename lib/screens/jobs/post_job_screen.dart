@@ -1,7 +1,9 @@
 import '../../models/api_models.dart';
 import '../../core/api/api_exception.dart';
 import '../profile/plans_screen.dart';
-import 'package:flutter/material.dart';
+import '../profile/kyc_screen.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -26,7 +28,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
   final selectedPerks = <String>{};
   String shift = 'Day';
   String contact = 'Apply + Call';
-  String wageType = 'daily';
+  String wageType = 'monthly';
+  String aiLanguage = 'en';
   String? category;
   String? state;
   String? city;
@@ -41,6 +44,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
     'Drainage',
     'Testing',
   ];
+  Map<String, List<String>> categorySkills = const {};
   List<String> perks = const [
     'Food',
     'Accommodation',
@@ -55,10 +59,17 @@ class _PostJobScreenState extends State<PostJobScreen> {
   final titleController = TextEditingController();
   final openingsController = TextEditingController(text: '1');
   final experienceController = TextEditingController(text: '0');
+  final experienceMaxController = TextEditingController();
   final wageMinController = TextEditingController();
   final wageMaxController = TextEditingController();
   final descriptionController = TextEditingController();
   final contactPhoneController = TextEditingController();
+  final addressController = TextEditingController();
+  final shiftStartController = TextEditingController();
+  final shiftEndController = TextEditingController();
+  final contactNameController = TextEditingController();
+  final contactDesignationController = TextEditingController();
+  final perkController = TextEditingController();
 
   @override
   void initState() {
@@ -73,15 +84,21 @@ class _PostJobScreenState extends State<PostJobScreen> {
     descriptionController.text = job.description;
     openingsController.text = job.vacancies > 0 ? '${job.vacancies}' : '';
     experienceController.text = '${job.experienceMin}';
+    experienceMaxController.text = job.experienceMax?.toString() ?? '';
     wageMinController.text = job.wageMin > 0 ? '${job.wageMin}' : '';
     wageMaxController.text = job.wageMax > 0 ? '${job.wageMax}' : '';
     contactPhoneController.text = job.contactPhone ?? '';
+    addressController.text = job.address ?? '';
+    shiftStartController.text = job.shiftStart ?? '';
+    shiftEndController.text = job.shiftEnd ?? '';
+    contactNameController.text = job.contactName ?? '';
+    contactDesignationController.text = job.contactDesignation ?? '';
     category = job.category.isEmpty ? null : job.category;
     state = job.state.isEmpty ? null : job.state;
     city = job.city.isEmpty ? null : job.city;
     selectedSkills.addAll(job.skills);
     selectedPerks.addAll(job.perks);
-    wageType = job.wageType;
+    wageType = 'monthly';
     if (job.shift.isNotEmpty) {
       shift = '${job.shift[0].toUpperCase()}${job.shift.substring(1)}';
     }
@@ -111,10 +128,20 @@ class _PostJobScreenState extends State<PostJobScreen> {
       setState(() {
         categories = _names(response['job_categories']);
         final apiSkills = _names(response['skills']);
+        final rawCategorySkills =
+            response['category_skills'] as Map? ?? const {};
+        categorySkills = rawCategorySkills.map(
+          (key, value) => MapEntry('$key', _names(value)),
+        );
         final apiPerks = _names(response['perks']);
         states = _names(response['states']);
         if (city != null) cities = [city!];
-        skills = {...apiSkills, ...selectedSkills}.toList();
+        skills = {
+          ...(category == null
+              ? apiSkills
+              : (categorySkills[category] ?? apiSkills)),
+          ...selectedSkills,
+        }.toList();
         perks = {...apiPerks, ...selectedPerks}.toList();
       });
     } catch (_) {
@@ -153,6 +180,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
     final description = descriptionController.text.trim();
     final vacancies = int.tryParse(openingsController.text);
     final experience = int.tryParse(experienceController.text);
+    final experienceMax = int.tryParse(experienceMaxController.text);
     final wageMin = num.tryParse(wageMinController.text);
     final wageMax = num.tryParse(wageMaxController.text);
     final contactMode = {
@@ -182,6 +210,19 @@ class _PostJobScreenState extends State<PostJobScreen> {
       return;
     }
     if (!draft &&
+        experience != null &&
+        experienceMax != null &&
+        experienceMax < experience) {
+      _message('Maximum experience cannot be lower than minimum experience.');
+      return;
+    }
+    if (!draft &&
+        ((shiftStartController.text.trim().isEmpty) !=
+            (shiftEndController.text.trim().isEmpty))) {
+      _message('Enter both shift start and end times, or leave both blank.');
+      return;
+    }
+    if (!draft &&
         contactMode != 'apply' &&
         !RegExp(r'^[6-9]\d{9}$').hasMatch(contactPhoneController.text.trim())) {
       _message('Enter a valid 10-digit contact number.');
@@ -191,18 +232,30 @@ class _PostJobScreenState extends State<PostJobScreen> {
       'title': title,
       if (description.isNotEmpty) 'description': description,
       'category': ?category,
-      'skills': selectedSkills.toList(),
+      if (!draft || selectedSkills.isNotEmpty)
+        'skills': selectedSkills.toList(),
       if (wageMin != null && wageMin >= 0) 'wage_min': wageMin,
       if (wageMax != null && wageMax >= (wageMin ?? 0)) 'wage_max': wageMax,
-      'wage_type': wageType,
+      if (!draft || wageMin != null || wageMax != null) 'wage_type': wageType,
       'city': ?city,
       'state': ?state,
-      'latitude': selectedLocation?.latitude,
-      'longitude': selectedLocation?.longitude,
-      if (vacancies != null && vacancies > 0) 'vacancies': vacancies,
-      'experience_min': experience != null && experience >= 0 ? experience : 0,
-      'shift': shift.toLowerCase(),
-      'perks': selectedPerks.toList(),
+      if (addressController.text.trim().isNotEmpty)
+        'address': addressController.text.trim(),
+      if (selectedLocation != null) 'latitude': selectedLocation!.latitude,
+      if (selectedLocation != null) 'longitude': selectedLocation!.longitude,
+      if (!draft && vacancies != null && vacancies > 0) 'vacancies': vacancies,
+      if (!draft || (experience != null && experience > 0))
+        'experience_min': experience != null && experience >= 0
+            ? experience
+            : 0,
+      if (experienceMax != null && experienceMax >= 0)
+        'experience_max': experienceMax,
+      if (!draft) 'shift': shift.toLowerCase(),
+      if (shiftStartController.text.trim().isNotEmpty)
+        'shift_start': shiftStartController.text.trim(),
+      if (shiftEndController.text.trim().isNotEmpty)
+        'shift_end': shiftEndController.text.trim(),
+      if (!draft || selectedPerks.isNotEmpty) 'perks': selectedPerks.toList(),
       'contact_mode':
           draft &&
               !RegExp(
@@ -213,6 +266,10 @@ class _PostJobScreenState extends State<PostJobScreen> {
       if (contactMode != 'apply' &&
           RegExp(r'^[6-9]\d{9}$').hasMatch(contactPhoneController.text.trim()))
         'contact_phone': contactPhoneController.text.trim(),
+      if (!draft && contactMode != 'apply')
+        'contact_name': ?contactNameController.text.trim(),
+      if (!draft && contactMode != 'apply')
+        'contact_designation': ?contactDesignationController.text.trim(),
       'requires_worker_fee': widget.job?.requiresWorkerFee ?? false,
       'worker_fee_amount': ?widget.job?.workerFeeAmount,
       'status': status,
@@ -279,6 +336,30 @@ class _PostJobScreenState extends State<PostJobScreen> {
             MaterialPageRoute(builder: (_) => const PlansScreen()),
           );
         }
+      } else if (exception.code == 'verification_required') {
+        final action = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Business verification required'),
+            content: Text(exception.message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Verify business'),
+              ),
+            ],
+          ),
+        );
+        if (action == true && mounted) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const KycScreen()),
+          );
+        }
       } else {
         _message(exception.message);
       }
@@ -303,6 +384,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
         city: city,
         state: state,
         skills: selectedSkills.toList(),
+        language: aiLanguage,
       );
       if (!mounted) return;
       if (suggestions.isEmpty) {
@@ -359,10 +441,17 @@ class _PostJobScreenState extends State<PostJobScreen> {
     titleController.dispose();
     openingsController.dispose();
     experienceController.dispose();
+    experienceMaxController.dispose();
     wageMinController.dispose();
     wageMaxController.dispose();
     descriptionController.dispose();
     contactPhoneController.dispose();
+    addressController.dispose();
+    shiftStartController.dispose();
+    shiftEndController.dispose();
+    contactNameController.dispose();
+    contactDesignationController.dispose();
+    perkController.dispose();
     super.dispose();
   }
 
@@ -407,12 +496,32 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       onTap: () => _choose(
                         'Select category',
                         categories,
-                        (value) => setState(() => category = value),
+                        (value) => setState(() {
+                          category = value;
+                          skills = {
+                            ...(categorySkills[value] ?? skills),
+                            ...selectedSkills,
+                          }.toList();
+                        }),
                       ),
                     ),
                     const SizedBox(height: 14),
                     const _Label('Skills required'),
                     _chips(skills, selectedSkills, multi: true),
+                    const SizedBox(height: 8),
+                    _Input(
+                      hint: 'Add a skill',
+                      controller: perkController,
+                      onSubmitted: (value) {
+                        final skill = value.trim();
+                        if (skill.isNotEmpty)
+                          setState(() {
+                            skills = {...skills, skill}.toList();
+                            selectedSkills.add(skill);
+                            perkController.clear();
+                          });
+                      },
+                    ),
                     const _Hint(
                       'Tap to add. Workers with these skills are matched first.',
                     ),
@@ -437,6 +546,21 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const _Label('Max experience'),
+                              _Input(
+                                hint: '5',
+                                suffix: 'yrs',
+                                controller: experienceMaxController,
+                                number: true,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
                               const _Label('Min experience'),
                               _Input(
                                 hint: '1',
@@ -450,74 +574,43 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       ],
                     ),
                     const _SectionLabel('Wage'),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final compact = constraints.maxWidth < 390;
-                        final amountFields = <Widget>[
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _Label('Min ₹'),
-                                _Input(
-                                  hint: '800',
-                                  prefix: '₹',
-                                  controller: wageMinController,
-                                  number: true,
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const _Label('Max ₹'),
-                                _Input(
-                                  hint: '1000',
-                                  prefix: '₹',
-                                  controller: wageMaxController,
-                                  number: true,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ];
-                        final periodField = SizedBox(
-                          width: compact ? double.infinity : 88,
+                    const Text(
+                      'Enter monthly salary in rupees',
+                      style: TextStyle(color: AppColors.muted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const _Label('Per'),
-                              _Select(
-                                wageType,
-                                onTap: () => _choose('Wage type', const [
-                                  'hourly',
-                                  'daily',
-                                  'monthly',
-                                ], (value) => setState(() => wageType = value)),
+                              const _Label('Minimum / month'),
+                              _Input(
+                                hint: '15000',
+                                prefix: '₹',
+                                controller: wageMinController,
+                                number: true,
                               ),
                             ],
                           ),
-                        );
-                        if (compact) {
-                          return Column(
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(children: amountFields),
-                              const SizedBox(height: 10),
-                              periodField,
+                              const _Label('Maximum / month'),
+                              _Input(
+                                hint: '30000',
+                                prefix: '₹',
+                                controller: wageMaxController,
+                                number: true,
+                              ),
                             ],
-                          );
-                        }
-                        return Row(
-                          children: [
-                            ...amountFields,
-                            const SizedBox(width: 10),
-                            periodField,
-                          ],
-                        );
-                      },
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 14),
                     const _Label('Shift'),
@@ -528,28 +621,83 @@ class _PostJobScreenState extends State<PostJobScreen> {
                         setState(() => shift = value);
                       },
                     ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _Input(
+                            hint: 'Start time (09:00)',
+                            controller: shiftStartController,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _Input(
+                            hint: 'End time (18:00)',
+                            controller: shiftEndController,
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 14),
                     const _Label('Perks & benefits'),
                     _chips(perks, selectedPerks, multi: true),
+                    const SizedBox(height: 8),
+                    _Input(
+                      hint: 'Add your own perk',
+                      controller: perkController,
+                      onSubmitted: (value) {
+                        final perk = value.trim();
+                        if (perk.isNotEmpty)
+                          setState(() {
+                            perks = {...perks, perk}.toList();
+                            selectedPerks.add(perk);
+                            perkController.clear();
+                          });
+                      },
+                    ),
                     const SizedBox(height: 14),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         const _Label('Job description'),
-                        TextButton.icon(
-                          onPressed: suggesting ? null : _suggestDescription,
-                          icon: suggesting
-                              ? const SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(LucideIcons.sparkles, size: 16),
-                          label: const Text('Suggest with AI'),
+                        Wrap(
+                          spacing: 2,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            _singleChips(
+                              ['en', 'hi'],
+                              aiLanguage,
+                              (value) => setState(() => aiLanguage = value),
+                            ),
+                            TextButton.icon(
+                              onPressed: suggesting
+                                  ? null
+                                  : _suggestDescription,
+                              icon: suggesting
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(LucideIcons.sparkles, size: 16),
+                              label: Text(
+                                aiLanguage == 'hi'
+                                    ? 'हिंदी में AI सुझाव'
+                                    : 'Suggest with AI',
+                              ),
+                            ),
+                          ],
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 12),
+                    const _Label('Address / landmark'),
+                    _Input(
+                      hint: 'Plot, street, area or landmark',
+                      controller: addressController,
                     ),
                     _Input(
                       hint:
@@ -635,6 +783,18 @@ class _PostJobScreenState extends State<PostJobScreen> {
                         hint: '9876543210',
                         controller: contactPhoneController,
                         number: true,
+                      ),
+                      const SizedBox(height: 12),
+                      const _Label('Who picks up the call?'),
+                      _Input(
+                        hint: 'e.g. Ramesh Kumar',
+                        controller: contactNameController,
+                      ),
+                      const SizedBox(height: 12),
+                      const _Label('Designation (optional)'),
+                      _Input(
+                        hint: 'e.g. Site supervisor',
+                        controller: contactDesignationController,
                       ),
                     ],
                   ],
@@ -787,6 +947,8 @@ class _Input extends StatelessWidget {
     this.suffix,
     this.controller,
     this.number = false,
+    this.onSubmitted,
+    this.enabled = true,
   });
   final String hint;
   final int lines;
@@ -794,9 +956,13 @@ class _Input extends StatelessWidget {
   final String? suffix;
   final TextEditingController? controller;
   final bool number;
+  final ValueChanged<String>? onSubmitted;
+  final bool enabled;
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
+    enabled: enabled,
+    onSubmitted: onSubmitted,
     keyboardType: number ? TextInputType.number : TextInputType.text,
     maxLines: lines,
     decoration: InputDecoration(

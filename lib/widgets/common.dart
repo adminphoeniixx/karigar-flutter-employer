@@ -146,7 +146,7 @@ class WorkerCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            '⌖ ${worker.distance} km     ₹${worker.wage}/day',
+                            '⌖ ${worker.distance} km     ${monthlyWage(worker.wage)}',
                             style: const TextStyle(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w600,

@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
 import '../profile/plans_screen.dart';
 import 'package:flutter/services.dart';
@@ -157,6 +158,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   Widget build(BuildContext context) {
     final w = widget.worker;
     final details = profile;
+    final languages = details?.languages ?? const <String>[];
     return Scaffold(
       appBar: AppBar(title: const Text('Worker Profile')),
       body: loadingProfile
@@ -230,7 +232,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                             const StatusPill('Verified'),
                           if (details?.available == true)
                             const BrandChip('● Available'),
-                          BrandChip('₹${w.wage}/day'),
+                          BrandChip(monthlyWage(w.wage)),
                         ],
                       ),
                     ],
@@ -294,20 +296,36 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                           ),
                         ),
                       ),
-                      if (unlocked)
+                      if (unlocked) ...[
+                        const SizedBox(height: 10),
                         ContactActions(phone: phone, email: details?.email),
+                      ],
                       if (!unlocked &&
                           widget.onUnlock == null &&
-                          details?.canUnlock != true)
-                        OutlinedButton(
-                          onPressed: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const PlansScreen(),
+                          details?.canUnlock != true) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton.icon(
+                            onPressed: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PlansScreen(),
+                              ),
+                            ),
+                            icon: const Icon(LucideIcons.badgeIndianRupee),
+                            label: const Text('View plans to access contacts'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              side: const BorderSide(color: AppColors.brand200),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(13),
+                              ),
                             ),
                           ),
-                          child: const Text('View plans to access contacts'),
                         ),
+                      ],
                       const SectionTitle('About'),
                       Text(
                         details?.bio.isNotEmpty == true
@@ -321,13 +339,79 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         runSpacing: 8,
                         children: w.skills.map(BrandChip.new).toList(),
                       ),
-                      const SectionTitle('Languages'),
-                      Wrap(
-                        spacing: 8,
-                        children: (details?.languages ?? const <String>[])
-                            .map((value) => BrandChip(value, neutral: true))
-                            .toList(),
+                      const SectionTitle('Work details'),
+                      Card(
+                        margin: EdgeInsets.zero,
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Column(
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _InfoTile(
+                                      icon: LucideIcons.briefcaseBusiness,
+                                      label: 'Experience',
+                                      value:
+                                          '${details?.experienceYears ?? w.experience} years',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _InfoTile(
+                                      icon: LucideIcons.indianRupee,
+                                      label: 'Expected wage',
+                                      value: monthlyWage(
+                                        details?.expectedWage ?? w.wage,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 24),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _InfoTile(
+                                      icon: LucideIcons.mapPin,
+                                      label: 'Location',
+                                      value: details?.city.isNotEmpty == true
+                                          ? '${details!.city}, ${details.state}'
+                                          : 'Not provided',
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _InfoTile(
+                                      icon: LucideIcons.graduationCap,
+                                      label: 'Education',
+                                      value:
+                                          details?.education?.isNotEmpty == true
+                                          ? details!.education!
+                                          : 'Not provided',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
+                      const SectionTitle('Languages'),
+                      if (languages.isEmpty)
+                        const Text(
+                          'Not provided',
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 13,
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: languages
+                              .map((value) => BrandChip(value, neutral: true))
+                              .toList(),
+                        ),
                       const SizedBox(height: 18),
                       if (widget.canMessage || unlocked)
                         Row(
@@ -360,4 +444,40 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
             ),
     );
   }
+}
+
+class _InfoTile extends StatelessWidget {
+  const _InfoTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+  final IconData icon;
+  final String label, value;
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(icon, size: 16, color: AppColors.primary),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(color: AppColors.muted, fontSize: 11),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
 }

@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
+import 'package:employer_kariger_app/core/app_strings.dart';
 import 'package:employer_kariger_app/screens/dashboard/home_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/job_manage_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/post_job_screen.dart';
@@ -80,7 +82,7 @@ class _JobsScreenState extends State<JobsScreen> {
 
   Widget _content(BuildContext context, List<Job> liveJobs) => Scaffold(
     appBar: AppBar(
-      title: const Text('My Jobs'),
+      title: Text(context.tr('My Jobs')),
       actions: [
         Padding(
           padding: const EdgeInsets.only(right: 16),
@@ -108,10 +110,10 @@ class _JobsScreenState extends State<JobsScreen> {
           ),
           child: Row(
             children: [
-              for (final tab in const {
-                'active': 'Active',
-                'closed': 'Closed',
-                'draft': 'Drafts',
+              for (final tab in {
+                'active': context.tr('Active'),
+                'closed': context.tr('Closed'),
+                'draft': context.tr('Drafts'),
               }.entries)
                 Expanded(
                   child: _Segment(
@@ -194,7 +196,7 @@ class _JobsMessage extends StatelessWidget {
         children: [
           Text(text, textAlign: TextAlign.center),
           const SizedBox(height: 12),
-          OutlinedButton(onPressed: onRetry, child: const Text('Retry')),
+          OutlinedButton(onPressed: onRetry, child: Text(context.tr('Retry'))),
         ],
       ),
     ),

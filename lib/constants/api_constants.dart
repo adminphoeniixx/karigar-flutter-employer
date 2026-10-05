@@ -18,6 +18,7 @@ class ApiConstants {
   static const profileLogo = '/employer/profile/logo';
   static const jobs = '/employer/jobs';
   static const suggestJobDescription = '/employer/jobs/suggest-description';
+  static const jobFormOptions = '/employer/jobs/form-options';
   static const applicants = '/employer/applicants';
   static const shortlisted = '/employer/shortlisted';
   static const screeningCalls = '/employer/screening-calls';
@@ -39,6 +40,7 @@ class ApiConstants {
 
   static String job(int id) => '$jobs/$id';
   static String closeJob(int id) => '${job(id)}/close';
+  static String repostJob(int id) => '${job(id)}/repost';
   static String boostJob(int id) => '${job(id)}/boost';
   static String jobMatches(int id) => '${job(id)}/matches';
   static String inviteWorker(int id) => '${job(id)}/invite';

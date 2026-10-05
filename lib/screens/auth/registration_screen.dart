@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:employer_kariger_app/core/analytics/meta_analytics.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';

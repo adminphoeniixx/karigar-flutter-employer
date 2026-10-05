@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'controllers/auth_controller.dart';
 import 'controllers/employer_controllers.dart';
 import 'core/api/api_client.dart';
 import 'core/app_scope.dart';
+import 'core/app_language.dart';
 import 'core/theme.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/splash_screen.dart';
@@ -27,6 +29,7 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
   late final JobsController jobs;
   late final WorkersController workers;
   late final ProfileController profile;
+  late final AppLanguage language;
   bool ready = false;
 
   @override
@@ -39,6 +42,7 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
     jobs = JobsController(api);
     workers = WorkersController(api);
     profile = ProfileController(api);
+    language = AppLanguage();
     Future.wait<void>([
       _initialize(),
       Future<void>.delayed(const Duration(milliseconds: 1400)),
@@ -54,6 +58,7 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
     await widget.onInitialize?.call();
     if (!mounted) return;
     await auth.restore();
+    await language.restore();
   }
 
   @override
@@ -64,6 +69,7 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
     jobs.dispose();
     workers.dispose();
     profile.dispose();
+    language.dispose();
     super.dispose();
   }
 
@@ -75,20 +81,38 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
     jobs: jobs,
     workers: workers,
     profile: profile,
-    child: MaterialApp(
-      title: 'Super Karigar Employer',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      builder: (context, child) => MediaQuery.withClampedTextScaling(
-        minScaleFactor: 0.9,
-        maxScaleFactor: 1.3,
-        child: child!,
+    language: language,
+    child: AnimatedBuilder(
+      animation: language,
+      builder: (context, _) => MaterialApp(
+        title: 'Super Karigar Employer',
+        debugShowCheckedModeBanner: false,
+        locale: language.locale,
+        supportedLocales: const [
+          Locale('en'),
+          Locale('hi'),
+          Locale('ta'),
+          Locale('te'),
+          Locale('bn'),
+          Locale('mr'),
+        ],
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        theme: AppTheme.light,
+        builder: (context, child) => MediaQuery.withClampedTextScaling(
+          minScaleFactor: 0.9,
+          maxScaleFactor: 1.3,
+          child: child!,
+        ),
+        home: !ready
+            ? const SplashScreen()
+            : auth.authenticated
+            ? const MainShell()
+            : const OnboardingScreen(),
       ),
-      home: !ready
-          ? const SplashScreen()
-          : auth.authenticated
-          ? const MainShell()
-          : const OnboardingScreen(),
     ),
   );
 }

@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
+import 'package:employer_kariger_app/core/app_strings.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/dashboard/main_shell.dart';
@@ -162,8 +164,8 @@ class _HomeScreenState extends State<HomeScreen> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Welcome back \u{1F44B}',
+            Text(
+              context.tr('Welcome back 👋'),
               style: TextStyle(
                 fontSize: 11.5,
                 color: AppColors.muted,
@@ -197,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ? Center(
               child: OutlinedButton(
                 onPressed: controller.load,
-                child: const Text('Retry'),
+                child: Text(context.tr('Retry')),
               ),
             )
           : ListView(
@@ -219,7 +221,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: _StatCard(
                         icon: LucideIcons.briefcaseBusiness,
                         value: '${stats['active_jobs'] ?? 0}',
-                        label: 'Active Jobs',
+                        label: context.tr('Active Jobs'),
                         iconColor: AppColors.primary,
                         iconBackground: AppColors.brand50,
                       ),
@@ -229,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: _StatCard(
                         icon: LucideIcons.usersRound,
                         value: '${stats['total_applicants'] ?? 0}',
-                        label: 'Total Applicants',
+                        label: context.tr('Total Applicants'),
                         iconColor: AppColors.indigo,
                         iconBackground: AppColors.indigoBg,
                       ),
@@ -243,7 +245,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: _StatCard(
                         icon: LucideIcons.star,
                         value: '${stats['shortlisted'] ?? 0}',
-                        label: 'Shortlisted',
+                        label: context.tr('Shortlisted'),
                         iconColor: AppColors.amber,
                         iconBackground: AppColors.amberBg,
                       ),
@@ -253,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: _StatCard(
                         icon: LucideIcons.check,
                         value: '${stats['hired'] ?? 0}',
-                        label: 'Hired',
+                        label: context.tr('Hired'),
                         iconColor: AppColors.green,
                         iconBackground: AppColors.greenBg,
                       ),
@@ -285,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
                 const SizedBox(height: 22),
                 _ListHeading(
-                  'Recent applicants',
+                  context.tr('Recent applicants'),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const JobsScreen()),
@@ -341,7 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 }),
                 const SizedBox(height: 22),
                 _ListHeading(
-                  'Your active jobs',
+                  context.tr('Your active jobs'),
                   onTap: () => Navigator.push(
                     context,
                     MaterialPageRoute(builder: (_) => const JobsScreen()),
@@ -771,7 +773,7 @@ class _ApplicantCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '⌖ ${worker.distance} km   ₹${worker.wage}/day',
+                        '⌖ ${worker.distance} km   ${monthlyWage(worker.wage)}',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,

@@ -1,114 +1,179 @@
 import 'dart:io';
-
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Text;
+import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-
-import 'package:employer_kariger_app/core/api/api_exception.dart';
-import 'package:employer_kariger_app/core/app_scope.dart';
-import 'package:employer_kariger_app/core/theme.dart';
-import 'package:employer_kariger_app/widgets/common.dart';
+import '../../core/api/api_exception.dart';
+import '../../core/app_scope.dart';
+import '../../core/theme.dart';
 
 class KycScreen extends StatefulWidget {
   const KycScreen({super.key});
-
   @override
   State<KycScreen> createState() => _KycScreenState();
 }
 
 class _KycScreenState extends State<KycScreen> {
-  final gstinController = TextEditingController();
-  final panController = TextEditingController();
-  File? gstDoc;
-  File? panDoc;
-  Map<String, dynamic>? existingKyc;
-  bool loading = true;
-  bool submitting = false;
-  String? error;
+  final legalName = TextEditingController(), address = TextEditingController();
+  final forms = <String, _DocumentForm>{};
+  List<Map<String, dynamic>> types = const [];
+  Map<String, Map<String, dynamic>> docs = const {};
+  Map<String, dynamic> kyc = const {};
+  String? type, error;
+  bool loading = true, submitting = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (loading && error == null) _load();
+    if (loading) _load();
+  }
+
+  Map<String, dynamic>? _first(
+    Iterable<Map<String, dynamic>> rows,
+    bool Function(Map<String, dynamic>) check,
+  ) {
+    for (final row in rows) {
+      if (check(row)) return row;
+    }
+    return null;
   }
 
   Future<void> _load() async {
     try {
-      final response = await AppScope.of(context).api.kyc();
+      final api = AppScope.of(context).api;
+      final data = await Future.wait([api.reference(), api.kyc()]);
       if (!mounted) return;
-      gstinController.text = '${response['gstin'] ?? ''}';
-      existingKyc = response['kyc'] is Map
-          ? Map<String, dynamic>.from(response['kyc'])
-          : null;
-    } on ApiException catch (exception) {
-      if (!mounted) return;
-      error = exception.statusCode == 404
+      final ref = data[0], response = data[1];
+      final verification = ref['verification'] is Map
+          ? Map<String, dynamic>.from(ref['verification'] as Map)
+          : <String, dynamic>{};
+      types = (verification['business_types'] as List? ?? const [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+      docs = {
+        for (final e
+            in (verification['documents'] as List? ?? const [])
+                .whereType<Map>())
+          '${e['key']}': Map<String, dynamic>.from(e),
+      };
+      kyc = response['kyc'] is Map
+          ? Map<String, dynamic>.from(response['kyc'] as Map)
+          : const {};
+      final business = response['business'] is Map
+          ? Map<String, dynamic>.from(response['business'] as Map)
+          : const {};
+      type = business['business_type']?.toString();
+      legalName.text = '${business['legal_name'] ?? ''}';
+      address.text = '${business['registered_address'] ?? ''}';
+      _syncDocuments();
+    } on ApiException catch (e) {
+      error = e.statusCode == 404
           ? 'Business verification is currently unavailable.'
-          : exception.message;
+          : e.message;
+    } catch (e) {
+      error = '$e';
     } finally {
       if (mounted) setState(() => loading = false);
     }
   }
 
-  Future<void> _pick(bool pan) async {
-    final result = await FilePicker.pickFiles(
+  void _syncDocuments() {
+    final selected = _first(types, (e) => '${e['key']}' == type);
+    final keys = (selected?['documents'] as List? ?? const [])
+        .map((e) => '$e')
+        .toSet();
+    final saved = (kyc['documents'] as List? ?? const []).whereType<Map>().map(
+      (e) => Map<String, dynamic>.from(e),
+    );
+    for (final key in keys) {
+      forms.putIfAbsent(key, () {
+        final old = _first(saved, (e) => '${e['type']}' == key);
+        return _DocumentForm()..number.text = '${old?['number'] ?? ''}';
+      });
+    }
+    forms.removeWhere((key, _) => !keys.contains(key));
+  }
+
+  Future<void> _pick(_DocumentForm form) async {
+    final picked = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
     );
-    final path = result?.files.single.path;
+    final path = picked?.files.single.path;
     if (path == null) return;
     final file = File(path);
     if (await file.length() > 5 * 1024 * 1024) {
       _message('File size must not exceed 5 MB.');
       return;
     }
-    setState(() {
-      if (pan) {
-        panDoc = file;
-      } else {
-        gstDoc = file;
-      }
-    });
+    setState(() => form.file = file);
   }
 
   Future<void> _submit() async {
-    final gstin = gstinController.text.trim().toUpperCase();
-    final pan = panController.text.trim().toUpperCase();
-    if (!RegExp(r'^\d{2}[A-Z]{5}\d{4}[A-Z]\d[Z][A-Z\d]$').hasMatch(gstin)) {
-      _message('Enter a valid 15-character GSTIN.');
+    if (type == null ||
+        legalName.text.trim().isEmpty ||
+        address.text.trim().isEmpty) {
+      _message('Select business type and complete business details.');
       return;
     }
-    if (!RegExp(r'^[A-Z]{5}\d{4}[A-Z]$').hasMatch(pan)) {
-      _message('Enter a valid PAN number.');
-      return;
-    }
-    if (existingKyc == null && (gstDoc == null || panDoc == null)) {
-      _message('PAN and GST documents are required for the first submission.');
-      return;
+    final fields = <String, String>{
+      'business_type': type!,
+      'legal_name': legalName.text.trim(),
+      'registered_address': address.text.trim(),
+    };
+    final files = <String, File>{};
+    for (final entry in forms.entries) {
+      final key = entry.key, form = entry.value;
+      if (form.missing) {
+        if (form.alternate == null || form.reason.text.trim().isEmpty) {
+          _message(
+            'Complete alternate details for ${docs[key]?['label'] ?? key}.',
+          );
+          return;
+        }
+        fields['${key}_missing'] = '1';
+        fields['${key}_alt_type'] = form.alternate!;
+        fields['${key}_reason'] = form.reason.text.trim();
+        if (form.number.text.trim().isNotEmpty)
+          fields['${key}_alt_number'] = form.number.text.trim();
+        if (form.file != null) files['${key}_alt_doc'] = form.file!;
+      } else {
+        if (form.number.text.trim().isEmpty) {
+          _message('Enter ${docs[key]?['label'] ?? key} number.');
+          return;
+        }
+        fields['${docs[key]?['number_field'] ?? '${key}_number'}'] = form
+            .number
+            .text
+            .trim()
+            .toUpperCase()
+            .replaceAll(' ', '');
+        if (form.file != null) files['${key}_doc'] = form.file!;
+      }
     }
     setState(() => submitting = true);
     try {
-      await AppScope.of(
-        context,
-      ).api.submitKyc(gstin: gstin, pan: pan, gstDoc: gstDoc, panDoc: panDoc);
+      await AppScope.of(context).api.submitKyc(fields: fields, files: files);
       if (!mounted) return;
       _message('Business verification submitted for review.');
       Navigator.pop(context, true);
-    } catch (exception) {
-      if (mounted) _message('$exception');
+    } on ApiException catch (e) {
+      _message(e.message);
     } finally {
       if (mounted) setState(() => submitting = false);
     }
   }
 
-  void _message(String value) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(value)));
-
+  void _message(String text) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   @override
   void dispose() {
-    gstinController.dispose();
-    panController.dispose();
+    legalName.dispose();
+    address.dispose();
+    for (final form in forms.values) {
+      form.dispose();
+    }
     super.dispose();
   }
 
@@ -128,76 +193,81 @@ class _KycScreenState extends State<KycScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppColors.greenBg,
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: const Icon(
-                          LucideIcons.shieldCheck,
-                          color: AppColors.green,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              existingKyc?['status_label'] ??
-                                  'Build trust with workers',
-                              style: const TextStyle(
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                            Text(
-                              '${existingKyc?['remarks'] ?? 'Submit business documents for verification.'}',
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.muted,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                child: ListTile(
+                  leading: const Icon(
+                    LucideIcons.shieldCheck,
+                    color: AppColors.primary,
                   ),
+                  title: Text(
+                    '${kyc['status_label'] ?? 'Verify your business'}',
+                  ),
+                  subtitle: kyc['remarks'] == null
+                      ? const Text('Submit your details for review.')
+                      : Text('${kyc['remarks']}'),
                 ),
               ),
-              const SectionTitle('Business information'),
-              LabeledField(
-                'GSTIN',
-                hint: '22ABCDE1234F1Z5',
-                controller: gstinController,
+              const SizedBox(height: 16),
+              const Text(
+                'Business details',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
               ),
-              LabeledField(
-                'PAN number',
-                hint: 'ABCDE1234F',
-                controller: panController,
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: type,
+                decoration: const InputDecoration(labelText: 'Business type'),
+                items: types
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: '${e['key']}',
+                        child: Text('${e['label']}'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => setState(() {
+                  type = value;
+                  _syncDocuments();
+                }),
               ),
-              const SectionTitle('Documents'),
-              _Upload('PAN card', file: panDoc, onTap: () => _pick(true)),
-              const SizedBox(height: 10),
-              _Upload(
-                'Business proof / GST certificate',
-                file: gstDoc,
-                onTap: () => _pick(false),
+              const SizedBox(height: 12),
+              TextField(
+                controller: legalName,
+                decoration: InputDecoration(
+                  labelText: type == 'individual'
+                      ? 'Full name (as on PAN)'
+                      : 'Legal name',
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: address,
+                minLines: 2,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  labelText: type == 'individual'
+                      ? 'Address'
+                      : 'Registered address',
+                ),
               ),
               const SizedBox(height: 22),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: submitting ? null : _submit,
-                  child: Text(
-                    submitting ? 'Submitting...' : 'Submit for Verification',
-                  ),
+              const Text(
+                'Documents',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+              ),
+              ...forms.entries.map(
+                (e) => _DocumentCard(
+                  label: '${docs[e.key]?['label'] ?? e.key}',
+                  config: docs[e.key] ?? const {},
+                  form: e.value,
+                  pick: () => _pick(e.value),
+                  changed: () => setState(() {}),
+                ),
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: submitting ? null : _submit,
+                icon: const Icon(LucideIcons.shieldCheck),
+                label: Text(
+                  submitting ? 'Submitting...' : 'Submit for verification',
                 ),
               ),
             ],
@@ -205,41 +275,103 @@ class _KycScreenState extends State<KycScreen> {
   );
 }
 
-class _Upload extends StatelessWidget {
-  const _Upload(this.text, {required this.file, required this.onTap});
-  final String text;
-  final File? file;
-  final VoidCallback onTap;
+class _DocumentForm {
+  final number = TextEditingController(), reason = TextEditingController();
+  bool missing = false;
+  String? alternate;
+  File? file;
+  void dispose() {
+    number.dispose();
+    reason.dispose();
+  }
+}
 
+class _DocumentCard extends StatelessWidget {
+  const _DocumentCard({
+    required this.label,
+    required this.config,
+    required this.form,
+    required this.pick,
+    required this.changed,
+  });
+  final String label;
+  final Map<String, dynamic> config;
+  final _DocumentForm form;
+  final VoidCallback pick, changed;
   @override
-  Widget build(BuildContext context) => Card(
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+  Widget build(BuildContext context) {
+    final alternatives = (config['alternates'] as List? ?? const [])
+        .whereType<Map>();
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
       child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(LucideIcons.upload, color: AppColors.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                file?.path.split(Platform.pathSeparator).last ?? text,
-                style: const TextStyle(fontWeight: FontWeight.w600),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text("I don't have this"),
+              value: form.missing,
+              onChanged: (v) {
+                form.missing = v;
+                changed();
+              },
             ),
-            Text(
-              file == null ? 'Upload' : 'Change',
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w600,
+            if (form.missing) ...[
+              DropdownButtonFormField<String>(
+                value: form.alternate,
+                decoration: const InputDecoration(
+                  labelText: 'Document you have',
+                ),
+                items: alternatives
+                    .map(
+                      (e) => DropdownMenuItem(
+                        value: '${e['key']}',
+                        child: Text('${e['label']}'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (v) {
+                  form.alternate = v;
+                  changed();
+                },
+              ),
+              TextField(
+                controller: form.number,
+                decoration: const InputDecoration(
+                  labelText: 'Document number (optional)',
+                ),
+              ),
+              TextField(
+                controller: form.reason,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: "Why don't you have it?",
+                ),
+              ),
+            ] else
+              TextField(
+                controller: form.number,
+                decoration: InputDecoration(
+                  labelText: '$label number',
+                  hintText: '${config['hint'] ?? ''}',
+                ),
+              ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: pick,
+              icon: const Icon(LucideIcons.upload, size: 18),
+              label: Text(
+                form.file == null
+                    ? 'Upload photo or PDF'
+                    : form.file!.path.split(Platform.pathSeparator).last,
               ),
             ),
           ],
         ),
       ),
-    ),
-  );
+    );
+  }
 }
