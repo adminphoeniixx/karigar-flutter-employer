@@ -305,43 +305,46 @@ class _ContactsViewState extends State<ContactsView> {
             ),
           ),
           if (usage.isNotEmpty)
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (usage['plan'] == null) ...[
-                      const Text(
-                        'Subscribe to a plan to unlock karigar contacts',
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const PlansScreen(),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (usage['plan'] == null) ...[
+                        const Text(
+                          'Subscribe to a plan to unlock karigar contacts',
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PlansScreen(),
+                            ),
                           ),
+                          child: const Text('See plans'),
                         ),
-                        child: const Text('See plans'),
-                      ),
-                    ] else ...[
-                      Text(
-                        '${usage['plan']} · ${asInt(usage['limit']) == 0 ? 'Unlimited' : usage['limit']} contact unlocks per month',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        '${usage['used'] ?? 0} used this cycle (${usage['used_database'] ?? 0} database, ${usage['used_applicants'] ?? 0} applicants)',
-                      ),
-                      Text(
-                        '${usage['remaining'] ?? 'Unlimited'} left + ${usage['purchased'] ?? 0} purchased credits',
-                      ),
-                      if (reset != null)
+                      ] else ...[
                         Text(
-                          'Renews ${MaterialLocalizations.of(context).formatMediumDate(reset.toLocal())}',
+                          '${usage['plan']} · ${asInt(usage['limit']) == 0 ? 'Unlimited' : usage['limit']} contact unlocks per month',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
+                        const SizedBox(height: 6),
+                        Text(
+                          '${usage['used'] ?? 0} used this cycle (${usage['used_database'] ?? 0} database, ${usage['used_applicants'] ?? 0} applicants)',
+                        ),
+                        Text(
+                          '${usage['remaining'] ?? 'Unlimited'} unlocks left',
+                        ),
+                        if (reset != null)
+                          Text(
+                            'Renews ${MaterialLocalizations.of(context).formatMediumDate(reset.toLocal())}',
+                          ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -368,50 +371,54 @@ class _ContactsViewState extends State<ContactsView> {
               ),
             ),
           ...rows.map(
-            (row) => Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${row['name'] ?? 'Worker'}',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+            (row) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${row['name'] ?? 'Worker'}',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Text(
-                      [
-                        row['city'],
-                        row['state'],
-                      ].where((v) => v != null && '$v'.isNotEmpty).join(', '),
-                    ),
-                    if (row['job'] is Map)
-                      Text('${row['job']['title']} · ${row['stage'] ?? ''}'),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 8,
-                      children: asStrings(
-                        row['skills'],
-                      ).map((s) => BrandChip(s, neutral: true)).toList(),
-                    ),
-                    const SizedBox(height: 8),
-                    if (row['phone'] != null) SelectableText('${row['phone']}'),
-                    ContactActions(
-                      phone: row['phone']?.toString(),
-                      email: row['email']?.toString(),
-                    ),
-                    TextButton(
-                      onPressed: () => _open(row),
-                      child: Text(
-                        widget.source == 'applicants'
-                            ? 'Applicants'
-                            : 'View profile',
+                      Text(
+                        [
+                          row['city'],
+                          row['state'],
+                        ].where((v) => v != null && '$v'.isNotEmpty).join(', '),
                       ),
-                    ),
-                  ],
+                      if (row['job'] is Map)
+                        Text('${row['job']['title']} · ${row['stage'] ?? ''}'),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 8,
+                        children: asStrings(
+                          row['skills'],
+                        ).map((s) => BrandChip(s, neutral: true)).toList(),
+                      ),
+                      const SizedBox(height: 8),
+                      if (row['phone'] != null)
+                        SelectableText('${row['phone']}'),
+                      ContactActions(
+                        phone: row['phone']?.toString(),
+                        email: row['email']?.toString(),
+                      ),
+                      TextButton(
+                        onPressed: () => _open(row),
+                        child: Text(
+                          widget.source == 'applicants'
+                              ? 'Applicants'
+                              : 'View profile',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

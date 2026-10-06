@@ -56,92 +56,174 @@ class _MessagesScreenState extends State<MessagesScreen> {
           )
         : RefreshIndicator(
             onRefresh: _load,
-            child: ListView(
+            child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
-              children: items.isEmpty
-                  ? const [
-                      Padding(
-                        padding: EdgeInsets.all(32),
-                        child: Center(child: Text('No conversations yet')),
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              itemCount: items.isEmpty ? 1 : items.length,
+              separatorBuilder: (_, _) => const Divider(
+                height: 1,
+                indent: 82,
+                endIndent: 16,
+                color: AppColors.line,
+              ),
+              itemBuilder: (context, index) {
+                if (items.isEmpty) {
+                  return const Padding(
+                    padding: EdgeInsets.all(32),
+                    child: Center(child: Text('No conversations yet')),
+                  );
+                }
+                final item = items[index];
+                final participant = item['participant'] is Map
+                    ? Map<String, dynamic>.from(item['participant'])
+                    : <String, dynamic>{};
+                final last = item['last_message'] is Map
+                    ? Map<String, dynamic>.from(item['last_message'])
+                    : <String, dynamic>{};
+                final name = '${participant['name'] ?? 'Worker'}';
+                final worker = Worker(name, 'Worker', 0, 0, 0, 0, const []);
+                final unread = (item['unread'] as num?)?.toInt() ?? 0;
+                return _ConversationTile(
+                  worker: worker,
+                  name: name,
+                  preview: '${last['body'] ?? 'Start chatting'}',
+                  time: '${last['created_ago'] ?? ''}',
+                  unread: unread,
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatScreen(
+                          worker: worker,
+                          conversationId: (item['id'] as num?)?.toInt(),
+                        ),
                       ),
-                    ]
-                  : items.map((item) {
-                      final participant = item['participant'] is Map
-                          ? Map<String, dynamic>.from(item['participant'])
-                          : <String, dynamic>{};
-                      final last = item['last_message'] is Map
-                          ? Map<String, dynamic>.from(item['last_message'])
-                          : <String, dynamic>{};
-                      final name = '${participant['name'] ?? 'Worker'}';
-                      final worker = Worker(
-                        name,
-                        'Worker',
-                        0,
-                        0,
-                        0,
-                        0,
-                        const [],
-                      );
-                      final unread = (item['unread'] as num?)?.toInt() ?? 0;
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 7,
-                        ),
-                        leading: CircleAvatar(
-                          radius: 23,
-                          backgroundColor: AppColors.brand100,
-                          child: Text(
-                            worker.initials,
-                            style: const TextStyle(
-                              color: AppColors.brandDark,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        title: Text(
-                          name,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        subtitle: Text(
-                          '${last['body'] ?? 'Start chatting'}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        trailing: SizedBox(
-                          width: 72,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '${last['created_ago'] ?? ''}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.muted,
-                                ),
-                              ),
-                              if (unread > 0) Badge(label: Text('$unread')),
-                            ],
-                          ),
-                        ),
-                        onTap: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => ChatScreen(
-                                worker: worker,
-                                conversationId: (item['id'] as num?)?.toInt(),
-                              ),
-                            ),
-                          );
-                          if (mounted) _load();
-                        },
-                      );
-                    }).toList(),
+                    );
+                    if (mounted) _load();
+                  },
+                );
+              },
             ),
           ),
+  );
+}
+
+class _ConversationTile extends StatelessWidget {
+  const _ConversationTile({
+    required this.worker,
+    required this.name,
+    required this.preview,
+    required this.time,
+    required this.unread,
+    required this.onTap,
+  });
+
+  final Worker worker;
+  final String name, preview, time;
+  final int unread;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: unread > 0
+        ? AppColors.brand50.withValues(alpha: .38)
+        : Colors.transparent,
+    child: InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: AppColors.brand100,
+              child: Text(
+                worker.initials,
+                style: const TextStyle(
+                  color: AppColors.brandDark,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontWeight: unread > 0
+                          ? FontWeight.w800
+                          : FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    preview,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: unread > 0
+                          ? AppColors.foreground
+                          : AppColors.muted,
+                      fontWeight: unread > 0
+                          ? FontWeight.w600
+                          : FontWeight.w400,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 62,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    time,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                  const SizedBox(height: 7),
+                  if (unread > 0)
+                    Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 19,
+                        minHeight: 19,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$unread',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
   );
 }

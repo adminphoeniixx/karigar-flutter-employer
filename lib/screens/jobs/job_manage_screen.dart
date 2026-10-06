@@ -8,12 +8,10 @@ import '../../widgets/contact_actions.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
-import 'package:employer_kariger_app/core/api/api_exception.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
 import 'package:employer_kariger_app/screens/jobs/applicant_features_screen.dart';
-import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
 import 'package:employer_kariger_app/screens/workers/worker_profile_screen.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 
@@ -272,77 +270,6 @@ class _JobManageScreenState extends State<JobManageScreen> {
       '${value.month.toString().padLeft(2, '0')}-'
       '${value.day.toString().padLeft(2, '0')}';
 
-  Future<void> _boostJob() async {
-    final api = AppScope.of(context).api;
-    final reference = await api.reference();
-    if (!mounted) return;
-    final tiers = (reference['boost_tiers'] as List? ?? const [])
-        .whereType<Map>()
-        .map((item) => Map<String, dynamic>.from(item))
-        .toList();
-    if (tiers.isEmpty) {
-      _message('Boost options are not available right now.');
-      return;
-    }
-    final tier = await showModalBottomSheet<Map<String, dynamic>>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: tiers
-              .map(
-                (item) => ListTile(
-                  leading: const Icon(LucideIcons.zap),
-                  title: Text('${item['label'] ?? item['key'] ?? 'Boost'}'),
-                  subtitle: Text(
-                    '${item['credits'] ?? 0} credits · ${item['days'] ?? 0} days',
-                  ),
-                  onTap: () => Navigator.pop(context, item),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-    if (tier == null || !mounted) return;
-    try {
-      final response = await api.boostJob(job.id, '${tier['key']}');
-      if (mounted) {
-        _message('${response['message'] ?? 'Job boosted.'}');
-      }
-    } on ApiException catch (exception) {
-      if (!mounted) return;
-      if (exception.code == 'out_of_credits') {
-        final openPlans = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: const Text('Not enough credits'),
-            content: Text(exception.message),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text('View plans'),
-              ),
-            ],
-          ),
-        );
-        if (openPlans == true && mounted) {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const PlansScreen()),
-          );
-        }
-      } else {
-        _message(exception.message);
-      }
-    }
-  }
-
   Future<void> _jobActions() async {
     final action = await showModalBottomSheet<String>(
       context: context,
@@ -354,11 +281,6 @@ class _JobManageScreenState extends State<JobManageScreen> {
               leading: const Icon(Icons.edit),
               title: const Text('Edit job'),
               onTap: () => Navigator.pop(context, 'edit'),
-            ),
-            ListTile(
-              leading: const Icon(LucideIcons.zap),
-              title: const Text('Boost job'),
-              onTap: () => Navigator.pop(context, 'boost'),
             ),
             ListTile(
               leading: const Icon(LucideIcons.share2),
@@ -388,8 +310,6 @@ class _JobManageScreenState extends State<JobManageScreen> {
           MaterialPageRoute(builder: (_) => PostJobScreen(job: details)),
         );
         if (changed == true && mounted) Navigator.pop(context, true);
-      } else if (action == 'boost') {
-        await _boostJob();
       } else if (action == 'share') {
         final details = await AppScope.of(context).api.job(job.id);
         if (details.shareUrl.isEmpty) {
@@ -557,6 +477,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
               profile.expectedWage,
               profile.skills,
               status: applicant.statusLabel,
+              verified: profile.verified,
             );
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -624,7 +545,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
                       child: OutlinedButton.icon(
                         onPressed: () => _unlock(applicant),
                         icon: const Icon(LucideIcons.lockOpen, size: 17),
-                        label: const Text('Unlock contact · 1 credit'),
+                        label: const Text('Unlock contact'),
                       ),
                     ),
                   Row(

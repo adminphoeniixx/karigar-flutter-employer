@@ -3,6 +3,7 @@ import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
 
@@ -58,6 +59,12 @@ class _MatchedWorkersScreenState extends State<MatchedWorkersScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${response['message'] ?? 'Invite sent.'}')),
       );
+    } on ApiException catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(exception.message)));
+      }
     } catch (exception) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -201,6 +208,7 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
     'interview_already_scheduled': 'An interview is already scheduled.',
     'no_phone_number': 'This worker has no phone number on file.',
     'worker_opted_out': 'The worker opted out of automated calls.',
+    'worker_unavailable': 'This worker is not available for work right now.',
     'call_in_progress': 'A screening call is already in progress.',
     'already_screened': 'This worker has already been screened.',
   };

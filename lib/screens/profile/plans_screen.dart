@@ -15,7 +15,8 @@ import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/profile/invoice_screen.dart';
 
 class PlansScreen extends StatefulWidget {
-  const PlansScreen({super.key});
+  const PlansScreen({super.key, this.focusDatabase = false});
+  final bool focusDatabase;
 
   @override
   State<PlansScreen> createState() => _PlansScreenState();
@@ -25,16 +26,16 @@ class _PlansScreenState extends State<PlansScreen> {
   Razorpay? razorpay;
   bool loading = true;
   String? error;
-  Map<String, dynamic> credits = const {};
+  Map<String, dynamic> unlocks = const {};
   List<Map<String, dynamic>> plans = const [];
-  List<Map<String, dynamic>> packs = const [];
+  Json? database;
   List<Map<String, dynamic>> invoices = const [];
   Json payment = {};
   Json? jobPosts;
   bool checkingOut = false;
+  int? checkoutPlanId;
   bool verifyingPayment = false;
   String? pendingSubscriptionId;
-  String? pendingOrderId;
 
   @override
   void initState() {
@@ -87,17 +88,25 @@ class _PlansScreenState extends State<PlansScreen> {
       final response = await AppScope.of(context).api.plans();
       if (!mounted) return;
       setState(() {
-        credits = response['credits'] is Map
-            ? Map<String, dynamic>.from(response['credits'])
+        unlocks = response['unlocks'] is Map
+            ? Map<String, dynamic>.from(response['unlocks'])
             : {};
+        database = response['database'] is Map
+            ? Json.from(response['database'])
+            : null;
         payment = response['payment'] is Map
             ? Json.from(response['payment'])
             : {};
         jobPosts = response['job_posts'] is Map
             ? Json.from(response['job_posts'])
             : null;
-        plans = _maps(response['plans']);
-        packs = _maps(response['credit_packs']);
+        plans = _maps(response['plans'])
+          ..sort((a, b) {
+            if (!widget.focusDatabase) return 0;
+            final aDatabase = a['type'] == 'database';
+            final bDatabase = b['type'] == 'database';
+            return aDatabase == bDatabase ? 0 : (aDatabase ? -1 : 1);
+          });
         invoices = _maps(response['invoices']);
       });
     } catch (exception) {
@@ -114,21 +123,22 @@ class _PlansScreenState extends State<PlansScreen> {
           .toList();
 
   Future<void> _subscribe(Map<String, dynamic> plan) async {
-    if (checkingOut ||
-        pendingSubscriptionId != null ||
-        pendingOrderId != null) {
+    if (checkingOut || pendingSubscriptionId != null) {
       return;
     }
+    final planId = (plan['id'] as num?)?.toInt();
+    if (planId == null) return;
     final checkout = razorpay;
     if (checkout == null) {
       _checkoutUnavailable();
       return;
     }
     try {
-      setState(() => checkingOut = true);
-      final response = await AppScope.of(
-        context,
-      ).api.subscribe((plan['id'] as num).toInt());
+      setState(() {
+        checkingOut = true;
+        checkoutPlanId = planId;
+      });
+      final response = await AppScope.of(context).api.subscribe(planId);
       if (!mounted) return;
       if (!await _confirmCheckout(response) || !mounted) {
         return;
@@ -142,7 +152,6 @@ class _PlansScreenState extends State<PlansScreen> {
           'Payment details are missing. Please try again.',
         );
       }
-      pendingOrderId = null;
       pendingSubscriptionId = subscriptionId;
       unawaited(
         AppScope.of(context).api.analytics.checkoutStarted(subscriptionId),
@@ -156,14 +165,18 @@ class _PlansScreenState extends State<PlansScreen> {
       });
     } catch (exception) {
       pendingSubscriptionId = null;
-      pendingOrderId = null;
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(SnackBar(content: Text('$exception')));
       }
     } finally {
-      if (mounted) setState(() => checkingOut = false);
+      if (mounted) {
+        setState(() {
+          checkingOut = false;
+          checkoutPlanId = null;
+        });
+      }
     }
   }
 
@@ -222,46 +235,6 @@ class _PlansScreenState extends State<PlansScreen> {
         '${reset == null ? '' : ' · resets ${MaterialLocalizations.of(context).formatShortDate(reset.toLocal())}'}';
   }
 
-  Future<void> _topUp(Map<String, dynamic> pack) async {
-    if (checkingOut ||
-        pendingSubscriptionId != null ||
-        pendingOrderId != null) {
-      return;
-    }
-    final checkout = razorpay;
-    if (checkout == null) {
-      _checkoutUnavailable();
-      return;
-    }
-    try {
-      setState(() => checkingOut = true);
-      final response = await AppScope.of(context).api.topUp('${pack['key']}');
-      if (!mounted) return;
-      pendingSubscriptionId = null;
-      pendingOrderId = '${response['razorpay_order_id']}';
-      unawaited(
-        AppScope.of(context).api.analytics.checkoutStarted(pendingOrderId!),
-      );
-      checkout.open({
-        'key': response['razorpay_key'],
-        'order_id': pendingOrderId,
-        'name': 'Karigar',
-        'description': '${response['credits'] ?? ''} contact credits',
-        'theme': {'color': '#F97316'},
-      });
-    } catch (exception) {
-      pendingSubscriptionId = null;
-      pendingOrderId = null;
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
-      }
-    } finally {
-      if (mounted) setState(() => checkingOut = false);
-    }
-  }
-
   void _checkoutUnavailable() {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -277,11 +250,10 @@ class _PlansScreenState extends State<PlansScreen> {
     verifyingPayment = true;
     pendingSubscriptionId ??= response.data?['razorpay_subscription_id']
         ?.toString();
-    if (pendingSubscriptionId == null) pendingOrderId ??= response.orderId;
     try {
       if (response.paymentId == null ||
           response.signature == null ||
-          (pendingSubscriptionId == null && pendingOrderId == null)) {
+          pendingSubscriptionId == null) {
         throw const FormatException(
           'Payment details are incomplete. Refresh plans to check payment status.',
         );
@@ -290,12 +262,6 @@ class _PlansScreenState extends State<PlansScreen> {
         await AppScope.of(context).api.subscriptionCallback({
           'razorpay_payment_id': response.paymentId,
           'razorpay_subscription_id': pendingSubscriptionId,
-          'razorpay_signature': response.signature,
-        });
-      } else if (pendingOrderId != null) {
-        await AppScope.of(context).api.topUpCallback({
-          'razorpay_payment_id': response.paymentId,
-          'razorpay_order_id': pendingOrderId,
           'razorpay_signature': response.signature,
         });
       }
@@ -313,13 +279,11 @@ class _PlansScreenState extends State<PlansScreen> {
     } finally {
       verifyingPayment = false;
       pendingSubscriptionId = null;
-      pendingOrderId = null;
     }
   }
 
   void _paymentError(PaymentFailureResponse response) {
     pendingSubscriptionId = null;
-    pendingOrderId = null;
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -344,7 +308,7 @@ class _PlansScreenState extends State<PlansScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Credits & Plans')),
+    appBar: AppBar(title: const Text('Plans & Worker Database')),
     body: loading && plans.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : error != null && plans.isEmpty
@@ -383,9 +347,10 @@ class _PlansScreenState extends State<PlansScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              credits['unmetered'] == true
-                                  ? 'Unlimited unlocks'
-                                  : '${credits['balance'] ?? 0} credits',
+                              database?['title']?.toString() ??
+                                  (unlocks['unmetered'] == true
+                                      ? 'Unlimited unlocks'
+                                      : '${unlocks['plan_remaining'] ?? 0} unlocks'),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 24,
@@ -393,7 +358,8 @@ class _PlansScreenState extends State<PlansScreen> {
                               ),
                             ),
                             Text(
-                              '${credits['plan_label'] ?? 'Free plan · unlock worker numbers'}',
+                              database?['subtitle']?.toString() ??
+                                  'Choose a plan to unlock worker contacts',
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 13,
@@ -405,7 +371,7 @@ class _PlansScreenState extends State<PlansScreen> {
                     ],
                   ),
                 ),
-                if (DateTime.tryParse('${credits['unlocks_reset_at'] ?? ''}')
+                if (DateTime.tryParse('${unlocks['unlocks_reset_at'] ?? ''}')
                     case final DateTime reset)
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
@@ -433,8 +399,8 @@ class _PlansScreenState extends State<PlansScreen> {
                   ),
                 ),
                 const SizedBox(height: 26),
-                const Text(
-                  'Choose a plan',
+                Text(
+                  widget.focusDatabase ? 'Buy Database' : 'Choose a plan',
                   style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 14),
@@ -444,64 +410,16 @@ class _PlansScreenState extends State<PlansScreen> {
                     child: _Plan(
                       plan: plan,
                       gstPercent: asDouble(payment['gst_percent']),
-                      onChoose: plan['purchasable'] == true && !checkingOut
+                      available: plan['purchasable'] == true,
+                      selected:
+                          checkoutPlanId != null &&
+                          checkoutPlanId == (plan['id'] as num?)?.toInt(),
+                      onChoose: plan['purchasable'] == true
                           ? () => _subscribe(plan)
                           : null,
                     ),
                   ),
                 ),
-                if (packs.isNotEmpty) ...[
-                  const SizedBox(height: 10),
-                  const Text(
-                    'Credit top-ups',
-                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 14),
-                  ...packs.map(
-                    (pack) => Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(14),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${pack['label'] ?? ''}',
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  Text(
-                                    '₹${pack['price'] ?? 0}',
-                                    style: const TextStyle(
-                                      color: AppColors.muted,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            FilledButton(
-                              onPressed:
-                                  checkingOut || payment['configured'] != true
-                                  ? null
-                                  : () => _topUp(pack),
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size(64, 44),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                ),
-                              ),
-                              child: const Text('Buy'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
                 if (invoices.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   const Text(
@@ -542,10 +460,13 @@ class _Plan extends StatelessWidget {
     required this.plan,
     required this.onChoose,
     required this.gstPercent,
+    required this.available,
+    required this.selected,
   });
   final double gstPercent;
   final Map<String, dynamic> plan;
   final VoidCallback? onChoose;
+  final bool available, selected;
 
   @override
   Widget build(BuildContext context) {
@@ -635,13 +556,22 @@ class _Plan extends StatelessWidget {
           const SizedBox(height: 14),
           FilledButton(
             onPressed: plan['is_current'] == true ? null : onChoose,
-            child: Text(
-              plan['is_current'] == true
-                  ? 'Current plan'
-                  : onChoose == null
-                  ? 'Unavailable'
-                  : 'Choose ${plan['name'] ?? ''}',
-            ),
+            child: selected
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    plan['is_current'] == true
+                        ? 'Current plan'
+                        : !available
+                        ? 'Unavailable'
+                        : 'Choose ${plan['name'] ?? ''}',
+                  ),
           ),
         ],
       ),

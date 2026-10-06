@@ -88,8 +88,8 @@ class EmployerProfile {
   final Rating rating;
 }
 
-class CreditSummary {
-  const CreditSummary({
+class UnlockSummary {
+  const UnlockSummary({
     this.balance = 0,
     this.purchased = 0,
     this.planRemaining = 0,
@@ -101,11 +101,11 @@ class CreditSummary {
     this.planLabel = '',
     this.unlocksResetAt,
   });
-  factory CreditSummary.fromJson(dynamic value) {
+  factory UnlockSummary.fromJson(dynamic value) {
     final json = value is Map
         ? Map<String, dynamic>.from(value)
         : <String, dynamic>{};
-    return CreditSummary(
+    return UnlockSummary(
       balance: asInt(json['balance']),
       purchased: asInt(json['purchased']),
       planRemaining: asInt(json['plan_remaining']),
@@ -127,6 +127,51 @@ class CreditSummary {
   final bool unmetered;
   final String plan, planLabel;
   final DateTime? unlocksResetAt;
+}
+
+class DatabaseAccess {
+  const DatabaseAccess({
+    this.active = false,
+    this.plan,
+    this.planType,
+    this.contacts = 0,
+    this.unlockLimit = 0,
+    this.unlocksUsed = 0,
+    this.unlocksRemaining,
+    this.renewsAt,
+    this.title = 'Worker Database',
+    this.subtitle = 'Buy a database plan to see karigar numbers',
+    this.cta = 'Buy Database',
+  });
+
+  factory DatabaseAccess.fromJson(dynamic value) {
+    final json = value is Map
+        ? Map<String, dynamic>.from(value)
+        : <String, dynamic>{};
+    return DatabaseAccess(
+      active: json['active'] == true,
+      plan: json['plan']?.toString(),
+      planType: json['plan_type']?.toString(),
+      contacts: asInt(json['contacts']),
+      unlockLimit: asInt(json['unlock_limit']),
+      unlocksUsed: asInt(json['unlocks_used']),
+      unlocksRemaining: json['unlocks_remaining'] == null
+          ? null
+          : asInt(json['unlocks_remaining']),
+      renewsAt: DateTime.tryParse('${json['renews_at'] ?? ''}'),
+      title: '${json['title'] ?? 'Worker Database'}',
+      subtitle:
+          '${json['subtitle'] ?? 'Buy a database plan to see karigar numbers'}',
+      cta: '${json['cta'] ?? 'Buy Database'}',
+    );
+  }
+
+  final bool active;
+  final String? plan, planType;
+  final int contacts, unlockLimit, unlocksUsed;
+  final int? unlocksRemaining;
+  final DateTime? renewsAt;
+  final String title, subtitle, cta;
 }
 
 class EmployerJob {
@@ -164,6 +209,8 @@ class EmployerJob {
     this.longitude,
     this.requiresWorkerFee = false,
     this.workerFeeAmount,
+    this.aiShortlistEnabled = true,
+    this.aiCallEnabled = true,
     this.createdAgo = '',
     this.shareUrl = '',
     this.boost = const {},
@@ -209,6 +256,8 @@ class EmployerJob {
     workerFeeAmount: json['worker_fee_amount'] == null
         ? null
         : asDouble(json['worker_fee_amount']),
+    aiShortlistEnabled: json['ai_shortlist_enabled'] != false,
+    aiCallEnabled: json['ai_call_enabled'] != false,
     createdAgo: '${json['created_ago'] ?? ''}',
     shareUrl: '${json['share_url'] ?? ''}',
     boost: json['boost'] is Map
@@ -230,6 +279,7 @@ class EmployerJob {
   final bool isDraft;
   final DateTime? publishedAt;
   final bool requiresWorkerFee;
+  final bool aiShortlistEnabled, aiCallEnabled;
   final Json stats, boost;
 }
 
@@ -351,18 +401,21 @@ class DashboardData {
   const DashboardData({
     required this.greeting,
     required this.stats,
-    required this.credits,
+    required this.unlocks,
+    required this.database,
     required this.jobs,
     required this.applicants,
     this.profile,
     this.verificationEnabled = false,
+    this.workerVerificationEnabled = true,
   });
   factory DashboardData.fromJson(Json json) => DashboardData(
     greeting: '${json['greeting'] ?? ''}',
     stats: json['stats'] is Map
         ? Map<String, dynamic>.from(json['stats'])
         : const {},
-    credits: CreditSummary.fromJson(json['credits']),
+    unlocks: UnlockSummary.fromJson(json['unlocks']),
+    database: DatabaseAccess.fromJson(json['database']),
     jobs: (json['active_jobs'] as List? ?? const [])
         .whereType<Map>()
         .map((e) => EmployerJob.fromJson(Map<String, dynamic>.from(e)))
@@ -377,12 +430,17 @@ class DashboardData {
     verificationEnabled:
         json['features'] is Map &&
         (json['features'] as Map)['verification_enabled'] == true,
+    workerVerificationEnabled:
+        json['features'] is! Map ||
+        (json['features'] as Map)['worker_verification_enabled'] != false,
   );
   final String greeting;
   final Json stats;
-  final CreditSummary credits;
+  final UnlockSummary unlocks;
+  final DatabaseAccess database;
   final List<EmployerJob> jobs;
   final List<Applicant> applicants;
   final EmployerProfile? profile;
   final bool verificationEnabled;
+  final bool workerVerificationEnabled;
 }

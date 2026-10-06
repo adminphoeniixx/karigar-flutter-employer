@@ -175,8 +175,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     _ProfileRow(
                       icon: LucideIcons.layers,
-                      title: context.tr('Credits & Plans'),
-                      subtitle: 'Subscriptions and contact credits',
+                      title: 'Plans & Worker Database',
+                      subtitle: 'Subscriptions and worker contacts',
                       trailing: '→',
                       onTap: () => _open(const PlansScreen()),
                     ),

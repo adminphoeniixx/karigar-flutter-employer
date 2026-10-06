@@ -14,6 +14,7 @@ import 'package:employer_kariger_app/screens/jobs/post_job_screen.dart';
 import 'package:employer_kariger_app/screens/messages/messages_screen.dart';
 import 'package:employer_kariger_app/screens/profile/kyc_screen.dart';
 import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
+import 'package:employer_kariger_app/screens/profile/profile_screen.dart';
 import 'package:employer_kariger_app/screens/workers/worker_profile_screen.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 
@@ -47,6 +48,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void _message(String value) => ScaffoldMessenger.of(
     context,
   ).showSnackBar(SnackBar(content: Text(value)));
+
+  void _openProfile() => Navigator.push(
+    context,
+    MaterialPageRoute(builder: (_) => const ProfileScreen()),
+  );
 
   Future<void> _applicantAction(int applicantId, String action) async {
     try {
@@ -148,35 +154,46 @@ class _HomeScreenState extends State<HomeScreen> {
         leadingWidth: 58,
         leading: Padding(
           padding: const EdgeInsets.only(left: 16, top: 9, bottom: 9),
-          child: CircleAvatar(
-            backgroundColor: AppColors.brand100,
-            child: Text(
-              initials.isEmpty ? 'K' : initials,
-              style: const TextStyle(
-                color: AppColors.brandDark,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
+          child: InkWell(
+            onTap: _openProfile,
+            borderRadius: BorderRadius.circular(20),
+            child: CircleAvatar(
+              backgroundColor: AppColors.brand100,
+              child: Text(
+                initials.isEmpty ? 'K' : initials,
+                style: const TextStyle(
+                  color: AppColors.brandDark,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
         ),
         titleSpacing: 8,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              context.tr('Welcome back 👋'),
-              style: TextStyle(
-                fontSize: 11.5,
-                color: AppColors.muted,
-                fontWeight: FontWeight.w400,
+        title: InkWell(
+          onTap: _openProfile,
+          borderRadius: BorderRadius.circular(8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.tr('Welcome back 👋'),
+                style: TextStyle(
+                  fontSize: 11.5,
+                  color: AppColors.muted,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
-            ),
-            Text(
-              greeting,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-            ),
-          ],
+              Text(
+                greeting,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
         actions: [
           _HeaderAction(
@@ -263,16 +280,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                _CreditsCard(
-                  balance: data?.credits.balance ?? 0,
-                  label: [
-                    data?.credits.planLabel ?? '',
-                    if (data?.credits.unlocksResetAt case final DateTime reset)
-                      'Unlocks renew ${MaterialLocalizations.of(context).formatMediumDate(reset.toLocal())}',
-                  ].where((text) => text.isNotEmpty).join(' · '),
+                _DatabaseCard(
+                  title: data?.database.title ?? 'Worker Database',
+                  subtitle:
+                      data?.database.subtitle ??
+                      'Buy a database plan to see karigar numbers',
+                  cta: data?.database.cta ?? 'Buy Database',
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const PlansScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const PlansScreen(focusDatabase: true),
+                    ),
                   ),
                 ),
                 if (data?.verificationEnabled == true &&
@@ -305,6 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     profile.expectedWage,
                     profile.skills,
                     status: applicant.statusLabel,
+                    verified: profile.verified,
                   );
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -547,14 +566,14 @@ class _StatCard extends StatelessWidget {
   );
 }
 
-class _CreditsCard extends StatelessWidget {
-  const _CreditsCard({
-    required this.balance,
-    required this.label,
+class _DatabaseCard extends StatelessWidget {
+  const _DatabaseCard({
+    required this.title,
+    required this.subtitle,
+    required this.cta,
     required this.onTap,
   });
-  final int balance;
-  final String label;
+  final String title, subtitle, cta;
   final VoidCallback onTap;
 
   @override
@@ -582,14 +601,14 @@ class _CreditsCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$balance contact credits',
+                  title,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 Text(
-                  label.isEmpty ? 'Unlock worker numbers' : label,
+                  subtitle,
                   style: const TextStyle(fontSize: 11, color: AppColors.muted),
                 ),
               ],
@@ -606,7 +625,7 @@ class _CreditsCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(11),
                 ),
               ),
-              child: const Text('Buy'),
+              child: Text(cta),
             ),
           ),
         ],
@@ -843,9 +862,7 @@ class _ApplicantCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 7),
                     Text(
-                      contactUnlocked
-                          ? 'Contact unlocked'
-                          : 'View contact · 1 credit',
+                      contactUnlocked ? 'Contact unlocked' : 'View contact',
                       style: const TextStyle(
                         color: AppColors.brandDark,
                         fontSize: 12,

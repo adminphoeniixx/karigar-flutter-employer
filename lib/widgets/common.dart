@@ -130,11 +130,12 @@ class WorkerCard extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 5),
-                              const Icon(
-                                LucideIcons.badgeCheck,
-                                size: 17,
-                                color: AppColors.green,
-                              ),
+                              if (worker.verified)
+                                const Icon(
+                                  LucideIcons.badgeCheck,
+                                  size: 17,
+                                  color: AppColors.green,
+                                ),
                             ],
                           ),
                           Text(

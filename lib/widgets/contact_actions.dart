@@ -5,39 +5,12 @@ import '../core/api/api_exception.dart';
 import '../screens/profile/plans_screen.dart';
 
 Future<void> showContactError(BuildContext context, Object error) async {
-  if (error is ApiException && error.code == 'no_plan') {
+  if (error is ApiException &&
+      (error.code == 'no_plan' || error.code == 'unlock_limit_reached')) {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => const PlansScreen()),
+      MaterialPageRoute(builder: (_) => const PlansScreen(focusDatabase: true)),
     );
-    return;
-  }
-  if (error is ApiException && error.code == 'out_of_credits') {
-    final open = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('No contact unlocks left'),
-        content: const Text(
-          'Upgrade your plan or buy a credit top-up to unlock more contacts.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Later'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('See plans & top-ups'),
-          ),
-        ],
-      ),
-    );
-    if (open == true && context.mounted) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const PlansScreen()),
-      );
-    }
     return;
   }
   ScaffoldMessenger.of(

@@ -49,8 +49,9 @@ class _WorkersScreenState extends State<WorkersScreen> {
           .map((item) => '$item')
           .where((item) => item.isNotEmpty)
           .toList();
-      if (mounted && values.isNotEmpty)
+      if (mounted && values.isNotEmpty) {
         setState(() => categories = ['All', ...values]);
+      }
     } catch (_) {
       // The directory remains searchable even if reference options are offline.
     }
@@ -84,6 +85,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
       final profileController = AppScope.of(context).profile;
       if (profileController.profile == null && !profileController.loading) {
         await profileController.load();
+        if (!mounted) return;
       }
       final profile = profileController.profile;
       if (profile?.latitude != null && profile?.longitude != null) {
@@ -125,6 +127,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
               item.distanceKm ?? 0,
               item.expectedWage,
               item.skills,
+              verified: item.verified,
             ),
             name: item.name,
             experience: item.experienceYears,
@@ -363,6 +366,9 @@ class _WorkersScreenState extends State<WorkersScreen> {
         initial: advancedFilters,
         categories: categories,
         initialCategory: category,
+        workerVerificationEnabled:
+            AppScope.of(context).dashboard.data?.workerVerificationEnabled ??
+            true,
       ),
     );
     if (result == null) return;
@@ -455,7 +461,11 @@ class _WorkerResultCard extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(width: 5),
-                          if (data.profile.verified)
+                          if (AppScope.of(
+                                    context,
+                                  ).dashboard.data?.workerVerificationEnabled !=
+                                  false &&
+                              data.profile.verified)
                             const Icon(
                               LucideIcons.badgeCheck,
                               size: 15,
@@ -532,7 +542,7 @@ class _WorkerResultCard extends StatelessWidget {
               FilledButton.icon(
                 onPressed: busy ? null : onUnlock,
                 icon: const Icon(Icons.lock_open, size: 18),
-                label: Text(busy ? 'Unlocking…' : 'Unlock contact · 1 credit'),
+                label: Text(busy ? 'Unlocking…' : 'Unlock contact'),
               )
             else
               const Text('Contact locked · view profile for plan access'),
@@ -548,10 +558,12 @@ class _WorkerFiltersSheet extends StatefulWidget {
     required this.initial,
     required this.categories,
     required this.initialCategory,
+    required this.workerVerificationEnabled,
   });
   final Map<String, dynamic> initial;
   final List<String> categories;
   final String initialCategory;
+  final bool workerVerificationEnabled;
 
   @override
   State<_WorkerFiltersSheet> createState() => _WorkerFiltersSheetState();
@@ -751,11 +763,12 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
                   }, (value) => setState(() => sort = value)),
                 ),
                 const SizedBox(height: 11),
-                _FilterSwitch(
-                  label: 'Only KYC-verified',
-                  value: verifiedOnly,
-                  onChanged: (value) => setState(() => verifiedOnly = value),
-                ),
+                if (widget.workerVerificationEnabled)
+                  _FilterSwitch(
+                    label: 'Only KYC-verified',
+                    value: verifiedOnly,
+                    onChanged: (value) => setState(() => verifiedOnly = value),
+                  ),
                 _FilterSwitch(
                   label: 'Available now',
                   value: availableNow,
@@ -810,7 +823,8 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
                         'wage_max': num.parse(maxWageController.text),
                       if (selectedLanguages.isNotEmpty)
                         'languages': selectedLanguages.toList(),
-                      if (verifiedOnly) 'verified': 1,
+                      if (widget.workerVerificationEnabled && verifiedOnly)
+                        'verified': 1,
                       if (availableNow) 'available': 1,
                       if (radiusKm != null) 'radius_km': radiusKm,
                       'sort': sort,

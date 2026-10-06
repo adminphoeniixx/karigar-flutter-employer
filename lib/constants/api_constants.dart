@@ -32,8 +32,6 @@ class ApiConstants {
   static const conversations = '/conversations';
   static const plans = '/employer/plans';
   static const plansCallback = '/employer/plans/callback';
-  static const creditsTopUp = '/employer/credits/top-up';
-  static const creditsCallback = '/employer/credits/callback';
   static const invoices = '/employer/invoices';
   static const preferences = '/preferences';
   static const sessions = '/auth/sessions';
@@ -41,7 +39,6 @@ class ApiConstants {
   static String job(int id) => '$jobs/$id';
   static String closeJob(int id) => '${job(id)}/close';
   static String repostJob(int id) => '${job(id)}/repost';
-  static String boostJob(int id) => '${job(id)}/boost';
   static String jobMatches(int id) => '${job(id)}/matches';
   static String inviteWorker(int id) => '${job(id)}/invite';
   static String jobApplicants(int id) => '${job(id)}/applicants';

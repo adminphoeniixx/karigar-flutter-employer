@@ -228,7 +228,11 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          if (details?.verified == true)
+                          if (AppScope.of(
+                                    context,
+                                  ).dashboard.data?.workerVerificationEnabled !=
+                                  false &&
+                              details?.verified == true)
                             const StatusPill('Verified'),
                           if (details?.available == true)
                             const BrandChip('● Available'),
@@ -289,7 +293,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                 TextButton(
                                   onPressed: unlocked || busy ? null : _unlock,
                                   child: Text(
-                                    unlocked ? 'Unlocked' : 'Unlock · 1 credit',
+                                    unlocked ? 'Unlocked' : 'Unlock contact',
                                   ),
                                 ),
                             ],
@@ -311,11 +315,12 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                             onPressed: () => Navigator.push(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => const PlansScreen(),
+                                builder: (_) =>
+                                    const PlansScreen(focusDatabase: true),
                               ),
                             ),
                             icon: const Icon(LucideIcons.badgeIndianRupee),
-                            label: const Text('View plans to access contacts'),
+                            label: const Text('Buy Database'),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: AppColors.primary,
                               side: const BorderSide(color: AppColors.brand200),

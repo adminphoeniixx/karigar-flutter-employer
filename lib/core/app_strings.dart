@@ -29,7 +29,6 @@ class AppStrings {
     'Reset': 'रीसेट करें',
     'Contact locked · view profile for plan access':
         'संपर्क लॉक है · प्लान एक्सेस के लिए प्रोफाइल देखें',
-    'Unlock contact · 1 credit': 'संपर्क अनलॉक करें · 1 क्रेडिट',
     'Worker Profile': 'कारीगर प्रोफाइल',
     'Messages': 'संदेश',
     'Message': 'संदेश',
@@ -45,7 +44,6 @@ class AppStrings {
     'Save as draft': 'ड्राफ्ट सेव करें',
     'View matched workers': 'मिलान वाले कारीगर देखें',
     'Matched workers': 'मिलान वाले कारीगर',
-    'Boost job': 'जॉब बूस्ट करें',
     'Business Verification': 'बिज़नेस सत्यापन',
     'Business verification required': 'बिज़नेस सत्यापन आवश्यक है',
     'Verify business': 'बिज़नेस सत्यापित करें',
@@ -53,16 +51,13 @@ class AppStrings {
     'Set up your business': 'अपना बिज़नेस सेट करें',
     'Business name and contact person are required.':
         'बिज़नेस का नाम और संपर्क व्यक्ति आवश्यक हैं।',
-    'Plans & Credits': 'प्लान और क्रेडिट',
     'See plans': 'प्लान देखें',
     'View plans': 'प्लान देखें',
     'View plans to access contacts': 'संपर्क पाने के लिए प्लान देखें',
-    'See plans & top-ups': 'प्लान और टॉप-अप देखें',
     'Continue': 'जारी रखें',
     'Continue to payment': 'भुगतान जारी रखें',
     'Confirm payment': 'भुगतान की पुष्टि करें',
     'Payment successful.': 'भुगतान सफल रहा।',
-    'Not enough credits': 'पर्याप्त क्रेडिट नहीं हैं',
     'No contact unlocks left': 'कोई संपर्क अनलॉक शेष नहीं है',
     'Billing profile': 'बिलिंग प्रोफाइल',
     'Tax invoice': 'टैक्स इनवॉइस',
@@ -149,7 +144,6 @@ class AppStrings {
     'Business Verification': 'बिज़नेस सत्यापन',
     'Shortlisted Workers': 'शॉर्टलिस्ट किए कारीगर',
     'Reviews & Ratings': 'रेटिंग और समीक्षा',
-    'Credits & Plans': 'क्रेडिट और प्लान',
   };
 }
 

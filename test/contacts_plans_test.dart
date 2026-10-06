@@ -65,14 +65,14 @@ void main() {
       expect(request.url.path, '/api/v1/employer/workers/41/unlock');
       return jsonResponse({
         'message': 'undefined',
-        'code': 'out_of_credits',
+        'code': 'unlock_limit_reached',
       }, 422);
     });
     await expectLater(
       api.unlockWorker(41),
       throwsA(
         isA<ApiException>()
-            .having((e) => e.code, 'code', 'out_of_credits')
+            .having((e) => e.code, 'code', 'unlock_limit_reached')
             .having((e) => e.message, 'message', isNot('undefined')),
       ),
     );
@@ -90,7 +90,7 @@ void main() {
       expect(worker.canUnlock, isTrue);
       expect(worker.contactUnlocked, isFalse);
       expect(worker.locked, isTrue);
-      final credits = CreditSummary.fromJson({
+      final credits = UnlockSummary.fromJson({
         'unmetered': true,
         'plan_remaining': null,
         'unlocks_reset_at': '2026-10-02T07:14:09Z',
@@ -203,7 +203,7 @@ void main() {
     });
     await tester.pumpWidget(harness(api, const WorkersScreen()));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Unlock contact · 1 credit'));
+    await tester.tap(find.text('Unlock contact'));
     await tester.pumpAndSettle();
     expect(unlocked, isTrue);
     expect(find.text('9876543210'), findsOneWidget);

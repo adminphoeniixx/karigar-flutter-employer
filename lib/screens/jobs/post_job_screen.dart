@@ -36,6 +36,10 @@ class _PostJobScreenState extends State<PostJobScreen> {
   bool loading = false;
   bool referenceLoading = true;
   bool suggesting = false;
+  bool aiShortlistEnabled = true;
+  bool aiCallEnabled = true;
+  bool aiShortlistAvailable = true;
+  bool aiCallAvailable = true;
   bool _referenceLoaded = false;
   List<String> categories = const [];
   List<String> skills = const [
@@ -110,6 +114,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
         }[job.contactMode] ??
         'Apply only';
     liveStatus = job.status == 'closed' ? 'closed' : 'active';
+    aiShortlistEnabled = job.aiShortlistEnabled;
+    aiCallEnabled = job.aiCallEnabled;
   }
 
   @override
@@ -144,6 +150,18 @@ class _PostJobScreenState extends State<PostJobScreen> {
         }.toList();
         perks = {...apiPerks, ...selectedPerks}.toList();
       });
+      try {
+        final options = await AppScope.of(context).api.jobFormOptions();
+        final ai = options['ai'];
+        if (mounted && ai is Map) {
+          setState(() {
+            aiShortlistAvailable = ai['shortlist_available'] != false;
+            aiCallAvailable = ai['call_available'] != false;
+          });
+        }
+      } catch (_) {
+        // Keep the switches available when older servers do not expose options.
+      }
     } catch (_) {
       // Bundled options keep this form usable while reference data is offline.
     } finally {
@@ -267,11 +285,13 @@ class _PostJobScreenState extends State<PostJobScreen> {
           RegExp(r'^[6-9]\d{9}$').hasMatch(contactPhoneController.text.trim()))
         'contact_phone': contactPhoneController.text.trim(),
       if (!draft && contactMode != 'apply')
-        'contact_name': ?contactNameController.text.trim(),
+        'contact_name': contactNameController.text.trim(),
       if (!draft && contactMode != 'apply')
-        'contact_designation': ?contactDesignationController.text.trim(),
+        'contact_designation': contactDesignationController.text.trim(),
       'requires_worker_fee': widget.job?.requiresWorkerFee ?? false,
       'worker_fee_amount': ?widget.job?.workerFeeAmount,
+      'ai_shortlist_enabled': aiShortlistEnabled,
+      'ai_call_enabled': aiCallEnabled,
       'status': status,
     };
     setState(() => loading = true);
@@ -514,12 +534,13 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       controller: perkController,
                       onSubmitted: (value) {
                         final skill = value.trim();
-                        if (skill.isNotEmpty)
+                        if (skill.isNotEmpty) {
                           setState(() {
                             skills = {...skills, skill}.toList();
                             selectedSkills.add(skill);
                             perkController.clear();
                           });
+                        }
                       },
                     ),
                     const _Hint(
@@ -648,13 +669,28 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       controller: perkController,
                       onSubmitted: (value) {
                         final perk = value.trim();
-                        if (perk.isNotEmpty)
+                        if (perk.isNotEmpty) {
                           setState(() {
                             perks = {...perks, perk}.toList();
                             selectedPerks.add(perk);
                             perkController.clear();
                           });
+                        }
                       },
+                    ),
+                    const SizedBox(height: 14),
+                    _AiHelpCard(
+                      shortlistEnabled: aiShortlistEnabled,
+                      callEnabled: aiCallEnabled,
+                      shortlistAvailable: aiShortlistAvailable,
+                      callAvailable: aiCallAvailable,
+                      onShortlistChanged: aiShortlistAvailable
+                          ? (value) =>
+                                setState(() => aiShortlistEnabled = value)
+                          : null,
+                      onCallChanged: aiCallAvailable && aiShortlistEnabled
+                          ? (value) => setState(() => aiCallEnabled = value)
+                          : null,
                     ),
                     const SizedBox(height: 14),
                     Row(
@@ -692,12 +728,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           ],
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                    const _Label('Address / landmark'),
-                    _Input(
-                      hint: 'Plot, street, area or landmark',
-                      controller: addressController,
                     ),
                     _Input(
                       hint:
@@ -751,6 +781,12 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 14),
+                    const _Label('Address / landmark'),
+                    _Input(
+                      hint: 'Plot, street, area or landmark',
+                      controller: addressController,
                     ),
                     const SizedBox(height: 14),
                     const _Label('Pin the job location'),
@@ -824,7 +860,6 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       ),
                     if (canDraft) const SizedBox(width: 10),
                     Expanded(
-                      flex: 2,
                       child: FilledButton(
                         onPressed: loading
                             ? null
@@ -926,6 +961,103 @@ class _PostJobScreenState extends State<PostJobScreen> {
   }
 }
 
+class _AiHelpCard extends StatelessWidget {
+  const _AiHelpCard({
+    required this.shortlistEnabled,
+    required this.callEnabled,
+    required this.shortlistAvailable,
+    required this.callAvailable,
+    required this.onShortlistChanged,
+    required this.onCallChanged,
+  });
+
+  final bool shortlistEnabled, callEnabled, shortlistAvailable, callAvailable;
+  final ValueChanged<bool>? onShortlistChanged, onCallChanged;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'AI help',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 6),
+          _AiSwitch(
+            title: 'AI shortlist',
+            description:
+                'AI scores every applicant. Strong matches are shortlisted for you and clear mismatches are turned down.',
+            value: shortlistEnabled,
+            onChanged: onShortlistChanged,
+            note: shortlistAvailable
+                ? null
+                : 'Switched off by the admin right now.',
+          ),
+          const Divider(height: 22),
+          _AiSwitch(
+            title: 'AI screening call',
+            description:
+                'An AI agent calls each auto-shortlisted karigar to check they are still interested and asks a few first questions. You get the answers.',
+            value: callEnabled,
+            onChanged: onCallChanged,
+            note: !callAvailable
+                ? 'Switched off by the admin right now.'
+                : !shortlistEnabled
+                ? 'Needs AI shortlist on.'
+                : null,
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _AiSwitch extends StatelessWidget {
+  const _AiSwitch({
+    required this.title,
+    required this.description,
+    required this.value,
+    required this.onChanged,
+    this.note,
+  });
+
+  final String title, description;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+  final String? note;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 3),
+            Text(
+              description,
+              style: const TextStyle(color: AppColors.muted, fontSize: 12),
+            ),
+            if (note != null) ...[
+              const SizedBox(height: 5),
+              Text(
+                note!,
+                style: const TextStyle(color: AppColors.muted, fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      ),
+      Switch(value: value, onChanged: onChanged),
+    ],
+  );
+}
+
 class _Label extends StatelessWidget {
   const _Label(this.text);
   final String text;
@@ -948,7 +1080,6 @@ class _Input extends StatelessWidget {
     this.controller,
     this.number = false,
     this.onSubmitted,
-    this.enabled = true,
   });
   final String hint;
   final int lines;
@@ -957,11 +1088,9 @@ class _Input extends StatelessWidget {
   final TextEditingController? controller;
   final bool number;
   final ValueChanged<String>? onSubmitted;
-  final bool enabled;
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
-    enabled: enabled,
     onSubmitted: onSubmitted,
     keyboardType: number ? TextInputType.number : TextInputType.text,
     maxLines: lines,

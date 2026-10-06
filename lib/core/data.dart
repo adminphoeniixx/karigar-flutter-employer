@@ -32,11 +32,13 @@ class Worker {
     this.wage,
     this.skills, {
     this.status = 'Pending',
+    this.verified = false,
   });
 
   final String name;
   final String trade;
   final String status;
+  final bool verified;
   final int experience;
   final int wage;
   final double rating;

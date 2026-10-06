@@ -155,8 +155,6 @@ class EmployerApiService {
   Future<void> deleteJob(int id) => client.delete(ApiConstants.job(id));
   Future<Json> closeJob(int id) => client.post('/employer/jobs/$id/close');
   Future<Json> repostJob(int id) => client.post(ApiConstants.repostJob(id));
-  Future<Json> boostJob(int id, String tier) =>
-      client.post('/employer/jobs/$id/boost', body: {'tier': tier});
   Future<Json> matches(int id) => client.get('/employer/jobs/$id/matches');
   Future<Json> invite(int jobId, int workerId, {String? message}) =>
       client.post(
@@ -332,38 +330,6 @@ class EmployerApiService {
     );
     final paymentId = payment['razorpay_payment_id']?.toString();
     final checkoutId = payment['razorpay_subscription_id']?.toString();
-    if (paymentId != null && checkoutId != null) {
-      unawaited(analytics.verifiedPayment(paymentId, checkoutId));
-    }
-    return response;
-  }
-
-  Future<Json> topUp(String pack) async {
-    final response = await client.post(
-      '/employer/credits/top-up',
-      body: {'pack': pack},
-    );
-    final id = response['razorpay_order_id']?.toString();
-    final amounts = response['amounts'];
-    if (id != null) {
-      await analytics.rememberCheckout(
-        checkoutId: id,
-        kind: 'credit_pack',
-        contentId: pack,
-        amount: amounts is Map ? double.tryParse('${amounts['total']}') : null,
-        currency: '${response['currency'] ?? 'INR'}',
-      );
-    }
-    return response;
-  }
-
-  Future<Json> topUpCallback(Json payment) async {
-    final response = await client.post(
-      '/employer/credits/callback',
-      body: payment,
-    );
-    final paymentId = payment['razorpay_payment_id']?.toString();
-    final checkoutId = payment['razorpay_order_id']?.toString();
     if (paymentId != null && checkoutId != null) {
       unawaited(analytics.verifiedPayment(paymentId, checkoutId));
     }

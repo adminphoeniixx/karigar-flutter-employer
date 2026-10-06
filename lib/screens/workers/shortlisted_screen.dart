@@ -90,6 +90,7 @@ class _ShortlistedScreenState extends State<ShortlistedScreen> {
                         profile.distanceKm ?? 0,
                         profile.expectedWage,
                         profile.skills,
+                        verified: profile.verified,
                         status: applicant.statusLabel,
                       );
                       return Padding(
