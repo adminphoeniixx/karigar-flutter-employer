@@ -329,277 +329,280 @@ class _JobManageScreenState extends State<JobManageScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Manage Job'),
-      actions: [
-        IconButton(
-          onPressed: job.id == 0 ? null : _jobActions,
-          icon: const Icon(LucideIcons.ellipsisVertical),
-        ),
-      ],
-    ),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Row(
-          children: [
-            BrandChip(job.category),
-            const SizedBox(width: 7),
-            StatusPill(job.status),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Text(
-          job.title,
-          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-        ),
-        Text(
-          '${job.wage} · ${job.openings} openings · Posted 2d ago',
-          style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
-        ),
-        const SectionTitle('Performance'),
-        ...[
-          ('Views', 124),
-          ('Applied', job.applied),
-          ('Shortlisted', job.shortlisted),
-          ('Interview', 3),
-          ('Hired', job.hired),
-        ].map(
-          (e) => Padding(
-            padding: const EdgeInsets.only(bottom: 9),
-            child: Stack(
-              children: [
-                Container(
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.line2,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                ),
-                FractionallySizedBox(
-                  widthFactor: (e.$2 / 124).clamp(.07, 1),
-                  child: Container(
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Manage Job'),
+        actions: [
+          IconButton(
+            onPressed: job.id == 0 ? null : _jobActions,
+            icon: const Icon(LucideIcons.ellipsisVertical),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            children: [
+              BrandChip(job.category),
+              const SizedBox(width: 7),
+              StatusPill(job.status),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(
+            job.title,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          Text(
+            '${job.wage} · ${job.openings} openings · Posted 2d ago',
+            style: TextStyle(fontSize: 12.5, color: colors.onSurfaceVariant),
+          ),
+          const SectionTitle('Performance'),
+          ...[
+            ('Views', 124),
+            ('Applied', job.applied),
+            ('Shortlisted', job.shortlisted),
+            ('Interview', 3),
+            ('Hired', job.hired),
+          ].map(
+            (e) => Padding(
+              padding: const EdgeInsets.only(bottom: 9),
+              child: Stack(
+                children: [
+                  Container(
                     height: 36,
                     decoration: BoxDecoration(
-                      color: AppColors.brand100,
+                      color: colors.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
+                  FractionallySizedBox(
+                    widthFactor: (e.$2 / 124).clamp(.07, 1),
+                    child: Container(
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: colors.primary.withValues(alpha: .25),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                  SizedBox(
+                    height: 36,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            e.$1,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          Text(
+                            '${e.$2}',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SectionTitle('Applicants'),
+          if (job.id != 0) ...[
+            OutlinedButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => MatchedWorkersScreen(jobId: job.id),
                 ),
-                SizedBox(
-                  height: 36,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          e.$1,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+              ),
+              icon: const Icon(LucideIcons.sparkles, size: 18),
+              label: const Text('View matched workers'),
+            ),
+            const SizedBox(height: 12),
+          ],
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children:
+                  const [
+                    ('all', 'All'),
+                    ('pending', 'Pending'),
+                    ('shortlisted', 'Shortlisted'),
+                    ('interview', 'Interview'),
+                    ('hired', 'Hired'),
+                    ('rejected', 'Rejected'),
+                  ].map((item) {
+                    final selected = stage == item.$1;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 7),
+                      child: ChoiceChip(
+                        selected: selected,
+                        label: Text('${item.$2} (${counts[item.$1] ?? 0})'),
+                        onSelected: (_) {
+                          if (selected) return;
+                          setState(() => stage = item.$1);
+                          _load();
+                        },
+                      ),
+                    );
+                  }).toList(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (loading)
+            const Center(child: CircularProgressIndicator())
+          else if (error != null)
+            OutlinedButton(onPressed: _load, child: const Text('Retry'))
+          else if (applicants.isEmpty)
+            Text(
+              'No applicants yet',
+              style: TextStyle(color: colors.onSurfaceVariant),
+            )
+          else
+            ...applicants.map((applicant) {
+              final profile = applicant.worker;
+              final worker = Worker(
+                profile.name,
+                profile.skills.isEmpty ? 'Worker' : profile.skills.first,
+                profile.experienceYears,
+                profile.rating.average,
+                profile.distanceKm ?? 0,
+                profile.expectedWage,
+                profile.skills,
+                status: applicant.statusLabel,
+                verified: profile.verified,
+              );
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  children: [
+                    WorkerCard(
+                      worker: worker,
+                      onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WorkerProfileScreen(
+                            worker: worker,
+                            profileId: profile.id,
+                            workerUserId: profile.userId,
+                            jobId: job.id,
+                            phone: profile.phone,
+                            contactUnlocked: applicant.contactUnlocked,
+                            canMessage: true,
+                            onUnlock: applicant.contactUnlocked
+                                ? null
+                                : () => _unlockFromProfile(applicant),
                           ),
                         ),
-                        Text(
-                          '${e.$2}',
-                          style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    if (applicant.ai != null)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: BrandChip(
+                          'AI match ${applicant.ai?['score'] ?? 0}% · '
+                          '${applicant.ai?['recommendation'] ?? ''}',
+                        ),
+                      ),
+                    if (applicant.resume != null)
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _downloadResume(applicant),
+                          icon: const Icon(LucideIcons.fileText, size: 17),
+                          label: Text(
+                            'Resume · ${applicant.resume?['name'] ?? 'PDF'}',
+                          ),
+                        ),
+                      ),
+                    SizedBox(
+                      width: double.infinity,
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => ScreeningCallsScreen(
+                              applicantId: applicant.id,
+                              workerName: profile.name,
+                            ),
+                          ),
+                        ).then((_) => _load()),
+                        icon: const Icon(LucideIcons.phoneCall, size: 17),
+                        label: const Text('AI screening calls'),
+                      ),
+                    ),
+                    if (!applicant.contactUnlocked)
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => _unlock(applicant),
+                          icon: const Icon(LucideIcons.lockOpen, size: 17),
+                          label: const Text('Unlock contact'),
+                        ),
+                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed:
+                                applicant.stage == 'shortlisted' ||
+                                    applicant.stage == 'interview'
+                                ? () => _interview(applicant)
+                                : () => _shortlist(applicant),
+                            child: Text(
+                              applicant.stage == 'interview'
+                                  ? 'Reschedule'
+                                  : applicant.stage == 'shortlisted'
+                                  ? 'Interview'
+                                  : 'Shortlist',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: applicant.stage == 'hired'
+                                ? null
+                                : () => _hire(applicant),
+                            child: Text(
+                              applicant.stage == 'hired' ? 'Hired' : 'Hire',
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.outlined(
+                          onPressed: applicant.stage == 'rejected'
+                              ? null
+                              : () => _reject(applicant),
+                          color: Colors.red,
+                          icon: const Icon(LucideIcons.x, size: 18),
                         ),
                       ],
                     ),
-                  ),
+                    if (applicant.stage == 'interview')
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton(
+                          onPressed: () => _cancelInterview(applicant),
+                          child: const Text('Cancel interview'),
+                        ),
+                      ),
+                  ],
                 ),
-              ],
-            ),
-          ),
-        ),
-        const SectionTitle('Applicants'),
-        if (job.id != 0) ...[
-          OutlinedButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => MatchedWorkersScreen(jobId: job.id),
-              ),
-            ),
-            icon: const Icon(LucideIcons.sparkles, size: 18),
-            label: const Text('View matched workers'),
-          ),
-          const SizedBox(height: 12),
+              );
+            }),
         ],
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children:
-                const [
-                  ('all', 'All'),
-                  ('pending', 'Pending'),
-                  ('shortlisted', 'Shortlisted'),
-                  ('interview', 'Interview'),
-                  ('hired', 'Hired'),
-                  ('rejected', 'Rejected'),
-                ].map((item) {
-                  final selected = stage == item.$1;
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 7),
-                    child: ChoiceChip(
-                      selected: selected,
-                      label: Text('${item.$2} (${counts[item.$1] ?? 0})'),
-                      onSelected: (_) {
-                        if (selected) return;
-                        setState(() => stage = item.$1);
-                        _load();
-                      },
-                    ),
-                  );
-                }).toList(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (loading)
-          const Center(child: CircularProgressIndicator())
-        else if (error != null)
-          OutlinedButton(onPressed: _load, child: const Text('Retry'))
-        else if (applicants.isEmpty)
-          const Text(
-            'No applicants yet',
-            style: TextStyle(color: AppColors.muted),
-          )
-        else
-          ...applicants.map((applicant) {
-            final profile = applicant.worker;
-            final worker = Worker(
-              profile.name,
-              profile.skills.isEmpty ? 'Worker' : profile.skills.first,
-              profile.experienceYears,
-              profile.rating.average,
-              profile.distanceKm ?? 0,
-              profile.expectedWage,
-              profile.skills,
-              status: applicant.statusLabel,
-              verified: profile.verified,
-            );
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Column(
-                children: [
-                  WorkerCard(
-                    worker: worker,
-                    onTap: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => WorkerProfileScreen(
-                          worker: worker,
-                          profileId: profile.id,
-                          workerUserId: profile.userId,
-                          jobId: job.id,
-                          phone: profile.phone,
-                          contactUnlocked: applicant.contactUnlocked,
-                          canMessage: true,
-                          onUnlock: applicant.contactUnlocked
-                              ? null
-                              : () => _unlockFromProfile(applicant),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (applicant.ai != null)
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: BrandChip(
-                        'AI match ${applicant.ai?['score'] ?? 0}% · '
-                        '${applicant.ai?['recommendation'] ?? ''}',
-                      ),
-                    ),
-                  if (applicant.resume != null)
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _downloadResume(applicant),
-                        icon: const Icon(LucideIcons.fileText, size: 17),
-                        label: Text(
-                          'Resume · ${applicant.resume?['name'] ?? 'PDF'}',
-                        ),
-                      ),
-                    ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: TextButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => ScreeningCallsScreen(
-                            applicantId: applicant.id,
-                            workerName: profile.name,
-                          ),
-                        ),
-                      ).then((_) => _load()),
-                      icon: const Icon(LucideIcons.phoneCall, size: 17),
-                      label: const Text('AI screening calls'),
-                    ),
-                  ),
-                  if (!applicant.contactUnlocked)
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () => _unlock(applicant),
-                        icon: const Icon(LucideIcons.lockOpen, size: 17),
-                        label: const Text('Unlock contact'),
-                      ),
-                    ),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed:
-                              applicant.stage == 'shortlisted' ||
-                                  applicant.stage == 'interview'
-                              ? () => _interview(applicant)
-                              : () => _shortlist(applicant),
-                          child: Text(
-                            applicant.stage == 'interview'
-                                ? 'Reschedule'
-                                : applicant.stage == 'shortlisted'
-                                ? 'Interview'
-                                : 'Shortlist',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: applicant.stage == 'hired'
-                              ? null
-                              : () => _hire(applicant),
-                          child: Text(
-                            applicant.stage == 'hired' ? 'Hired' : 'Hire',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.outlined(
-                        onPressed: applicant.stage == 'rejected'
-                            ? null
-                            : () => _reject(applicant),
-                        color: Colors.red,
-                        icon: const Icon(LucideIcons.x, size: 18),
-                      ),
-                    ],
-                  ),
-                  if (applicant.stage == 'interview')
-                    SizedBox(
-                      width: double.infinity,
-                      child: TextButton(
-                        onPressed: () => _cancelInterview(applicant),
-                        child: const Text('Cancel interview'),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          }),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }

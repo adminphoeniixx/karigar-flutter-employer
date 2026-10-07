@@ -158,7 +158,9 @@ class _WorkersScreenState extends State<WorkersScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.line),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -211,7 +213,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
           : Column(
               children: [
                 Container(
-                  color: AppColors.card,
+                  color: Theme.of(context).colorScheme.surface,
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
                   child: Column(
                     children: [
@@ -220,18 +222,24 @@ class _WorkersScreenState extends State<WorkersScreen> {
                         child: TextField(
                           onChanged: (value) => query = value,
                           onSubmitted: (_) => _search(),
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             prefixIcon: Icon(
                               LucideIcons.search,
                               size: 18,
-                              color: AppColors.muted,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
                             hintText: 'Search skill, trade, name...',
                             hintStyle: TextStyle(
                               fontSize: 14,
-                              color: AppColors.muted,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                             ),
-                            fillColor: AppColors.background,
+                            fillColor: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                             contentPadding: EdgeInsets.zero,
                           ),
                         ),
@@ -252,16 +260,22 @@ class _WorkersScreenState extends State<WorkersScreen> {
                               onSelected: (_) => _selectCategory(item),
                               showCheckmark: false,
                               selectedColor: AppColors.primary,
-                              backgroundColor: Colors.white,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
                               side: BorderSide(
                                 color: selected
                                     ? AppColors.primary
-                                    : AppColors.line,
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.outlineVariant,
                               ),
                               labelStyle: TextStyle(
                                 color: selected
                                     ? Colors.white
-                                    : AppColors.muted,
+                                    : Theme.of(
+                                        context,
+                                      ).colorScheme.onSurfaceVariant,
                                 fontSize: 12,
                                 fontWeight: FontWeight.w500,
                               ),

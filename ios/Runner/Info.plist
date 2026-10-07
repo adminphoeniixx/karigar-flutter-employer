@@ -69,6 +69,10 @@
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Take a business profile image with your camera.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Choose a business profile image from your photo library.</string>
 	<key>UISupportedInterfaceOrientations~ipad</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>

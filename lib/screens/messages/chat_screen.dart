@@ -90,131 +90,141 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Row(
-        children: [
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.brand100,
-            child: Text(
-              widget.worker.initials,
-              style: const TextStyle(fontSize: 11, color: AppColors.brandDark),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: Row(
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: AppColors.brand100,
+              child: Text(
+                widget.worker.initials,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.brandDark,
+                ),
+              ),
             ),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 9),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.worker.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Text(
+                    'Online',
+                    style: TextStyle(fontSize: 11, color: AppColors.green),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: [
-                Text(
-                  widget.worker.name,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(14),
+                    itemCount: messages.length,
+                    itemBuilder: (_, i) {
+                      final message = messages[i];
+                      final me = message['sent_by_me'] == true;
+                      return Align(
+                        alignment: me
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 7),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 9,
+                          ),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.sizeOf(context).width * 0.78,
+                          ),
+                          decoration: BoxDecoration(
+                            color: me
+                                ? colors.primary
+                                : colors.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(16),
+                            border: me
+                                ? null
+                                : Border.all(color: colors.outlineVariant),
+                          ),
+                          child: Text(
+                            '${message['body'] ?? ''}',
+                            style: TextStyle(
+                              color: me ? colors.onPrimary : colors.onSurface,
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-                const Text(
-                  'Online',
-                  style: TextStyle(fontSize: 11, color: AppColors.green),
+                SizedBox(
+                  height: 39,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    children:
+                        [
+                              'Can you join tomorrow?',
+                              'Share your location',
+                              'Call me',
+                            ]
+                            .map(
+                              (e) => Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ActionChip(
+                                  label: Text(e),
+                                  onPressed: sending ? null : () => _send(e),
+                                ),
+                              ),
+                            )
+                            .toList(),
+                  ),
+                ),
+                SafeArea(
+                  top: false,
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    color: colors.surface,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: controller,
+                            decoration: const InputDecoration(
+                              hintText: 'Type a message...',
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          onPressed: sending ? null : _send,
+                          icon: const Icon(LucideIcons.send),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    ),
-    body: loading
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(14),
-                  itemCount: messages.length,
-                  itemBuilder: (_, i) {
-                    final message = messages[i];
-                    final me = message['sent_by_me'] == true;
-                    return Align(
-                      alignment: me
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 7),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 13,
-                          vertical: 9,
-                        ),
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-                        ),
-                        decoration: BoxDecoration(
-                          color: me ? AppColors.primary : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: me ? null : Border.all(color: AppColors.line),
-                        ),
-                        child: Text(
-                          '${message['body'] ?? ''}',
-                          style: TextStyle(
-                            color: me ? Colors.white : AppColors.foreground,
-                            fontSize: 14,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              SizedBox(
-                height: 39,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  children:
-                      [
-                            'Can you join tomorrow?',
-                            'Share your location',
-                            'Call me',
-                          ]
-                          .map(
-                            (e) => Padding(
-                              padding: const EdgeInsets.only(right: 8),
-                              child: ActionChip(
-                                label: Text(e),
-                                onPressed: sending ? null : () => _send(e),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                ),
-              ),
-              SafeArea(
-                top: false,
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  color: AppColors.card,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: controller,
-                          decoration: const InputDecoration(
-                            hintText: 'Type a message...',
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton.filled(
-                        onPressed: sending ? null : _send,
-                        icon: const Icon(LucideIcons.send),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-  );
+    );
+  }
 }

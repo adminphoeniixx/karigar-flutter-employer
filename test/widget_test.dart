@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:employer_kariger_app/app.dart';
 import 'package:employer_kariger_app/screens/splash_screen.dart';
 import 'package:employer_kariger_app/core/theme.dart';
+import 'package:employer_kariger_app/core/app_theme_controller.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,45 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  test('dark theme selection is applied and persisted', () async {
+    SharedPreferences.setMockInitialValues({});
+    final controller = AppThemeController();
+    await controller.restore();
+
+    await controller.setDark(true);
+
+    expect(controller.mode, ThemeMode.dark);
+    final preferences = await SharedPreferences.getInstance();
+    expect(preferences.getString('employer_theme_mode'), 'dark');
+    controller.dispose();
+  });
+
+  testWidgets('theme can change while an outlined button is visible', (
+    tester,
+  ) async {
+    Widget app(ThemeMode mode) => MaterialApp(
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: mode,
+      themeAnimationDuration: Duration.zero,
+      home: Scaffold(
+        body: OutlinedButton(
+          onPressed: () {},
+          style: OutlinedButton.styleFrom(
+            backgroundColor: AppColors.card,
+            foregroundColor: const Color(0xFFE11D48),
+          ),
+          child: const Text('Log out'),
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(app(ThemeMode.light));
+    await tester.pumpWidget(app(ThemeMode.dark));
+
+    expect(tester.takeException(), isNull);
+  });
+
   for (final size in [
     const Size(320, 568),
     const Size(360, 640),

@@ -222,6 +222,8 @@ class ApiClient {
 
   Map<String, String> _headers({bool json = true}) => {
     HttpHeaders.acceptHeader: 'application/json',
+    // Identifies this client for app-specific maintenance and update rules.
+    'X-App': 'employer',
     if (json) HttpHeaders.contentTypeHeader: 'application/json',
     if (_token != null) HttpHeaders.authorizationHeader: 'Bearer $_token',
   };

@@ -121,4 +121,44 @@ abstract final class AppTheme {
       ),
     );
   }
+
+  static ThemeData get dark {
+    final text = GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).apply(
+      bodyColor: const Color(0xFFF6EFE8),
+      displayColor: const Color(0xFFF6EFE8),
+    );
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: ColorScheme.fromSeed(
+        brightness: Brightness.dark,
+        seedColor: AppColors.primary,
+        primary: const Color(0xFFFFB39A),
+        surface: const Color(0xFF201A16),
+      ),
+      scaffoldBackgroundColor: const Color(0xFF17120F),
+      textTheme: text,
+      appBarTheme: AppBarTheme(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
+        backgroundColor: const Color(0xFF201A16),
+        foregroundColor: const Color(0xFFF6EFE8),
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: text.titleMedium?.copyWith(
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: const Color(0xFF201A16),
+        elevation: 2,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: Color(0xFF3B312B)),
+        ),
+      ),
+    );
+  }
 }

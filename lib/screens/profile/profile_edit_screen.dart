@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -123,14 +123,47 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   }
 
   Future<void> _pickLogo() async {
-    final api = AppScope.of(context).api;
-    final result = await FilePicker.pickFiles(
-      type: FileType.image,
-      allowMultiple: false,
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(LucideIcons.camera),
+              title: const Text('Take photo'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.camera),
+            ),
+            ListTile(
+              leading: const Icon(LucideIcons.image),
+              title: const Text('Choose from gallery'),
+              onTap: () => Navigator.pop(sheetContext, ImageSource.gallery),
+            ),
+          ],
+        ),
+      ),
     );
-    final path = result?.files.single.path;
-    if (path == null) return;
-    final file = File(path);
+    if (source == null || !mounted) return;
+    try {
+      final image = await ImagePicker().pickImage(
+        source: source,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        imageQuality: 88,
+      );
+      if (image == null) return;
+      await _uploadLogo(File(image.path));
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not select image: $exception')),
+        );
+      }
+    }
+  }
+
+  Future<void> _uploadLogo(File file) async {
+    final api = AppScope.of(context).api;
     if (await file.length() > 2 * 1024 * 1024) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -191,16 +224,33 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     borderRadius: BorderRadius.circular(48),
                     child: Column(
                       children: [
-                        const Stack(
+                        Stack(
                           children: [
                             CircleAvatar(
                               radius: 44,
                               backgroundColor: AppColors.brand50,
-                              child: Icon(
-                                LucideIcons.building2,
-                                size: 40,
-                                color: AppColors.primary,
-                              ),
+                              backgroundImage:
+                                  AppScope.of(context).profile.profile?.logoUrl
+                                          ?.trim()
+                                          .isNotEmpty ==
+                                      true
+                                  ? NetworkImage(
+                                      AppScope.of(
+                                        context,
+                                      ).profile.profile!.logoUrl!,
+                                    )
+                                  : null,
+                              child:
+                                  AppScope.of(context).profile.profile?.logoUrl
+                                          ?.trim()
+                                          .isNotEmpty ==
+                                      true
+                                  ? null
+                                  : const Icon(
+                                      LucideIcons.building2,
+                                      size: 40,
+                                      color: AppColors.primary,
+                                    ),
                             ),
                             Positioned(
                               right: 0,

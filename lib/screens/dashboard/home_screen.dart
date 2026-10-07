@@ -16,6 +16,7 @@ import 'package:employer_kariger_app/screens/profile/kyc_screen.dart';
 import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
 import 'package:employer_kariger_app/screens/profile/profile_screen.dart';
 import 'package:employer_kariger_app/screens/workers/worker_profile_screen.dart';
+import 'package:employer_kariger_app/screens/workers/shortlisted_screen.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -148,6 +149,7 @@ class _HomeScreenState extends State<HomeScreen> {
         .take(2)
         .join()
         .toUpperCase();
+    final logoUrl = data?.profile?.logoUrl?.trim();
     return Scaffold(
       appBar: AppBar(
         toolbarHeight: 58,
@@ -159,14 +161,19 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(20),
             child: CircleAvatar(
               backgroundColor: AppColors.brand100,
-              child: Text(
-                initials.isEmpty ? 'K' : initials,
-                style: const TextStyle(
-                  color: AppColors.brandDark,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              backgroundImage: logoUrl?.isNotEmpty == true
+                  ? NetworkImage(logoUrl!)
+                  : null,
+              child: logoUrl?.isNotEmpty == true
+                  ? null
+                  : Text(
+                      initials.isEmpty ? 'K' : initials,
+                      style: const TextStyle(
+                        color: AppColors.brandDark,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
             ),
           ),
         ),
@@ -181,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 context.tr('Welcome back 👋'),
                 style: TextStyle(
                   fontSize: 11.5,
-                  color: AppColors.muted,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w400,
                 ),
               ),
@@ -241,6 +248,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: context.tr('Active Jobs'),
                         iconColor: AppColors.primary,
                         iconBackground: AppColors.brand50,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const JobsScreen()),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -251,6 +262,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: context.tr('Total Applicants'),
                         iconColor: AppColors.indigo,
                         iconBackground: AppColors.indigoBg,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const JobsScreen()),
+                        ),
                       ),
                     ),
                   ],
@@ -265,6 +280,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: context.tr('Shortlisted'),
                         iconColor: AppColors.amber,
                         iconBackground: AppColors.amberBg,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const ShortlistedScreen(),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -275,6 +296,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         label: context.tr('Hired'),
                         iconColor: AppColors.green,
                         iconBackground: AppColors.greenBg,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (_) => const JobsScreen()),
+                        ),
                       ),
                     ),
                   ],
@@ -406,38 +431,41 @@ class _HeaderAction extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.only(left: 8),
-    child: Stack(
-      children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(12),
-          child: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.line),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 21),
-          ),
-        ),
-        Positioned(
-          top: 7,
-          right: 7,
-          child: Container(
-            width: 6,
-            height: 6,
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              shape: BoxShape.circle,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: Stack(
+        children: [
+          InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                border: Border.all(color: colors.outlineVariant),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 21),
             ),
           ),
-        ),
-      ],
-    ),
-  );
+          Positioned(
+            top: 7,
+            right: 7,
+            child: Container(
+              width: 6,
+              height: 6,
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _PostJobBanner extends StatelessWidget {
@@ -517,53 +545,71 @@ class _StatCard extends StatelessWidget {
     required this.label,
     required this.iconColor,
     required this.iconBackground,
+    required this.onTap,
   });
   final IconData icon;
   final String value;
   final String label;
   final Color iconColor;
   final Color iconBackground;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Container(
-    constraints: const BoxConstraints(minHeight: 120),
-    padding: const EdgeInsets.all(14),
-    decoration: BoxDecoration(
-      color: AppColors.card,
-      border: Border.all(color: AppColors.line),
-      borderRadius: BorderRadius.circular(16),
-      boxShadow: const [
-        BoxShadow(
-          color: Color(0x0A000000),
-          blurRadius: 8,
-          offset: Offset(0, 3),
-        ),
-      ],
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 34,
-          height: 34,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 120),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: iconBackground,
-            borderRadius: BorderRadius.circular(10),
+            color: colors.surface,
+            border: Border.all(color: colors.outlineVariant),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0A000000),
+                blurRadius: 8,
+                offset: Offset(0, 3),
+              ),
+            ],
           ),
-          child: Icon(icon, color: iconColor, size: 19),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? iconColor.withValues(alpha: .18)
+                      : iconBackground,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: iconColor, size: 19),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                label,
+                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        Text(
-          value,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
-        ),
-        Text(
-          label,
-          style: const TextStyle(color: AppColors.muted, fontSize: 12),
-        ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 }
 
 class _DatabaseCard extends StatelessWidget {
@@ -577,61 +623,70 @@ class _DatabaseCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(15),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.brand50,
-              borderRadius: BorderRadius.circular(13),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: isDark
+                    ? colors.primary.withValues(alpha: .18)
+                    : AppColors.brand50,
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: const Icon(
+                LucideIcons.layers,
+                color: AppColors.primary,
+                size: 21,
+              ),
             ),
-            child: const Icon(
-              LucideIcons.layers,
-              color: AppColors.primary,
-              size: 21,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+            SizedBox(
+              height: 38,
+              child: FilledButton(
+                onPressed: onTap,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(54, 38),
+                  padding: const EdgeInsets.symmetric(horizontal: 13),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(11),
                   ),
                 ),
-                Text(
-                  subtitle,
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(
-            height: 38,
-            child: FilledButton(
-              onPressed: onTap,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(54, 38),
-                padding: const EdgeInsets.symmetric(horizontal: 13),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(11),
-                ),
+                child: Text(cta),
               ),
-              child: Text(cta),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _VerifyCard extends StatelessWidget {
@@ -737,63 +792,145 @@ class _ApplicantCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Card(
-    child: InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppColors.brand100,
-                  child: Text(
-                    displayName.split(' ').map((e) => e[0]).take(2).join(),
-                    style: const TextStyle(
-                      color: AppColors.brandDark,
-                      fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  CircleAvatar(
+                    radius: 22,
+                    backgroundColor: isDark
+                        ? colors.primary.withValues(alpha: .25)
+                        : AppColors.brand100,
+                    child: Text(
+                      displayName.split(' ').map((e) => e[0]).take(2).join(),
+                      style: const TextStyle(
+                        color: AppColors.brandDark,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              displayName,
-                              style: const TextStyle(
-                                fontSize: 14.5,
-                                fontWeight: FontWeight.w700,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                displayName,
+                                style: const TextStyle(
+                                  fontSize: 14.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 5),
-                          const Icon(
-                            LucideIcons.badgeCheck,
-                            size: 15,
-                            color: AppColors.green,
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '${worker.trade} · ${worker.experience} yrs exp · ★ ${worker.rating}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.muted,
+                            const SizedBox(width: 5),
+                            const Icon(
+                              LucideIcons.badgeCheck,
+                              size: 15,
+                              color: AppColors.green,
+                            ),
+                          ],
                         ),
+                        Text(
+                          '${worker.trade} · ${worker.experience} yrs exp · ★ ${worker.rating}',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '⌖ ${worker.distance} km   ${monthlyWage(worker.wage)}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: status == 'Shortlisted'
+                          ? AppColors.indigoBg
+                          : AppColors.amberBg,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      status,
+                      style: TextStyle(
+                        color: status == 'Shortlisted'
+                            ? AppColors.indigo
+                            : AppColors.amber,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(height: 4),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Wrap(
+                  spacing: 7,
+                  runSpacing: 8,
+                  children: skills
+                      .map((e) => BrandChip(e, neutral: true))
+                      .toList(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: contactUnlocked ? null : onUnlock,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: contactUnlocked
+                        ? (isDark
+                              ? AppColors.green.withValues(alpha: .20)
+                              : AppColors.greenBg)
+                        : (isDark
+                              ? colors.primary.withValues(alpha: .18)
+                              : AppColors.brand50),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        contactUnlocked
+                            ? LucideIcons.lockOpen
+                            : LucideIcons.lockKeyhole,
+                        size: 16,
+                        color: contactUnlocked
+                            ? AppColors.green
+                            : AppColors.primary,
+                      ),
+                      const SizedBox(width: 7),
                       Text(
-                        '⌖ ${worker.distance} km   ${monthlyWage(worker.wage)}',
-                        style: const TextStyle(
+                        contactUnlocked ? 'Contact unlocked' : 'View contact',
+                        style: TextStyle(
+                          color: contactUnlocked
+                              ? AppColors.green
+                              : colors.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -801,129 +938,59 @@ class _ApplicantCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: status == 'Shortlisted'
-                        ? AppColors.indigoBg
-                        : AppColors.amberBg,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      color: status == 'Shortlisted'
-                          ? AppColors.indigo
-                          : AppColors.amber,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Wrap(
-                spacing: 7,
-                runSpacing: 8,
-                children: skills
-                    .map((e) => BrandChip(e, neutral: true))
-                    .toList(),
               ),
-            ),
-            const SizedBox(height: 12),
-            InkWell(
-              onTap: contactUnlocked ? null : onUnlock,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                height: 36,
-                decoration: BoxDecoration(
-                  color: contactUnlocked
-                      ? AppColors.greenBg
-                      : AppColors.brand50,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      contactUnlocked
-                          ? LucideIcons.lockOpen
-                          : LucideIcons.lockKeyhole,
-                      size: 16,
-                      color: contactUnlocked
-                          ? AppColors.green
-                          : AppColors.primary,
-                    ),
-                    const SizedBox(width: 7),
-                    Text(
-                      contactUnlocked ? 'Contact unlocked' : 'View contact',
-                      style: const TextStyle(
-                        color: AppColors.brandDark,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: onPrimary,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(38),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                      icon: Icon(
+                        status == 'Shortlisted'
+                            ? LucideIcons.calendarDays
+                            : LucideIcons.star,
+                        size: 16,
+                      ),
+                      label: Text(
+                        status == 'Shortlisted' ? 'Interview' : 'Shortlist',
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: onHire,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(38),
+                      ),
+                      child: const Text('Hire'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 46,
+                    child: OutlinedButton(
+                      onPressed: onReject,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(38),
+                        padding: EdgeInsets.zero,
+                        foregroundColor: Colors.redAccent,
+                      ),
+                      child: const Icon(LucideIcons.x, size: 17),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onPrimary,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(38),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                    icon: Icon(
-                      status == 'Shortlisted'
-                          ? LucideIcons.calendarDays
-                          : LucideIcons.star,
-                      size: 16,
-                    ),
-                    label: Text(
-                      status == 'Shortlisted' ? 'Interview' : 'Shortlist',
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: onHire,
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(38),
-                    ),
-                    child: const Text('Hire'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 46,
-                  child: OutlinedButton(
-                    onPressed: onReject,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(38),
-                      padding: EdgeInsets.zero,
-                      foregroundColor: Colors.redAccent,
-                    ),
-                    child: const Icon(LucideIcons.x, size: 17),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 Widget jobCard(Job job, VoidCallback onTap) => Card(

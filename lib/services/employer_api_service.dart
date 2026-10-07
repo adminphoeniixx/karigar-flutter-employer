@@ -50,6 +50,18 @@ class EmployerApiService {
       client.post(ApiConstants.locale, body: {'locale': locale});
 
   Future<Json> reference() => client.get(ApiConstants.reference);
+  Future<Json> maintenance() =>
+      client.get(ApiConstants.appMaintenance, query: {'app': 'employer'});
+  Future<Json> appUpdate({required String platform, required String version}) =>
+      client.get(
+        ApiConstants.appUpdate,
+        query: {'app': 'employer', 'platform': platform, 'version': version},
+      );
+  Future<Json> legal() => client.get(ApiConstants.legal);
+  Future<Json> legalDocument(String key) =>
+      client.get(ApiConstants.legalDocument(key));
+  Future<Json> support() =>
+      client.get(ApiConstants.support, query: {'audience': 'employer'});
   Future<List<String>> cities(String state) async => asStrings(
     (await client.get(ApiConstants.cities, query: {'state': state}))['cities'],
   );
@@ -303,10 +315,11 @@ class EmployerApiService {
       client.post('/conversations/$id/read');
 
   Future<Json> plans() => client.get('/employer/plans');
-  Future<Json> subscribe(int planId, {String? coupon}) async {
+  Future<Json> orders() => client.get(ApiConstants.orders);
+  Future<Json> subscribe(int planId, {String? coupon, String? email}) async {
     final response = await client.post(
       '/employer/plans/$planId/subscribe',
-      body: {'coupon': ?coupon},
+      body: {'coupon': ?coupon, 'email': ?email},
     );
     final amounts = response['amounts'];
     final rawId =
@@ -336,8 +349,8 @@ class EmployerApiService {
     return response;
   }
 
-  Future<Json> invoice(int subscriptionId) =>
-      client.get(ApiConstants.invoice(subscriptionId));
+  Future<Json> invoice(int invoiceId) =>
+      client.get(ApiConstants.invoice(invoiceId));
 
   Future<Json> preferences() => client.get('/preferences');
   Future<Json> updatePreferences(Json values) =>

@@ -13,6 +13,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/profile/invoice_screen.dart';
+import 'package:employer_kariger_app/screens/profile/order_history_screen.dart';
 
 class PlansScreen extends StatefulWidget {
   const PlansScreen({super.key, this.focusDatabase = false});
@@ -32,6 +33,7 @@ class _PlansScreenState extends State<PlansScreen> {
   List<Map<String, dynamic>> invoices = const [];
   Json payment = {};
   Json? jobPosts;
+  String? billingEmail;
   bool checkingOut = false;
   int? checkoutPlanId;
   bool verifyingPayment = false;
@@ -100,6 +102,7 @@ class _PlansScreenState extends State<PlansScreen> {
         jobPosts = response['job_posts'] is Map
             ? Json.from(response['job_posts'])
             : null;
+        billingEmail = response['billing_email']?.toString();
         plans = _maps(response['plans'])
           ..sort((a, b) {
             if (!widget.focusDatabase) return 0;
@@ -133,12 +136,16 @@ class _PlansScreenState extends State<PlansScreen> {
       _checkoutUnavailable();
       return;
     }
+    final email = await _invoiceEmail();
+    if (!mounted || email == null) return;
     try {
       setState(() {
         checkingOut = true;
         checkoutPlanId = planId;
       });
-      final response = await AppScope.of(context).api.subscribe(planId);
+      final response = await AppScope.of(
+        context,
+      ).api.subscribe(planId, email: email.isEmpty ? null : email);
       if (!mounted) return;
       if (!await _confirmCheckout(response) || !mounted) {
         return;
@@ -178,6 +185,48 @@ class _PlansScreenState extends State<PlansScreen> {
         });
       }
     }
+  }
+
+  Future<String?> _invoiceEmail() async {
+    final existing = billingEmail?.trim() ?? '';
+    if (existing.isNotEmpty) return existing;
+    final controller = TextEditingController();
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Email for your GST invoice'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            hintText: 'accounts@company.com',
+            helperText: 'We will email each tax invoice to this address.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, ''),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = controller.text.trim();
+              if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)) {
+                ScaffoldMessenger.of(dialogContext).showSnackBar(
+                  const SnackBar(content: Text('Enter a valid email address.')),
+                );
+                return;
+              }
+              Navigator.pop(dialogContext, value);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return result;
   }
 
   Future<bool> _confirmCheckout(Json response) async {
@@ -308,7 +357,19 @@ class _PlansScreenState extends State<PlansScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Plans & Worker Database')),
+    appBar: AppBar(
+      title: const Text('Plans & Worker Database'),
+      actions: [
+        IconButton(
+          tooltip: 'Order history',
+          icon: const Icon(LucideIcons.receiptText),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const OrderHistoryScreen()),
+          ),
+        ),
+      ],
+    ),
     body: loading && plans.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : error != null && plans.isEmpty
@@ -398,28 +459,46 @@ class _PlansScreenState extends State<PlansScreen> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 26),
-                Text(
-                  widget.focusDatabase ? 'Buy Database' : 'Choose a plan',
-                  style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 14),
-                ...plans.map(
-                  (plan) => Padding(
-                    padding: const EdgeInsets.only(bottom: 14),
-                    child: _Plan(
-                      plan: plan,
-                      gstPercent: asDouble(payment['gst_percent']),
-                      available: plan['purchasable'] == true,
-                      selected:
-                          checkoutPlanId != null &&
-                          checkoutPlanId == (plan['id'] as num?)?.toInt(),
-                      onChoose: plan['purchasable'] == true
-                          ? () => _subscribe(plan)
-                          : null,
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(LucideIcons.receiptText),
+                  title: const Text('Order history'),
+                  subtitle: const Text('Payments, renewals and tax invoices'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const OrderHistoryScreen(),
                     ),
                   ),
                 ),
+                _ActivePlanBanner(plans: plans),
+                const SizedBox(height: 26),
+                _PlanSection(
+                  title: 'Job plans',
+                  subtitle:
+                      'Post jobs, see applicants and open the Worker Database.',
+                  plans: plans
+                      .where((plan) => plan['type'] != 'database')
+                      .toList(),
+                  gstPercent: asDouble(payment['gst_percent']),
+                  checkoutPlanId: checkoutPlanId,
+                  onChoose: _subscribe,
+                ),
+                if (plans.any((plan) => plan['type'] == 'database')) ...[
+                  const SizedBox(height: 28),
+                  _PlanSection(
+                    title: 'Database plans',
+                    subtitle:
+                        'Get worker contacts on their own or alongside a job plan.',
+                    plans: plans
+                        .where((plan) => plan['type'] == 'database')
+                        .toList(),
+                    gstPercent: asDouble(payment['gst_percent']),
+                    checkoutPlanId: checkoutPlanId,
+                    onChoose: _subscribe,
+                  ),
+                ],
                 if (invoices.isNotEmpty) ...[
                   const SizedBox(height: 24),
                   const Text(
@@ -433,7 +512,9 @@ class _PlansScreenState extends State<PlansScreen> {
                       leading: const Icon(LucideIcons.receiptText),
                       title: Text('${invoice['invoice_number'] ?? 'Invoice'}'),
                       subtitle: Text(
-                        '${invoice['plan'] ?? ''} · ${invoice['date'] ?? ''}',
+                        '${invoice['plan'] ?? ''}'
+                        '${(invoice['cycle'] as num? ?? 1) > 1 ? ' · Renewal' : ''}'
+                        ' · ${invoice['date'] ?? ''}',
                       ),
                       trailing: Text('₹${invoice['total'] ?? 0}'),
                       onTap: () {
@@ -442,7 +523,7 @@ class _PlansScreenState extends State<PlansScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => InvoiceScreen(subscriptionId: id),
+                            builder: (_) => InvoiceScreen(invoiceId: id),
                           ),
                         );
                       },
@@ -455,32 +536,150 @@ class _PlansScreenState extends State<PlansScreen> {
   );
 }
 
+class _ActivePlanBanner extends StatelessWidget {
+  const _ActivePlanBanner({required this.plans});
+  final List<Map<String, dynamic>> plans;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = plans
+        .where((plan) => plan['is_current'] == true)
+        .firstOrNull;
+    if (current == null) return const SizedBox.shrink();
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Icon(LucideIcons.circleCheck, color: colors.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Active plan: ${current['name'] ?? ''}',
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+            decoration: BoxDecoration(
+              color: colors.primary.withValues(alpha: .14),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text('Active', style: TextStyle(color: colors.primary)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlanSection extends StatelessWidget {
+  const _PlanSection({
+    required this.title,
+    required this.subtitle,
+    required this.plans,
+    required this.gstPercent,
+    required this.checkoutPlanId,
+    required this.onChoose,
+  });
+  final String title, subtitle;
+  final List<Map<String, dynamic>> plans;
+  final double gstPercent;
+  final int? checkoutPlanId;
+  final ValueChanged<Map<String, dynamic>> onChoose;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final columns = constraints.maxWidth >= 1100
+          ? 4
+          : constraints.maxWidth >= 680
+          ? 2
+          : 1;
+      final gap = 16.0;
+      final width = (constraints.maxWidth - gap * (columns - 1)) / columns;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            subtitle,
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: gap,
+            runSpacing: gap,
+            children: plans
+                .map(
+                  (plan) => SizedBox(
+                    width: width,
+                    child: _Plan(
+                      plan: plan,
+                      gstPercent: gstPercent,
+                      available: plan['purchasable'] == true,
+                      canPurchase: plan['can_purchase'] is bool
+                          ? plan['can_purchase'] == true
+                          : plan['purchasable'] == true &&
+                                plan['is_current'] != true,
+                      selected: checkoutPlanId == (plan['id'] as num?)?.toInt(),
+                      onChoose:
+                          (plan['can_purchase'] is bool
+                              ? plan['can_purchase'] == true
+                              : plan['purchasable'] == true &&
+                                    plan['is_current'] != true)
+                          ? () => onChoose(plan)
+                          : null,
+                    ),
+                  ),
+                )
+                .toList(),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 class _Plan extends StatelessWidget {
   const _Plan({
     required this.plan,
     required this.onChoose,
     required this.gstPercent,
     required this.available,
+    required this.canPurchase,
     required this.selected,
   });
   final double gstPercent;
   final Map<String, dynamic> plan;
   final VoidCallback? onChoose;
-  final bool available, selected;
+  final bool available, canPurchase, selected;
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final featureLabels = (plan['feature_list'] as List? ?? const [])
         .whereType<String>();
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: colors.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: plan['is_current'] == true
               ? AppColors.primary
-              : AppColors.line,
+              : colors.outlineVariant,
           width: plan['is_current'] == true ? 1.5 : 1,
         ),
       ),
@@ -529,7 +728,7 @@ class _Plan extends StatelessWidget {
           ),
           Text(
             '${plan['interval'] ?? ''}',
-            style: const TextStyle(color: AppColors.muted),
+            style: TextStyle(color: colors.onSurfaceVariant),
           ),
           if (gstPercent > 0 &&
               asDouble(plan['price_with_gst']) > asDouble(plan['price']))
@@ -554,8 +753,15 @@ class _Plan extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 14),
+          if (plan['already_purchased'] == true) ...[
+            Text(
+              '${plan['purchase_note'] ?? 'You already have this plan.'}',
+              style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+          ],
           FilledButton(
-            onPressed: plan['is_current'] == true ? null : onChoose,
+            onPressed: selected || !canPurchase ? null : onChoose,
             child: selected
                 ? const SizedBox(
                     width: 18,
@@ -566,8 +772,11 @@ class _Plan extends StatelessWidget {
                     ),
                   )
                 : Text(
-                    plan['is_current'] == true
+                    plan['is_current'] == true &&
+                            plan['already_purchased'] != true
                         ? 'Current plan'
+                        : plan['already_purchased'] == true
+                        ? 'Already purchased'
                         : !available
                         ? 'Unavailable'
                         : 'Choose ${plan['name'] ?? ''}',

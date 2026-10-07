@@ -8,22 +8,34 @@ class BrandChip extends StatelessWidget {
   final String text;
   final bool neutral;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
-    decoration: BoxDecoration(
-      color: neutral ? Colors.white : AppColors.brand50,
-      border: Border.all(color: neutral ? AppColors.line : AppColors.brand100),
-      borderRadius: BorderRadius.circular(20),
-    ),
-    child: Text(
-      text,
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: neutral ? AppColors.muted : AppColors.brandDark,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      decoration: BoxDecoration(
+        color: neutral
+            ? colors.surfaceContainerHighest
+            : isDark
+            ? colors.primary.withValues(alpha: .18)
+            : AppColors.brand50,
+        border: Border.all(
+          color: neutral
+              ? colors.outlineVariant
+              : colors.primary.withValues(alpha: .35),
+        ),
+        borderRadius: BorderRadius.circular(20),
       ),
-    ),
-  );
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: neutral ? colors.onSurfaceVariant : colors.primary,
+        ),
+      ),
+    );
+  }
 }
 
 class SectionTitle extends StatelessWidget {
@@ -34,11 +46,11 @@ class SectionTitle extends StatelessWidget {
     padding: const EdgeInsets.only(top: 20, bottom: 10, left: 4),
     child: Text(
       text.toUpperCase(),
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w700,
         letterSpacing: .6,
-        color: AppColors.muted,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     ),
   );

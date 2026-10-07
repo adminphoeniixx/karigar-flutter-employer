@@ -476,411 +476,423 @@ class _PostJobScreenState extends State<PostJobScreen> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: Text(
-        widget.job == null
-            ? 'Post a Job'
-            : editingDraft
-            ? 'Edit draft'
-            : 'Edit job',
-        style: const TextStyle(fontSize: 16),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(
+          widget.job == null
+              ? 'Post a Job'
+              : editingDraft
+              ? 'Edit draft'
+              : 'Edit job',
+          style: const TextStyle(fontSize: 16),
+        ),
       ),
-    ),
-    body: referenceLoading
-        ? const Center(child: CircularProgressIndicator())
-        : Column(
-            children: [
-              Expanded(
-                child: ListView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-                  children: [
-                    if (!canDraft) ...[
-                      const _Label('Status'),
-                      _singleChips(
-                        ['active', 'closed'],
-                        liveStatus,
-                        (value) => setState(() => liveStatus = value),
+      body: referenceLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                    children: [
+                      if (!canDraft) ...[
+                        const _Label('Status'),
+                        _singleChips(
+                          ['active', 'closed'],
+                          liveStatus,
+                          (value) => setState(() => liveStatus = value),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                      const _Label('Job title'),
+                      _Input(
+                        hint: 'e.g. Plumber for apartment project',
+                        controller: titleController,
                       ),
                       const SizedBox(height: 14),
-                    ],
-                    const _Label('Job title'),
-                    _Input(
-                      hint: 'e.g. Plumber for apartment project',
-                      controller: titleController,
-                    ),
-                    const SizedBox(height: 14),
-                    const _Label('Category'),
-                    _Select(
-                      category ?? 'Select category',
-                      onTap: () => _choose(
-                        'Select category',
-                        categories,
-                        (value) => setState(() {
-                          category = value;
-                          skills = {
-                            ...(categorySkills[value] ?? skills),
-                            ...selectedSkills,
-                          }.toList();
-                        }),
+                      const _Label('Category'),
+                      _Select(
+                        category ?? 'Select category',
+                        onTap: () => _choose(
+                          'Select category',
+                          categories,
+                          (value) => setState(() {
+                            category = value;
+                            skills = {
+                              ...(categorySkills[value] ?? skills),
+                              ...selectedSkills,
+                            }.toList();
+                          }),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    const _Label('Skills required'),
-                    _chips(skills, selectedSkills, multi: true),
-                    const SizedBox(height: 8),
-                    _Input(
-                      hint: 'Add a skill',
-                      controller: perkController,
-                      onSubmitted: (value) {
-                        final skill = value.trim();
-                        if (skill.isNotEmpty) {
-                          setState(() {
-                            skills = {...skills, skill}.toList();
-                            selectedSkills.add(skill);
-                            perkController.clear();
-                          });
-                        }
-                      },
-                    ),
-                    const _Hint(
-                      'Tap to add. Workers with these skills are matched first.',
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _Label('Openings'),
-                              _Input(
-                                hint: '3',
-                                controller: openingsController,
-                                number: true,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _Label('Max experience'),
-                              _Input(
-                                hint: '5',
-                                suffix: 'yrs',
-                                controller: experienceMaxController,
-                                number: true,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _Label('Min experience'),
-                              _Input(
-                                hint: '1',
-                                suffix: 'yrs',
-                                controller: experienceController,
-                                number: true,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const _SectionLabel('Wage'),
-                    const Text(
-                      'Enter monthly salary in rupees',
-                      style: TextStyle(color: AppColors.muted, fontSize: 12),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _Label('Minimum / month'),
-                              _Input(
-                                hint: '15000',
-                                prefix: '₹',
-                                controller: wageMinController,
-                                number: true,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _Label('Maximum / month'),
-                              _Input(
-                                hint: '30000',
-                                prefix: '₹',
-                                controller: wageMaxController,
-                                number: true,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const _Label('Shift'),
-                    _singleChips(
-                      ['Day', 'Night', 'Rotational', 'Flexible'],
-                      shift,
-                      (value) {
-                        setState(() => shift = value);
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _Input(
-                            hint: 'Start time (09:00)',
-                            controller: shiftStartController,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: _Input(
-                            hint: 'End time (18:00)',
-                            controller: shiftEndController,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    const _Label('Perks & benefits'),
-                    _chips(perks, selectedPerks, multi: true),
-                    const SizedBox(height: 8),
-                    _Input(
-                      hint: 'Add your own perk',
-                      controller: perkController,
-                      onSubmitted: (value) {
-                        final perk = value.trim();
-                        if (perk.isNotEmpty) {
-                          setState(() {
-                            perks = {...perks, perk}.toList();
-                            selectedPerks.add(perk);
-                            perkController.clear();
-                          });
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 14),
-                    _AiHelpCard(
-                      shortlistEnabled: aiShortlistEnabled,
-                      callEnabled: aiCallEnabled,
-                      shortlistAvailable: aiShortlistAvailable,
-                      callAvailable: aiCallAvailable,
-                      onShortlistChanged: aiShortlistAvailable
-                          ? (value) =>
-                                setState(() => aiShortlistEnabled = value)
-                          : null,
-                      onCallChanged: aiCallAvailable && aiShortlistEnabled
-                          ? (value) => setState(() => aiCallEnabled = value)
-                          : null,
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const _Label('Job description'),
-                        Wrap(
-                          spacing: 2,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            _singleChips(
-                              ['en', 'hi'],
-                              aiLanguage,
-                              (value) => setState(() => aiLanguage = value),
+                      const SizedBox(height: 14),
+                      const _Label('Skills required'),
+                      _chips(skills, selectedSkills, multi: true),
+                      const SizedBox(height: 8),
+                      _Input(
+                        hint: 'Add a skill',
+                        controller: perkController,
+                        onSubmitted: (value) {
+                          final skill = value.trim();
+                          if (skill.isNotEmpty) {
+                            setState(() {
+                              skills = {...skills, skill}.toList();
+                              selectedSkills.add(skill);
+                              perkController.clear();
+                            });
+                          }
+                        },
+                      ),
+                      const _Hint(
+                        'Tap to add. Workers with these skills are matched first.',
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Label('Openings'),
+                                _Input(
+                                  hint: '3',
+                                  controller: openingsController,
+                                  number: true,
+                                ),
+                              ],
                             ),
-                            TextButton.icon(
-                              onPressed: suggesting
-                                  ? null
-                                  : _suggestDescription,
-                              icon: suggesting
-                                  ? const SizedBox(
-                                      width: 14,
-                                      height: 14,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Label('Max experience'),
+                                _Input(
+                                  hint: '5',
+                                  suffix: 'yrs',
+                                  controller: experienceMaxController,
+                                  number: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Label('Min experience'),
+                                _Input(
+                                  hint: '1',
+                                  suffix: 'yrs',
+                                  controller: experienceController,
+                                  number: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const _SectionLabel('Wage'),
+                      const Text(
+                        'Enter monthly salary in rupees',
+                        style: TextStyle(color: AppColors.muted, fontSize: 12),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Label('Minimum / month'),
+                                _Input(
+                                  hint: '15000',
+                                  prefix: '₹',
+                                  controller: wageMinController,
+                                  number: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Label('Maximum / month'),
+                                _Input(
+                                  hint: '30000',
+                                  prefix: '₹',
+                                  controller: wageMaxController,
+                                  number: true,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const _Label('Shift'),
+                      _singleChips(
+                        ['Day', 'Night', 'Rotational', 'Flexible'],
+                        shift,
+                        (value) {
+                          setState(() => shift = value);
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _Input(
+                              hint: 'Start time (09:00)',
+                              controller: shiftStartController,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: _Input(
+                              hint: 'End time (18:00)',
+                              controller: shiftEndController,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const _Label('Perks & benefits'),
+                      _chips(perks, selectedPerks, multi: true),
+                      const SizedBox(height: 8),
+                      _Input(
+                        hint: 'Add your own perk',
+                        controller: perkController,
+                        onSubmitted: (value) {
+                          final perk = value.trim();
+                          if (perk.isNotEmpty) {
+                            setState(() {
+                              perks = {...perks, perk}.toList();
+                              selectedPerks.add(perk);
+                              perkController.clear();
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      _AiHelpCard(
+                        shortlistEnabled: aiShortlistEnabled,
+                        callEnabled: aiCallEnabled,
+                        shortlistAvailable: aiShortlistAvailable,
+                        callAvailable: aiCallAvailable,
+                        onShortlistChanged: aiShortlistAvailable
+                            ? (value) =>
+                                  setState(() => aiShortlistEnabled = value)
+                            : null,
+                        onCallChanged: aiCallAvailable && aiShortlistEnabled
+                            ? (value) => setState(() => aiCallEnabled = value)
+                            : null,
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const _Label('Job description'),
+                          Wrap(
+                            spacing: 2,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              _singleChips(
+                                ['en', 'hi'],
+                                aiLanguage,
+                                (value) => setState(() => aiLanguage = value),
+                              ),
+                              TextButton.icon(
+                                onPressed: suggesting
+                                    ? null
+                                    : _suggestDescription,
+                                icon: suggesting
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        LucideIcons.sparkles,
+                                        size: 16,
                                       ),
-                                    )
-                                  : const Icon(LucideIcons.sparkles, size: 16),
-                              label: Text(
-                                aiLanguage == 'hi'
-                                    ? 'हिंदी में AI सुझाव'
-                                    : 'Suggest with AI',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    _Input(
-                      hint:
-                          'Describe the work, site details, duration, tools provided…',
-                      lines: 4,
-                      controller: descriptionController,
-                    ),
-                    const _SectionLabel('Location'),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _Label('State'),
-                              _Select(
-                                state ?? 'Select',
-                                onTap: () => _choose(
-                                  'Select state',
-                                  states,
-                                  _loadCities,
+                                label: Text(
+                                  aiLanguage == 'hi'
+                                      ? 'हिंदी में AI सुझाव'
+                                      : 'Suggest with AI',
                                 ),
                               ),
                             ],
                           ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _Label('City'),
-                              _Select(
-                                city ?? 'Select',
-                                onTap: () {
-                                  if (state == null) {
-                                    _message('Select a state first.');
-                                  } else {
-                                    _choose(
-                                      'Select city',
-                                      cities,
-                                      (value) => setState(() {
-                                        city = value;
-                                        selectedLocation = null;
-                                      }),
-                                    );
-                                  }
-                                },
-                              ),
-                            ],
+                        ],
+                      ),
+                      _Input(
+                        hint:
+                            'Describe the work, site details, duration, tools provided…',
+                        lines: 4,
+                        controller: descriptionController,
+                      ),
+                      const _SectionLabel('Location'),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Label('State'),
+                                _Select(
+                                  state ?? 'Select',
+                                  onTap: () => _choose(
+                                    'Select state',
+                                    states,
+                                    _loadCities,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const _Label('City'),
+                                _Select(
+                                  city ?? 'Select',
+                                  onTap: () {
+                                    if (state == null) {
+                                      _message('Select a state first.');
+                                    } else {
+                                      _choose(
+                                        'Select city',
+                                        cities,
+                                        (value) => setState(() {
+                                          city = value;
+                                          selectedLocation = null;
+                                        }),
+                                      );
+                                    }
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      const _Label('Address / landmark'),
+                      _Input(
+                        hint: 'Plot, street, area or landmark',
+                        controller: addressController,
+                      ),
+                      const SizedBox(height: 14),
+                      const _Label('Pin the job location'),
+                      SizedBox(
+                        height: 190,
+                        child: LocationMap(
+                          key: ValueKey('$state/$city'),
+                          initialLocation:
+                              selectedLocation ??
+                              const LatLng(22.5937, 78.9629),
+                          initialZoom: selectedLocation == null ? 4 : 13,
+                          hasSelection: selectedLocation != null,
+                          onLocationChanged: (point) =>
+                              selectedLocation = point,
+                        ),
+                      ),
+                      const Text(
+                        'Move the map or tap to pin the exact work site.',
+                        style: TextStyle(fontSize: 12, color: AppColors.muted),
+                      ),
+                      const SizedBox(height: 14),
+                      const _Label('How should workers reach you?'),
+                      _singleChips(
+                        ['Apply + Call', 'Apply only', 'Call only'],
+                        contact,
+                        (value) => setState(() => contact = value),
+                      ),
+                      if (contact != 'Apply only') ...[
+                        const SizedBox(height: 14),
+                        const _Label('Contact phone'),
+                        _Input(
+                          hint: '9876543210',
+                          controller: contactPhoneController,
+                          number: true,
+                        ),
+                        const SizedBox(height: 12),
+                        const _Label('Who picks up the call?'),
+                        _Input(
+                          hint: 'e.g. Ramesh Kumar',
+                          controller: contactNameController,
+                        ),
+                        const SizedBox(height: 12),
+                        const _Label('Designation (optional)'),
+                        _Input(
+                          hint: 'e.g. Site supervisor',
+                          controller: contactDesignationController,
                         ),
                       ],
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 11, 16, 20),
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    border: Border(
+                      top: BorderSide(color: colors.outlineVariant),
                     ),
-                    const SizedBox(height: 14),
-                    const _Label('Address / landmark'),
-                    _Input(
-                      hint: 'Plot, street, area or landmark',
-                      controller: addressController,
-                    ),
-                    const SizedBox(height: 14),
-                    const _Label('Pin the job location'),
-                    SizedBox(
-                      height: 190,
-                      child: LocationMap(
-                        key: ValueKey('$state/$city'),
-                        initialLocation:
-                            selectedLocation ?? const LatLng(22.5937, 78.9629),
-                        initialZoom: selectedLocation == null ? 4 : 13,
-                        hasSelection: selectedLocation != null,
-                        onLocationChanged: (point) => selectedLocation = point,
-                      ),
-                    ),
-                    const Text(
-                      'Move the map or tap to pin the exact work site.',
-                      style: TextStyle(fontSize: 12, color: AppColors.muted),
-                    ),
-                    const SizedBox(height: 14),
-                    const _Label('How should workers reach you?'),
-                    _singleChips(
-                      ['Apply + Call', 'Apply only', 'Call only'],
-                      contact,
-                      (value) => setState(() => contact = value),
-                    ),
-                    if (contact != 'Apply only') ...[
-                      const SizedBox(height: 14),
-                      const _Label('Contact phone'),
-                      _Input(
-                        hint: '9876543210',
-                        controller: contactPhoneController,
-                        number: true,
-                      ),
-                      const SizedBox(height: 12),
-                      const _Label('Who picks up the call?'),
-                      _Input(
-                        hint: 'e.g. Ramesh Kumar',
-                        controller: contactNameController,
-                      ),
-                      const SizedBox(height: 12),
-                      const _Label('Designation (optional)'),
-                      _Input(
-                        hint: 'e.g. Site supervisor',
-                        controller: contactDesignationController,
+                  ),
+                  child: Row(
+                    children: [
+                      if (canDraft)
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: loading ? null : () => _submit('draft'),
+                            style: OutlinedButton.styleFrom(
+                              minimumSize: const Size.fromHeight(50),
+                              foregroundColor: colors.onSurface,
+                              side: BorderSide(color: colors.outlineVariant),
+                            ),
+                            child: Text(
+                              widget.job == null
+                                  ? 'Save as draft'
+                                  : 'Save draft',
+                            ),
+                          ),
+                        ),
+                      if (canDraft) const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: loading
+                              ? null
+                              : () => _submit(canDraft ? 'active' : liveStatus),
+                          child: Text(
+                            loading
+                                ? 'Saving...'
+                                : widget.job == null
+                                ? 'Post job'
+                                : editingDraft
+                                ? 'Publish'
+                                : 'Save changes',
+                          ),
+                        ),
                       ),
                     ],
-                  ],
+                  ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.fromLTRB(16, 11, 16, 20),
-                decoration: const BoxDecoration(
-                  color: AppColors.card,
-                  border: Border(top: BorderSide(color: AppColors.line)),
-                ),
-                child: Row(
-                  children: [
-                    if (canDraft)
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: loading ? null : () => _submit('draft'),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(50),
-                            foregroundColor: AppColors.foreground,
-                            side: const BorderSide(color: AppColors.line),
-                          ),
-                          child: Text(
-                            widget.job == null ? 'Save as draft' : 'Save draft',
-                          ),
-                        ),
-                      ),
-                    if (canDraft) const SizedBox(width: 10),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: loading
-                            ? null
-                            : () => _submit(canDraft ? 'active' : liveStatus),
-                        child: Text(
-                          loading
-                              ? 'Saving...'
-                              : widget.job == null
-                              ? 'Post job'
-                              : editingDraft
-                              ? 'Publish'
-                              : 'Save changes',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-  );
+              ],
+            ),
+    );
+  }
 
   Widget _chips(
     List<String> values,
@@ -1108,7 +1120,10 @@ class _Input extends StatelessWidget {
                 widthFactor: 1,
                 child: Text(
                   suffix!,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ),
@@ -1121,25 +1136,28 @@ class _Select extends StatelessWidget {
   final String text;
   final VoidCallback? onTap;
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(12),
-    child: Container(
-      height: 48,
-      padding: const EdgeInsets.symmetric(horizontal: 13),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        border: Border.all(color: AppColors.line),
-        borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 48,
+        padding: const EdgeInsets.symmetric(horizontal: 13),
+        decoration: BoxDecoration(
+          color: colors.surfaceContainerHighest,
+          border: Border.all(color: colors.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+            const Icon(LucideIcons.chevronDown, size: 16),
+          ],
+        ),
       ),
-      child: Row(
-        children: [
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
-          const Icon(LucideIcons.chevronDown, size: 16),
-        ],
-      ),
-    ),
-  );
+    );
+  }
 }
 
 class _Hint extends StatelessWidget {

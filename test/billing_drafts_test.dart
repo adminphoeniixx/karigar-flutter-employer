@@ -331,6 +331,7 @@ void main() {
         });
       }
       return jsonResponse({
+        'billing_email': 'accounts@example.com',
         'payment': {'gst_percent': 18},
         'job_posts': {'used': 3, 'limit': 5, 'unlimited': false},
         'plans': [
@@ -391,9 +392,7 @@ void main() {
         'pdf_url': 'https://example.com/api/v1/employer/invoices/12/pdf',
       }),
     );
-    await tester.pumpWidget(
-      harness(api, const InvoiceScreen(subscriptionId: 12)),
-    );
+    await tester.pumpWidget(harness(api, const InvoiceScreen(invoiceId: 12)));
     await tester.pumpAndSettle();
     expect(find.text('Download PDF'), findsOneWidget);
     expect(find.text('GST (18%)'), findsOneWidget);

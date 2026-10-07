@@ -9,8 +9,8 @@ import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 
 class InvoiceScreen extends StatefulWidget {
-  const InvoiceScreen({super.key, required this.subscriptionId});
-  final int subscriptionId;
+  const InvoiceScreen({super.key, required this.invoiceId});
+  final int invoiceId;
 
   @override
   State<InvoiceScreen> createState() => _InvoiceScreenState();
@@ -37,9 +37,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       error = null;
     });
     try {
-      final response = await AppScope.of(
-        context,
-      ).api.invoice(widget.subscriptionId);
+      final response = await AppScope.of(context).api.invoice(widget.invoiceId);
       if (!mounted) return;
       setState(() {
         pdfUrl = response['pdf_url']?.toString();
@@ -60,7 +58,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
     try {
       final file = await AppScope.of(
         context,
-      ).api.invoicePdf(widget.subscriptionId, url: pdfUrl);
+      ).api.invoicePdf(widget.invoiceId, url: pdfUrl);
       if (!mounted) return;
       if (file.bytes.length < 5 ||
           String.fromCharCodes(file.bytes.take(5)) != '%PDF-') {
@@ -68,7 +66,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
           'The server did not return a PDF. Please try again.',
         );
       }
-      final name = (file.filename ?? 'Invoice-${widget.subscriptionId}.pdf')
+      final name = (file.filename ?? 'Invoice-${widget.invoiceId}.pdf')
           .split(RegExp(r'[/\\]'))
           .last;
       final path = await FilePicker.saveFile(

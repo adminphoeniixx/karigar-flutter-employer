@@ -31,10 +31,15 @@ class ApiConstants {
   static const team = '/employer/team';
   static const conversations = '/conversations';
   static const plans = '/employer/plans';
+  static const orders = '/employer/orders';
   static const plansCallback = '/employer/plans/callback';
   static const invoices = '/employer/invoices';
   static const preferences = '/preferences';
   static const sessions = '/auth/sessions';
+  static const appUpdate = '/app/update';
+  static const appMaintenance = '/app/maintenance';
+  static const legal = '/legal';
+  static const support = '/support';
 
   static String job(int id) => '$jobs/$id';
   static String closeJob(int id) => '${job(id)}/close';
@@ -62,4 +67,5 @@ class ApiConstants {
   static String subscribePlan(int id) => '$plans/$id/subscribe';
   static String invoice(int subscriptionId) => '$invoices/$subscriptionId';
   static String session(int id) => '$sessions/$id';
+  static String legalDocument(String key) => '$legal/$key';
 }

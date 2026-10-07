@@ -9,6 +9,7 @@ import 'package:employer_kariger_app/models/api_models.dart';
 import 'package:employer_kariger_app/screens/jobs/jobs_screen.dart';
 import 'package:employer_kariger_app/screens/profile/kyc_screen.dart';
 import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
+import 'package:employer_kariger_app/screens/profile/order_history_screen.dart';
 import 'package:employer_kariger_app/screens/profile/profile_edit_screen.dart';
 import 'package:employer_kariger_app/screens/profile/reviews_screen.dart';
 import 'package:employer_kariger_app/screens/profile/settings_screen.dart';
@@ -69,7 +70,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    border: Border.all(color: AppColors.line),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(LucideIcons.settings, size: 21),
@@ -95,16 +98,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     _BusinessHeader(profile: profile),
                     Container(
-                      color: AppColors.background,
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                       child: OutlinedButton.icon(
                         onPressed: () =>
                             _open(const ProfileEditScreen(), refresh: true),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(48),
-                          foregroundColor: AppColors.brandDark,
-                          backgroundColor: AppColors.brand50,
-                          side: const BorderSide(color: AppColors.brand200),
+                          foregroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primary,
+                          backgroundColor: Theme.of(
+                            context,
+                          ).colorScheme.primaryContainer,
+                          side: BorderSide(
+                            color: Theme.of(context).colorScheme.outlineVariant,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),
                           ),
@@ -114,7 +123,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     Container(
-                      color: AppColors.background,
+                      color: Theme.of(context).colorScheme.surfaceContainerLow,
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 22),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -122,7 +131,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           Text(
                             'USUALLY HIRING FOR',
                             style: TextStyle(
-                              color: AppColors.muted,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontSize: 13,
                               fontWeight: FontWeight.w700,
                               letterSpacing: .5,
@@ -181,6 +192,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       onTap: () => _open(const PlansScreen()),
                     ),
                     _ProfileRow(
+                      icon: LucideIcons.receiptText,
+                      title: 'Order History',
+                      subtitle: 'Payments, renewals and tax invoices',
+                      trailing: '→',
+                      onTap: () => _open(const OrderHistoryScreen()),
+                    ),
+                    _ProfileRow(
                       icon: LucideIcons.slidersHorizontal,
                       title: context.tr('Settings'),
                       subtitle: 'Language, security, theme',
@@ -212,64 +230,81 @@ class _BusinessHeader extends StatelessWidget {
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const CircleAvatar(
+        CircleAvatar(
           radius: 32,
           backgroundColor: Colors.white,
-          child: Icon(
-            LucideIcons.building2,
-            size: 30,
-            color: AppColors.primary,
-          ),
+          backgroundImage: profile?.logoUrl?.trim().isNotEmpty == true
+              ? NetworkImage(profile!.logoUrl!)
+              : null,
+          child: profile?.logoUrl?.trim().isNotEmpty == true
+              ? null
+              : const Icon(
+                  LucideIcons.building2,
+                  size: 30,
+                  color: AppColors.primary,
+                ),
         ),
         const SizedBox(width: 14),
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                profile?.companyName.isNotEmpty == true
-                    ? profile!.companyName
-                    : 'Your business',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
+          // Keep the avatar vertically centered; only the name/details need
+          // breathing room above them inside the orange header.
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  profile?.companyName.isNotEmpty == true
+                      ? profile!.companyName
+                      : 'Your business',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                profile?.industry ?? 'Complete your business profile',
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-              ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  const Icon(LucideIcons.mapPin, color: Colors.white, size: 15),
-                  const SizedBox(width: 4),
-                  Text(
-                    [profile?.city, profile?.state]
-                        .whereType<String>()
-                        .where((value) => value.isNotEmpty)
-                        .join(', '),
-                    style: const TextStyle(color: Colors.white, fontSize: 12.5),
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '★ ${profile?.rating.average.toStringAsFixed(1) ?? '0.0'} '
-                    '(${profile?.rating.count ?? 0})',
-                    style: const TextStyle(
+                const SizedBox(height: 2),
+                Text(
+                  profile?.industry ?? 'Complete your business profile',
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      LucideIcons.mapPin,
                       color: Colors.white,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
+                      size: 15,
                     ),
-                  ),
+                    const SizedBox(width: 4),
+                    Text(
+                      [profile?.city, profile?.state]
+                          .whereType<String>()
+                          .where((value) => value.isNotEmpty)
+                          .join(', '),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '★ ${profile?.rating.average.toStringAsFixed(1) ?? '0.0'} '
+                      '(${profile?.rating.count ?? 0})',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+                if (profile?.verified == true) ...[
+                  const SizedBox(height: 8),
+                  const _VerifiedEmployerPill(),
                 ],
-              ),
-              if (profile?.verified == true) ...[
-                const SizedBox(height: 8),
-                const _VerifiedEmployerPill(),
               ],
-            ],
+            ),
           ),
         ),
       ],
@@ -323,73 +358,82 @@ class _ProfileRow extends StatelessWidget {
   final bool verified;
 
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    child: Container(
-      height: 69,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: const BoxDecoration(
-        color: AppColors.card,
-        border: Border(bottom: BorderSide(color: AppColors.line2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: AppColors.brand50,
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 11.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (verified)
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        height: 69,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: colors.surface,
+          border: Border(bottom: BorderSide(color: colors.outlineVariant)),
+        ),
+        child: Row(
+          children: [
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: AppColors.greenBg,
-                borderRadius: BorderRadius.circular(20),
+                color: colors.primaryContainer,
+                borderRadius: BorderRadius.circular(11),
               ),
-              child: const Text(
-                'Verified',
+              child: Icon(icon, color: AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (verified)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.greenBg,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Verified',
+                  style: TextStyle(
+                    color: AppColors.green,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              )
+            else
+              Text(
+                trailing ?? '→',
                 style: TextStyle(
-                  color: AppColors.green,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+                  color: colors.onSurfaceVariant,
+                  fontSize: 11.5,
                 ),
               ),
-            )
-          else
-            Text(
-              trailing ?? '→',
-              style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
-            ),
-        ],
+          ],
+        ),
       ),
-    ),
-  );
+    );
+  }
 }
