@@ -13,7 +13,6 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
-import 'package:employer_kariger_app/screens/profile/invoice_screen.dart';
 import 'package:employer_kariger_app/screens/profile/order_history_screen.dart';
 import 'package:employer_kariger_app/screens/profile/payment_success_screen.dart';
 
@@ -32,7 +31,6 @@ class _PlansScreenState extends State<PlansScreen> {
   Map<String, dynamic> unlocks = const {};
   List<Map<String, dynamic>> plans = const [];
   Json? database;
-  List<Map<String, dynamic>> invoices = const [];
   Json payment = {};
   Json? jobPosts;
   String? billingEmail;
@@ -112,7 +110,6 @@ class _PlansScreenState extends State<PlansScreen> {
             final bDatabase = b['type'] == 'database';
             return aDatabase == bDatabase ? 0 : (aDatabase ? -1 : 1);
           });
-        invoices = _maps(response['invoices']);
       });
     } catch (exception) {
       if (mounted) setState(() => error = '$exception');
@@ -534,140 +531,10 @@ class _PlansScreenState extends State<PlansScreen> {
                     onChoose: _subscribe,
                   ),
                 ],
-                if (invoices.isNotEmpty) ...[
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Invoices',
-                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 10),
-                  ...invoices.map(
-                    (invoice) => _InvoicePreviewCard(
-                      invoice: invoice,
-                      onView: () {
-                        final id = (invoice['id'] as num?)?.toInt();
-                        if (id == null) return;
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => InvoiceScreen(invoiceId: id),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const OrderHistoryScreen(),
-                        ),
-                      ),
-                      icon: const Icon(LucideIcons.history, size: 18),
-                      label: const Text('View complete order history'),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
   );
-}
-
-class _InvoicePreviewCard extends StatelessWidget {
-  const _InvoicePreviewCard({required this.invoice, required this.onView});
-
-  final Map<String, dynamic> invoice;
-  final VoidCallback onView;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    final renewal = (invoice['cycle'] as num? ?? 1) > 1;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        onTap: onView,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 14, 10, 12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(
-                  color: colors.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  LucideIcons.receiptText,
-                  color: colors.primary,
-                  size: 21,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${invoice['invoice_number'] ?? 'Tax invoice'}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      '${invoice['plan'] ?? 'Plan'}${renewal ? ' · Renewal' : ''}',
-                      style: TextStyle(color: colors.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${invoice['date'] ?? ''}',
-                      style: TextStyle(
-                        color: colors.onSurfaceVariant,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    money(invoice['total']),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  TextButton(
-                    onPressed: onView,
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(0, 32),
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                    ),
-                    child: const Text('View invoice'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class _ActivePlanBanner extends StatelessWidget {

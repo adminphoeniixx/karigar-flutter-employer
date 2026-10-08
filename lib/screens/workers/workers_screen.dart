@@ -26,6 +26,8 @@ class _WorkersScreenState extends State<WorkersScreen> {
   String category = 'All';
   Map<String, dynamic> advancedFilters = {};
   late final controller = AppScope.of(context).workers;
+  late final ScrollController _scrollController = ScrollController()
+    ..addListener(_loadNextPageIfNeeded);
   bool _loaded = false;
 
   List<String> categories = const ['All'];
@@ -63,12 +65,28 @@ class _WorkersScreenState extends State<WorkersScreen> {
       setState(() {
         contactCounts = {...contactCounts, ...controller.contactCounts};
       });
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _loadNextPageIfNeeded(),
+      );
+    }
+  }
+
+  void _loadNextPageIfNeeded() {
+    if (!_scrollController.hasClients ||
+        controller.loading ||
+        !controller.hasMore) {
+      return;
+    }
+    final position = _scrollController.position;
+    if (position.maxScrollExtent - position.pixels <= 200) {
+      controller.loadMore();
     }
   }
 
   @override
   void dispose() {
     if (_loaded) controller.removeListener(_refresh);
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -291,6 +309,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
                 ),
                 Expanded(
                   child: ListView(
+                    controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
                     children: [
                       if (controller.loading && visible.isEmpty)
@@ -346,6 +365,11 @@ class _WorkersScreenState extends State<WorkersScreen> {
                           ),
                         ),
                       ),
+                      if (controller.loading && visible.isNotEmpty)
+                        const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        ),
                     ],
                   ),
                 ),

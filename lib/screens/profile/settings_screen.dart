@@ -322,7 +322,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (selected != null) {
       try {
-        await api.setLocale(selected);
+        // The API's Hindi locale also carries the Hindi + English preference;
+        // the app keeps the distinct local Hinglish presentation.
+        await api.setLocale(selected == 'hinglish' ? 'hi' : selected);
         await appLanguage.select(selected);
       } catch (exception) {
         if (mounted) {

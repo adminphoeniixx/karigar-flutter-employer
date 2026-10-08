@@ -8,6 +8,7 @@ import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
 import 'package:employer_kariger_app/screens/jobs/jobs_screen.dart';
 import 'package:employer_kariger_app/screens/profile/kyc_screen.dart';
+import 'package:employer_kariger_app/screens/profile/invoices_screen.dart';
 import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
 import 'package:employer_kariger_app/screens/profile/order_history_screen.dart';
 import 'package:employer_kariger_app/screens/profile/profile_edit_screen.dart';
@@ -197,6 +198,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       subtitle: 'Payments, renewals and tax invoices',
                       trailing: '→',
                       onTap: () => _open(const OrderHistoryScreen()),
+                    ),
+                    _ProfileRow(
+                      icon: LucideIcons.fileText,
+                      title: 'Invoices',
+                      subtitle: 'View and download tax invoices',
+                      trailing: '→',
+                      onTap: () => _open(const InvoicesScreen()),
                     ),
                     _ProfileRow(
                       icon: LucideIcons.slidersHorizontal,

@@ -65,10 +65,15 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
     // Paint the existing splash before starting platform initialization.
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    await widget.onInitialize?.call();
+    final initialize = widget.onInitialize;
+    if (initialize != null) {
+      await initialize().timeout(const Duration(seconds: 8));
+    }
     if (!mounted) return;
     try {
-      final maintenance = await api.maintenance();
+      final maintenance = await api.maintenance().timeout(
+        const Duration(seconds: 8),
+      );
       if (maintenance['maintenance'] == true) {
         maintenanceMessage =
             maintenance['message']?.toString() ??
@@ -78,10 +83,12 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
         )?.toLocal();
         return;
       }
-      final update = await api.appUpdate(
-        platform: Platform.isIOS ? 'ios' : 'android',
-        version: '1.0.0',
-      );
+      final update = await api
+          .appUpdate(
+            platform: Platform.isIOS ? 'ios' : 'android',
+            version: '1.0.0',
+          )
+          .timeout(const Duration(seconds: 8));
       if (update['update_available'] == true) {
         updateMessage =
             update['message']?.toString() ??
@@ -123,7 +130,7 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
       builder: (context, _) => MaterialApp(
         title: 'Super Karigar Employer',
         debugShowCheckedModeBanner: false,
-        locale: language.locale,
+        locale: language.materialLocale,
         supportedLocales: const [
           Locale('en'),
           Locale('hi'),

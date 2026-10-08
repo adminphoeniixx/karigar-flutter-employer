@@ -41,9 +41,29 @@ class WorkersController extends BaseController {
   Json access = {};
   Json contactCounts = {};
   int total = 0;
+  int page = 1;
+  int lastPage = 1;
+  Map<String, dynamic> _filters = {};
 
-  Future<void> search([Map<String, dynamic> filters = const {}]) async {
-    final response = await run(() => api.workers(filters));
+  bool get hasMore => page < lastPage;
+
+  /// Starts a new directory search from the first server page.
+  Future<void> search([Map<String, dynamic> filters = const {}]) =>
+      _fetch(filters, more: false);
+
+  /// Appends the next server page to the current directory results.
+  Future<void> loadMore() => _fetch(_filters, more: true);
+
+  Future<void> _fetch(
+    Map<String, dynamic> filters, {
+    required bool more,
+  }) async {
+    if (loading || (more && !hasMore)) return;
+    final nextPage = more ? page + 1 : 1;
+    final activeFilters = more ? _filters : Map<String, dynamic>.from(filters);
+    final response = await run(
+      () => api.workers({...activeFilters, 'page': nextPage}),
+    );
     if (response == null) return;
     contactCounts = response['contact_counts'] is Map
         ? Json.from(response['contact_counts'])
@@ -51,10 +71,18 @@ class WorkersController extends BaseController {
     final wrapper = response['workers'];
     total = wrapper is Map ? asInt(wrapper['total']) : 0;
     final rows = wrapper is Map ? wrapper['data'] as List? : null;
-    items = (rows ?? const [])
+    final incoming = (rows ?? const [])
         .whereType<Map>()
         .map((e) => WorkerProfile.fromJson(Map<String, dynamic>.from(e)))
         .toList();
+    items = more ? [...items, ...incoming] : incoming;
+    page = wrapper is Map && asInt(wrapper['current_page']) > 0
+        ? asInt(wrapper['current_page'])
+        : nextPage;
+    lastPage = wrapper is Map && asInt(wrapper['last_page']) > 0
+        ? asInt(wrapper['last_page'])
+        : page;
+    _filters = Map<String, dynamic>.from(activeFilters);
     access = response['access'] is Map
         ? Map<String, dynamic>.from(response['access'])
         : {};

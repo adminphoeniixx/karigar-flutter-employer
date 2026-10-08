@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import '../l10n/worker_translations.dart';
+import 'app_scope.dart';
 
 /// UI translations for employer-facing, fixed app labels. Dynamic API data
 /// (jobs, names, skills) is intentionally left untouched.
@@ -7,8 +8,11 @@ class AppStrings {
   const AppStrings._();
 
   static String text(BuildContext context, String source) {
-    final language = Localizations.localeOf(context).languageCode;
+    final language =
+        AppScope.maybeOf(context)?.appLanguage.locale.languageCode ??
+        Localizations.localeOf(context).languageCode;
     if (language == 'en') return source;
+    if (language == 'hinglish') return _hinglish[source] ?? source;
     // Reuse the complete, proven catalogue used in the worker app, then let
     // employer-only copy override it.
     return _employerHi[source] ??
@@ -86,6 +90,47 @@ class AppStrings {
     'Email': 'ईमेल',
     'Later': 'बाद में',
     'Load more': 'और दिखाएं',
+  };
+
+  // Hinglish keeps familiar business terms in English and presents common app
+  // actions in Roman Hindi. Text without a curated equivalent stays English,
+  // so changing language never makes an action harder to understand.
+  static const _hinglish = <String, String>{
+    'Settings': 'Settings',
+    'Preferences': 'Pasand',
+    'Language': 'Bhasha',
+    'Choose language': 'Bhasha chunein',
+    'Dark theme': 'Dark theme',
+    'Applicant alerts': 'Applicant alerts',
+    'Message alerts': 'Message alerts',
+    'Account & Security': 'Account aur security',
+    'Login & security': 'Login aur security',
+    'Help & Support': 'Madad aur support',
+    'Log out': 'Log out',
+    'Home': 'Home',
+    'Post': 'Post karein',
+    'Workers': 'Karigar',
+    'Profile': 'Profile',
+    'Find Workers': 'Karigar khojein',
+    'Find karigars': 'Karigar khojein',
+    'Search skill, trade, name...': 'Skill, kaam ya naam khojein...',
+    'All': 'Sabhi',
+    'Apply': 'Laagu karein',
+    'Apply filters': 'Filters laagu karein',
+    'Clear filters': 'Filters hataein',
+    'My Jobs': 'Meri jobs',
+    'Post Job': 'Job post karein',
+    'Business Profile': 'Business profile',
+    'Edit Business Profile': 'Business profile badlein',
+    'Shortlisted Workers': 'Shortlist kiye karigar',
+    'Reviews & Ratings': 'Reviews aur ratings',
+    'Plans & Worker Database': 'Plans aur worker database',
+    'Order History': 'Order history',
+    'Invoices': 'Invoices',
+    'Retry': 'Dobara try karein',
+    'Save': 'Save karein',
+    'Cancel': 'Cancel',
+    'Continue': 'Aage badhein',
   };
 
   static const _hi = <String, String>{

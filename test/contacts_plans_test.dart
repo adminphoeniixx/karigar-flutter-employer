@@ -169,6 +169,41 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('worker directory automatically appends the next server page', (
+    tester,
+  ) async {
+    final requests = <Uri>[];
+    final api = service((request) async {
+      requests.add(request.url);
+      final page = request.url.queryParameters['page'] ?? '1';
+      if (request.url.path.endsWith('/reference')) {
+        return jsonResponse({'job_categories': []});
+      }
+      return jsonResponse({
+        'workers': {
+          'data': [
+            {
+              'id': int.parse(page),
+              'user_id': int.parse(page),
+              'name': 'Directory worker $page',
+              'skills': ['Weaving'],
+            },
+          ],
+          'total': 2,
+          'current_page': int.parse(page),
+          'last_page': 2,
+        },
+      });
+    });
+    await tester.pumpWidget(harness(api, const WorkersScreen()));
+    await tester.pumpAndSettle();
+    expect(find.text('Directory worker 1'), findsOneWidget);
+    expect(requests.last.queryParameters['page'], '2');
+    expect(find.text('Directory worker 1'), findsOneWidget);
+    expect(find.text('Directory worker 2'), findsOneWidget);
+    expect(find.text('Load more'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('directory unlock refreshes contact and counts', (tester) async {
     bool unlocked = false;
     final api = service((request) async {
