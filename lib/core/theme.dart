@@ -27,10 +27,90 @@ abstract final class AppColors {
 }
 
 abstract final class AppTheme {
+  // Keep the visual hierarchy compact and predictable across every screen.
+  // Individual screens may still opt into a larger style for a true hero title.
+  static TextTheme _standardTextTheme(TextTheme base) => base.copyWith(
+    displayLarge: base.displayLarge?.copyWith(
+      fontSize: 32,
+      fontWeight: FontWeight.w700,
+    ),
+    displayMedium: base.displayMedium?.copyWith(
+      fontSize: 28,
+      fontWeight: FontWeight.w700,
+    ),
+    displaySmall: base.displaySmall?.copyWith(
+      fontSize: 24,
+      fontWeight: FontWeight.w700,
+    ),
+    headlineLarge: base.headlineLarge?.copyWith(
+      fontSize: 24,
+      fontWeight: FontWeight.w700,
+    ),
+    headlineMedium: base.headlineMedium?.copyWith(
+      fontSize: 22,
+      fontWeight: FontWeight.w700,
+    ),
+    headlineSmall: base.headlineSmall?.copyWith(
+      fontSize: 20,
+      fontWeight: FontWeight.w700,
+    ),
+    titleLarge: base.titleLarge?.copyWith(
+      fontSize: 18,
+      fontWeight: FontWeight.w700,
+    ),
+    titleMedium: base.titleMedium?.copyWith(
+      fontSize: 16,
+      fontWeight: FontWeight.w600,
+    ),
+    titleSmall: base.titleSmall?.copyWith(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+    ),
+    bodyLarge: base.bodyLarge?.copyWith(fontSize: 16),
+    bodyMedium: base.bodyMedium?.copyWith(fontSize: 14),
+    bodySmall: base.bodySmall?.copyWith(fontSize: 12),
+    labelLarge: base.labelLarge?.copyWith(
+      fontSize: 14,
+      fontWeight: FontWeight.w600,
+    ),
+    labelMedium: base.labelMedium?.copyWith(
+      fontSize: 12,
+      fontWeight: FontWeight.w600,
+    ),
+  );
+
+  static ButtonStyle _filledButtonStyle(TextTheme text) =>
+      FilledButton.styleFrom(
+        minimumSize: const Size(64, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        textStyle: text.labelLarge,
+        disabledBackgroundColor: AppColors.line,
+        disabledForegroundColor: AppColors.muted2,
+      );
+
+  static ButtonStyle _outlinedButtonStyle(
+    TextTheme text, {
+    Color foreground = AppColors.foreground,
+    Color side = AppColors.line,
+  }) => OutlinedButton.styleFrom(
+    minimumSize: const Size(64, 44),
+    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+    foregroundColor: foreground,
+    side: BorderSide(color: side),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    textStyle: text.labelLarge,
+    disabledForegroundColor: AppColors.muted2,
+  );
+
   static ThemeData get light {
-    final text = GoogleFonts.outfitTextTheme().apply(
-      bodyColor: AppColors.foreground,
-      displayColor: AppColors.foreground,
+    final text = _standardTextTheme(
+      GoogleFonts.outfitTextTheme().apply(
+        bodyColor: AppColors.foreground,
+        displayColor: AppColors.foreground,
+      ),
     );
     return ThemeData(
       useMaterial3: true,
@@ -75,33 +155,9 @@ abstract final class AppTheme {
           borderSide: const BorderSide(color: AppColors.brand400),
         ),
       ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          // Keep the global button width finite so buttons remain valid inside
-          // Rows, dialog action bars, and list-card trailing areas. Parents
-          // that provide tight width constraints still render full-width.
-          minimumSize: const Size(64, 50),
-          backgroundColor: AppColors.primary,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          textStyle: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-          disabledBackgroundColor: AppColors.line,
-          disabledForegroundColor: AppColors.muted2,
-        ),
-      ),
+      filledButtonTheme: FilledButtonThemeData(style: _filledButtonStyle(text)),
       outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(64, 50),
-          foregroundColor: AppColors.foreground,
-          side: const BorderSide(color: AppColors.line),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-          textStyle: text.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-          disabledForegroundColor: AppColors.muted2,
-        ),
+        style: _outlinedButtonStyle(text),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
@@ -123,9 +179,11 @@ abstract final class AppTheme {
   }
 
   static ThemeData get dark {
-    final text = GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).apply(
-      bodyColor: const Color(0xFFF6EFE8),
-      displayColor: const Color(0xFFF6EFE8),
+    final text = _standardTextTheme(
+      GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme).apply(
+        bodyColor: const Color(0xFFF6EFE8),
+        displayColor: const Color(0xFFF6EFE8),
+      ),
     );
     return ThemeData(
       useMaterial3: true,
@@ -148,6 +206,30 @@ abstract final class AppTheme {
         titleTextStyle: text.titleMedium?.copyWith(
           fontSize: 18,
           fontWeight: FontWeight.w700,
+        ),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFF201A16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
+        hintStyle: text.bodyMedium?.copyWith(color: const Color(0xFFB8AAA0)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      filledButtonTheme: FilledButtonThemeData(style: _filledButtonStyle(text)),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: _outlinedButtonStyle(
+          text,
+          foreground: const Color(0xFFF6EFE8),
+          side: const Color(0xFF3B312B),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          textStyle: text.labelLarge,
+          foregroundColor: const Color(0xFFFFB39A),
         ),
       ),
       cardTheme: CardThemeData(

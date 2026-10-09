@@ -162,7 +162,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
       appBar: AppBar(
         toolbarHeight: 58,
         title: const Text(
-          'Find Workers',
+          'Karigars',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
         actions: [
@@ -191,29 +191,30 @@ class _WorkersScreenState extends State<WorkersScreen> {
             ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
-          child: SafeArea(
-            top: false,
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.all(8),
-              child: Row(
-                children: [
-                  for (final entry in [
-                    'Find karigars',
-                    'Database contacts (${contactCounts['database_total'] ?? 0})',
-                    'Applicant contacts (${contactCounts['applicants_total'] ?? 0})',
-                  ].asMap().entries)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(entry.value),
-                        selected: tab == entry.key,
-                        onSelected: (_) => setState(() => tab = entry.key),
-                      ),
-                    ),
-                ],
-              ),
+          preferredSize: const Size.fromHeight(52),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+            child: Row(
+              children: [
+                _DirectoryTab(
+                  label: 'Find',
+                  selected: tab == 0,
+                  onSelected: () => setState(() => tab = 0),
+                ),
+                const SizedBox(width: 7),
+                _DirectoryTab(
+                  label: 'Database (${contactCounts['database_total'] ?? 0})',
+                  selected: tab == 1,
+                  onSelected: () => setState(() => tab = 1),
+                ),
+                const SizedBox(width: 7),
+                _DirectoryTab(
+                  label:
+                      'Applicants (${contactCounts['applicants_total'] ?? 0})',
+                  selected: tab == 2,
+                  onSelected: () => setState(() => tab = 2),
+                ),
+              ],
             ),
           ),
         ),
@@ -335,13 +336,17 @@ class _WorkersScreenState extends State<WorkersScreen> {
                           ),
                         ),
                       Text(
-                        '${controller.total == 0 ? visible.length : controller.total} workers found',
+                        '${controller.total == 0 ? visible.length : controller.total} karigar found',
                         style: const TextStyle(
                           color: AppColors.muted,
                           fontSize: 11.5,
                         ),
                       ),
                       const SizedBox(height: 11),
+                      if (visible.isEmpty &&
+                          !controller.loading &&
+                          controller.error == null)
+                        const _EmptyWorkerResults(),
                       ...visible.map(
                         (item) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
@@ -418,6 +423,82 @@ class _WorkersScreenState extends State<WorkersScreen> {
     });
     await _search(selectedCategory: selectedCategory);
   }
+}
+
+class _DirectoryTab extends StatelessWidget {
+  const _DirectoryTab({
+    required this.label,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onSelected;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: ChoiceChip(
+      label: SizedBox(
+        width: double.infinity,
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
+        ),
+      ),
+      selected: selected,
+      showCheckmark: false,
+      onSelected: (_) => onSelected(),
+      selectedColor: AppColors.primary,
+      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      side: BorderSide(
+        color: selected
+            ? AppColors.primary
+            : Theme.of(context).colorScheme.outlineVariant,
+      ),
+      labelStyle: TextStyle(
+        color: selected
+            ? Colors.white
+            : Theme.of(context).colorScheme.onSurfaceVariant,
+        fontSize: 11.5,
+        fontWeight: FontWeight.w600,
+      ),
+      padding: EdgeInsets.zero,
+    ),
+  );
+}
+
+class _EmptyWorkerResults extends StatelessWidget {
+  const _EmptyWorkerResults();
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 48),
+    child: Center(
+      child: Column(
+        children: [
+          Icon(
+            LucideIcons.usersRound,
+            size: 34,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'No karigars found',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 5),
+          const Text(
+            'Try changing your search or filters.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.muted, fontSize: 12.5),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _WorkerView {
@@ -512,7 +593,12 @@ class _WorkerResultCard extends StatelessWidget {
                         ],
                       ),
                       Text(
-                        '${data.worker.trade} · ${data.experience} yrs · ★ ${data.rating} (${data.reviews})',
+                        [
+                          data.worker.trade,
+                          '${data.experience} yrs',
+                          if (data.reviews > 0)
+                            '★ ${data.rating} (${data.reviews})',
+                        ].join(' · '),
                         style: const TextStyle(
                           color: AppColors.muted,
                           fontSize: 11,
@@ -536,15 +622,17 @@ class _WorkerResultCard extends StatelessWidget {
                               fontSize: 11.5,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          Text(
-                            monthlyWage(data.wage),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                          if (data.wage > 0) ...[
+                            const SizedBox(width: 12),
+                            Text(
+                              monthlyWage(data.wage),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
+                            const SizedBox(width: 8),
+                          ],
                           if (data.profile.available)
                             const Text(
                               '● Available',
@@ -571,16 +659,40 @@ class _WorkerResultCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             if (data.profile.contactUnlocked) ...[
-              Text(data.profile.phone ?? 'Contact unlocked'),
+              const Divider(height: 18),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.phone_outlined,
+                    size: 16,
+                    color: AppColors.muted,
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      data.profile.phone ?? 'Contact unlocked',
+                      style: const TextStyle(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
               ContactActions(
                 phone: data.profile.phone,
                 email: data.profile.email,
+                expanded: true,
               ),
             ] else if (data.profile.canUnlock)
-              FilledButton.icon(
-                onPressed: busy ? null : onUnlock,
-                icon: const Icon(Icons.lock_open, size: 18),
-                label: Text(busy ? 'Unlocking…' : 'Unlock contact'),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: busy ? null : onUnlock,
+                  icon: const Icon(Icons.lock_open, size: 18),
+                  label: Text(busy ? 'Unlocking…' : 'Unlock contact'),
+                ),
               )
             else
               const Text('Contact locked · view profile for plan access'),
@@ -838,7 +950,7 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
                       maxWageController.clear();
                     }),
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
+                      minimumSize: const Size.fromHeight(44),
                       foregroundColor: AppColors.foreground,
                       side: const BorderSide(color: AppColors.line),
                       shape: RoundedRectangleBorder(
@@ -868,7 +980,7 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
                       'sort': sort,
                     }),
                     style: FilledButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
+                      minimumSize: const Size.fromHeight(44),
                     ),
                     child: const Text('Apply'),
                   ),

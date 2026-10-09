@@ -858,7 +858,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           child: OutlinedButton(
                             onPressed: loading ? null : () => _submit('draft'),
                             style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(50),
+                              minimumSize: const Size.fromHeight(44),
                               foregroundColor: colors.onSurface,
                               side: BorderSide(color: colors.outlineVariant),
                             ),

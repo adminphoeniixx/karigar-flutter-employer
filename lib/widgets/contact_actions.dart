@@ -19,8 +19,14 @@ Future<void> showContactError(BuildContext context, Object error) async {
 }
 
 class ContactActions extends StatelessWidget {
-  const ContactActions({super.key, this.phone, this.email});
+  const ContactActions({
+    super.key,
+    this.phone,
+    this.email,
+    this.expanded = false,
+  });
   final String? phone, email;
+  final bool expanded;
   Future<void> _open(BuildContext context, Uri uri) async {
     try {
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -37,6 +43,44 @@ class ContactActions extends StatelessWidget {
   Widget build(BuildContext context) {
     var digits = (phone ?? '').replaceAll(RegExp(r'\D'), '');
     if (digits.length == 10) digits = '91$digits';
+    if (expanded && digits.isNotEmpty) {
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () =>
+                      _open(context, Uri(scheme: 'tel', path: '+$digits')),
+                  icon: const Icon(Icons.call, size: 17),
+                  label: const Text('Call'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () =>
+                      _open(context, Uri.https('wa.me', '/$digits')),
+                  child: const Text('WhatsApp'),
+                ),
+              ),
+            ],
+          ),
+          if (email?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    _open(context, Uri(scheme: 'mailto', path: email)),
+                icon: const Icon(Icons.email_outlined, size: 17),
+                label: const Text('Email'),
+              ),
+            ),
+          ],
+        ],
+      );
+    }
     return Wrap(
       spacing: 8,
       runSpacing: 8,

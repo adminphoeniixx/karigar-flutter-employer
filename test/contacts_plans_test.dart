@@ -242,7 +242,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(unlocked, isTrue);
     expect(find.text('9876543210'), findsOneWidget);
-    expect(find.text('Database contacts (1)'), findsOneWidget);
+    expect(find.text('Database (1)'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

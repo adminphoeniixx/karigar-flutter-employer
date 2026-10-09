@@ -243,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       );
                     },
                     style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
+                      minimumSize: const Size.fromHeight(44),
                       backgroundColor: Theme.of(context).colorScheme.surface,
                       foregroundColor: Theme.of(context).colorScheme.error,
                       side: BorderSide(

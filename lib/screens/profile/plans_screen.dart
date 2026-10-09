@@ -4,7 +4,6 @@ import '../../core/api/api_exception.dart';
 import 'package:employer_kariger_app/core/analytics/meta_analytics.dart';
 import '../../core/billing/billing.dart';
 import '../../models/api_models.dart';
-import 'profile_edit_screen.dart';
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:flutter/services.dart';
@@ -13,7 +12,6 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
-import 'package:employer_kariger_app/screens/profile/order_history_screen.dart';
 import 'package:employer_kariger_app/screens/profile/payment_success_screen.dart';
 
 class PlansScreen extends StatefulWidget {
@@ -389,19 +387,7 @@ class _PlansScreenState extends State<PlansScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(
-      title: const Text('Plans & Worker Database'),
-      actions: [
-        IconButton(
-          tooltip: 'Order history',
-          icon: const Icon(LucideIcons.receiptText),
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const OrderHistoryScreen()),
-          ),
-        ),
-      ],
-    ),
+    appBar: AppBar(title: const Text('Plans & Worker Database')),
     body: loading && plans.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : error != null && plans.isEmpty
@@ -420,7 +406,7 @@ class _PlansScreenState extends State<PlansScreen> {
               ),
               children: [
                 Container(
-                  padding: const EdgeInsets.all(18),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [AppColors.primary, AppColors.gradientEnd],
@@ -432,9 +418,9 @@ class _PlansScreenState extends State<PlansScreen> {
                       const Icon(
                         LucideIcons.walletCards,
                         color: Colors.white,
-                        size: 34,
+                        size: 28,
                       ),
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,7 +432,7 @@ class _PlansScreenState extends State<PlansScreen> {
                                       : '${unlocks['plan_remaining'] ?? 0} unlocks'),
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 24,
+                                fontSize: 18,
                                 fontWeight: FontWeight.w700,
                               ),
                             ),
@@ -474,36 +460,9 @@ class _PlansScreenState extends State<PlansScreen> {
                   ),
                 if (jobPosts != null && jobPosts!['unlimited'] != true)
                   Padding(
-                    padding: const EdgeInsets.only(top: 12),
+                    padding: const EdgeInsets.only(top: 12,bottom: 12),
                     child: Text(_usageLabel(context)),
                   ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Billing profile'),
-                  subtitle: const Text(
-                    'Add GSTIN and state for correct GST, and your email to receive invoices.',
-                  ),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ProfileEditScreen(),
-                    ),
-                  ),
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(LucideIcons.receiptText),
-                  title: const Text('Order history'),
-                  subtitle: const Text('Payments, renewals and tax invoices'),
-                  trailing: const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const OrderHistoryScreen(),
-                    ),
-                  ),
-                ),
                 _ActivePlanBanner(plans: plans),
                 const SizedBox(height: 26),
                 _PlanSection(
@@ -653,7 +612,7 @@ class _PlanSection extends StatelessWidget {
   );
 }
 
-class _Plan extends StatelessWidget {
+class _Plan extends StatefulWidget {
   const _Plan({
     required this.plan,
     required this.onChoose,
@@ -668,12 +627,24 @@ class _Plan extends StatelessWidget {
   final bool available, canPurchase, selected;
 
   @override
+  State<_Plan> createState() => _PlanState();
+}
+
+class _PlanState extends State<_Plan> {
+  bool showAllFeatures = false;
+
+  @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final plan = widget.plan;
     final featureLabels = (plan['feature_list'] as List? ?? const [])
-        .whereType<String>();
+        .whereType<String>()
+        .toList();
+    final visibleFeatures = showAllFeatures
+        ? featureLabels
+        : featureLabels.take(3).toList();
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colors.surface,
         borderRadius: BorderRadius.circular(16),
@@ -687,8 +658,6 @@ class _Plan extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (plan['recommended'] == true)
-            const Chip(label: Text('Recommended')),
           if (plan['is_current'] == true)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -701,6 +670,22 @@ class _Plan extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          if (plan['recommended'] == true && plan['is_current'] != true)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.brand50,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: const Text(
+                'RECOMMENDED',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: AppColors.brandDark,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -721,7 +706,7 @@ class _Plan extends StatelessWidget {
               Text(
                 '₹${plan['price'] ?? 0}',
                 style: const TextStyle(
-                  fontSize: 28,
+                  fontSize: 24,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -731,13 +716,13 @@ class _Plan extends StatelessWidget {
             '${plan['interval'] ?? ''}',
             style: TextStyle(color: colors.onSurfaceVariant),
           ),
-          if (gstPercent > 0 &&
+          if (widget.gstPercent > 0 &&
               asDouble(plan['price_with_gst']) > asDouble(plan['price']))
             Text(
-              '+ ${percent(gstPercent)}% GST · ${money(plan['price_with_gst'])} total',
+              '+ ${percent(widget.gstPercent)}% GST · ${money(plan['price_with_gst'])} total',
             ),
           const SizedBox(height: 12),
-          ...featureLabels.map(
+          ...visibleFeatures.map(
             (feature) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
@@ -753,6 +738,23 @@ class _Plan extends StatelessWidget {
               ),
             ),
           ),
+          if (featureLabels.length > 3)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                onPressed: () =>
+                    setState(() => showAllFeatures = !showAllFeatures),
+                style: TextButton.styleFrom(
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.only(top: 4, bottom: 2),
+                ),
+                child: Text(
+                  showAllFeatures
+                      ? 'Show fewer features'
+                      : '+ ${featureLabels.length - 3} more features',
+                ),
+              ),
+            ),
           const SizedBox(height: 14),
           if (plan['already_purchased'] == true) ...[
             Text(
@@ -761,27 +763,32 @@ class _Plan extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          FilledButton(
-            onPressed: selected || !canPurchase ? null : onChoose,
-            child: selected
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: widget.selected || !widget.canPurchase
+                  ? null
+                  : widget.onChoose,
+              child: widget.selected
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : Text(
+                      plan['is_current'] == true &&
+                              plan['already_purchased'] != true
+                          ? 'Current plan'
+                          : plan['already_purchased'] == true
+                          ? 'Already purchased'
+                          : !widget.available
+                          ? 'Unavailable'
+                          : 'Choose ${plan['name'] ?? ''}',
                     ),
-                  )
-                : Text(
-                    plan['is_current'] == true &&
-                            plan['already_purchased'] != true
-                        ? 'Current plan'
-                        : plan['already_purchased'] == true
-                        ? 'Already purchased'
-                        : !available
-                        ? 'Unavailable'
-                        : 'Choose ${plan['name'] ?? ''}',
-                  ),
+            ),
           ),
         ],
       ),

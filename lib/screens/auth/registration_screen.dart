@@ -554,7 +554,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 child: OutlinedButton(
                   onPressed: loading ? null : _saveAndFinish,
                   style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(50),
+                    minimumSize: const Size.fromHeight(44),
                     foregroundColor: AppColors.foreground,
                     side: const BorderSide(color: AppColors.line),
                     shape: RoundedRectangleBorder(

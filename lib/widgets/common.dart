@@ -95,9 +95,15 @@ class StatusPill extends StatelessWidget {
 }
 
 class WorkerCard extends StatelessWidget {
-  const WorkerCard({super.key, required this.worker, this.onTap});
+  const WorkerCard({
+    super.key,
+    required this.worker,
+    this.onTap,
+    this.maxSkills = 4,
+  });
   final Worker worker;
   final VoidCallback? onTap;
+  final int maxSkills;
   @override
   Widget build(BuildContext context) => Card(
     child: InkWell(
@@ -151,20 +157,30 @@ class WorkerCard extends StatelessWidget {
                             ],
                           ),
                           Text(
-                            '${worker.trade} · ${worker.experience} yrs exp · ★ ${worker.rating}',
+                            [
+                              worker.trade,
+                              '${worker.experience} yrs exp',
+                              if (worker.rating > 0) '★ ${worker.rating}',
+                            ].join(' · '),
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.muted,
                             ),
                           ),
-                          const SizedBox(height: 5),
-                          Text(
-                            '⌖ ${worker.distance} km     ${monthlyWage(worker.wage)}',
-                            style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
+                          if (worker.distance > 0 || worker.wage > 0) ...[
+                            const SizedBox(height: 5),
+                            Text(
+                              [
+                                if (worker.distance > 0)
+                                  '⌖ ${worker.distance.toStringAsFixed(1)} km',
+                                if (worker.wage > 0) monthlyWage(worker.wage),
+                              ].join('     '),
+                              style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
-                          ),
+                          ],
                         ],
                       ),
                     ),
@@ -182,9 +198,16 @@ class WorkerCard extends StatelessWidget {
                 Wrap(
                   spacing: 6,
                   runSpacing: 6,
-                  children: worker.skills
-                      .map((s) => BrandChip(s, neutral: true))
-                      .toList(),
+                  children: [
+                    ...worker.skills
+                        .take(maxSkills)
+                        .map((s) => BrandChip(s, neutral: true)),
+                    if (worker.skills.length > maxSkills)
+                      BrandChip(
+                        '+${worker.skills.length - maxSkills} more',
+                        neutral: true,
+                      ),
+                  ],
                 ),
               ],
             );

@@ -160,35 +160,36 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     final details = profile;
     final languages = details?.languages ?? const <String>[];
     return Scaffold(
-      appBar: AppBar(title: const Text('Worker Profile')),
+      appBar: AppBar(title: const Text('Karigar Profile')),
       body: loadingProfile
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
                       colors: [AppColors.primary, AppColors.gradientEnd],
                     ),
                   ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
                           CircleAvatar(
-                            radius: 33,
+                            radius: 28,
                             backgroundColor: AppColors.brand100,
                             child: Text(
                               w.initials,
                               style: const TextStyle(
-                                fontSize: 24,
+                                fontSize: 20,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.brandDark,
                               ),
                             ),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,7 +198,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   w.name,
                                   style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 20,
+                                    fontSize: 18,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -209,35 +210,53 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 5),
-                                Text(
-                                  '⌖ ${details?.city ?? 'Location unavailable'}'
-                                  '${w.distance > 0 ? ' · ${w.distance} km' : ''}'
-                                  '   ★ ${details?.rating.average ?? w.rating}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                  ),
+                                Wrap(
+                                  spacing: 10,
+                                  runSpacing: 4,
+                                  children: [
+                                    Text(
+                                      '${details?.city ?? 'Location unavailable'}'
+                                      '${w.distance > 0 ? ' · ${w.distance.toStringAsFixed(1)} km' : ''}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    if ((details?.rating.count ?? 0) > 0)
+                                      Text(
+                                        '★ ${details!.rating.average.toStringAsFixed(1)}',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                               ],
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 14),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          if (AppScope.of(
-                                    context,
-                                  ).dashboard.data?.workerVerificationEnabled !=
-                                  false &&
-                              details?.verified == true)
-                            const StatusPill('Verified'),
-                          if (details?.available == true)
-                            const BrandChip('● Available'),
-                          BrandChip(monthlyWage(w.wage)),
-                        ],
+                      const SizedBox(height: 12),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            if (AppScope.of(context)
+                                        .dashboard
+                                        .data
+                                        ?.workerVerificationEnabled !=
+                                    false &&
+                                details?.verified == true)
+                              const StatusPill('Verified'),
+                            if (details?.available == true)
+                              const BrandChip('● Available'),
+                            if (w.wage > 0) BrandChip(monthlyWage(w.wage)),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -250,92 +269,105 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                       Card(
                         child: Padding(
                           padding: const EdgeInsets.all(14),
-                          child: Row(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: AppColors.brand50,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  LucideIcons.phone,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    const Text(
-                                      'Phone number',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: AppColors.muted,
-                                      ),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: AppColors.brand50,
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
-                                    Text(
-                                      unlocked && phone?.isNotEmpty == true
-                                          ? '+91 $phone'
-                                          : 'Contact locked',
-                                      style: const TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                    child: const Icon(
+                                      LucideIcons.phone,
+                                      color: AppColors.primary,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Contact number',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: AppColors.muted,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          unlocked && phone?.isNotEmpty == true
+                                              ? '+91 $phone'
+                                              : 'Contact locked',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                              if (widget.onUnlock != null ||
-                                  details?.canUnlock == true)
-                                TextButton(
-                                  onPressed: unlocked || busy ? null : _unlock,
-                                  child: Text(
-                                    unlocked ? 'Unlocked' : 'Unlock contact',
+                              if (!unlocked &&
+                                  (widget.onUnlock != null ||
+                                      details?.canUnlock == true)) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton.icon(
+                                    onPressed: busy ? null : _unlock,
+                                    icon: const Icon(LucideIcons.lockOpen),
+                                    label: Text(
+                                      busy ? 'Unlocking…' : 'Unlock contact',
+                                    ),
                                   ),
                                 ),
+                              ],
+                              if (!unlocked &&
+                                  widget.onUnlock == null &&
+                                  details?.canUnlock != true) ...[
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) => const PlansScreen(
+                                          focusDatabase: true,
+                                        ),
+                                      ),
+                                    ),
+                                    icon: const Icon(
+                                      LucideIcons.badgeIndianRupee,
+                                    ),
+                                    label: const Text('View database plans'),
+                                  ),
+                                ),
+                              ],
+                              if (unlocked) ...[
+                                const Divider(height: 24),
+                                ContactActions(
+                                  phone: phone,
+                                  email: details?.email,
+                                  expanded: true,
+                                ),
+                              ],
                             ],
                           ),
                         ),
                       ),
-                      if (unlocked) ...[
-                        const SizedBox(height: 10),
-                        ContactActions(phone: phone, email: details?.email),
-                      ],
-                      if (!unlocked &&
-                          widget.onUnlock == null &&
-                          details?.canUnlock != true) ...[
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 48,
-                          child: OutlinedButton.icon(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const PlansScreen(focusDatabase: true),
-                              ),
-                            ),
-                            icon: const Icon(LucideIcons.badgeIndianRupee),
-                            label: const Text('Buy Database'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.primary,
-                              side: const BorderSide(color: AppColors.brand200),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(13),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
                       const SectionTitle('About'),
                       Text(
                         details?.bio.isNotEmpty == true
                             ? details!.bio
-                            : 'Worker profile details are not available.',
+                            : 'Karigar profile details are not available.',
                         style: const TextStyle(fontSize: 14.5, height: 1.55),
                       ),
                       const SectionTitle('Skills'),
@@ -365,9 +397,12 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                     child: _InfoTile(
                                       icon: LucideIcons.indianRupee,
                                       label: 'Expected wage',
-                                      value: monthlyWage(
-                                        details?.expectedWage ?? w.wage,
-                                      ),
+                                      value:
+                                          (details?.expectedWage ?? w.wage) > 0
+                                          ? monthlyWage(
+                                              details?.expectedWage ?? w.wage,
+                                            )
+                                          : 'Not disclosed',
                                     ),
                                   ),
                                 ],

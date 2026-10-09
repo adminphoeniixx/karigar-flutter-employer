@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import '../../core/app_scope.dart';
 import '../../core/data.dart';
+import '../../core/theme.dart';
 import '../../models/api_models.dart';
 import '../../widgets/common.dart';
 import '../../widgets/contact_actions.dart';
@@ -403,11 +404,33 @@ class _ContactsViewState extends State<ContactsView> {
                         ).map((s) => BrandChip(s, neutral: true)).toList(),
                       ),
                       const SizedBox(height: 8),
-                      if (row['phone'] != null)
-                        SelectableText('${row['phone']}'),
+                      if (row['phone'] != null) ...[
+                        const Divider(height: 18),
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.phone_outlined,
+                              size: 16,
+                              color: AppColors.muted,
+                            ),
+                            const SizedBox(width: 7),
+                            Expanded(
+                              child: SelectableText(
+                                '${row['phone']}',
+                                style: const TextStyle(
+                                  fontSize: 13.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       ContactActions(
                         phone: row['phone']?.toString(),
                         email: row['email']?.toString(),
+                        expanded: true,
                       ),
                       TextButton(
                         onPressed: () => _open(row),

@@ -83,7 +83,7 @@ class _BottomNav extends StatelessWidget {
     (LucideIcons.house, 'Home'),
     (LucideIcons.briefcaseBusiness, 'My Jobs'),
     (LucideIcons.plus, 'Post'),
-    (LucideIcons.usersRound, 'Workers'),
+    (LucideIcons.usersRound, 'Karigars'),
     (LucideIcons.building2, 'Profile'),
   ];
 

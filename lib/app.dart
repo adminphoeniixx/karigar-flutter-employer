@@ -154,8 +154,10 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
         // Apply a user-selected theme immediately instead.
         themeAnimationDuration: Duration.zero,
         builder: (context, child) => MediaQuery.withClampedTextScaling(
-          minScaleFactor: 0.9,
-          maxScaleFactor: 1.3,
+          // Use the app's designed type scale so system accessibility scaling
+          // cannot make individual labels or controls disproportionate.
+          minScaleFactor: 1.0,
+          maxScaleFactor: 1.0,
           child: child!,
         ),
         home: !ready

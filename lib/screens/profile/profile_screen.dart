@@ -105,7 +105,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onPressed: () =>
                             _open(const ProfileEditScreen(), refresh: true),
                         style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(48),
+                          minimumSize: const Size.fromHeight(44),
                           foregroundColor: Theme.of(
                             context,
                           ).colorScheme.primary,

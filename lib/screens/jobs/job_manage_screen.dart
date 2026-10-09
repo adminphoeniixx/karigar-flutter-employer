@@ -23,6 +23,133 @@ class JobManageScreen extends StatefulWidget {
   State<JobManageScreen> createState() => _JobManageScreenState();
 }
 
+class _JobSummaryCard extends StatelessWidget {
+  const _JobSummaryCard({required this.job});
+
+  final Job job;
+
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [BrandChip(job.category), StatusPill(job.status)],
+          ),
+          const SizedBox(height: 11),
+          Text(
+            job.title,
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 5),
+          Row(
+            children: [
+              const Icon(
+                LucideIcons.indianRupee,
+                size: 15,
+                color: AppColors.muted,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  job.wage,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.muted,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(
+                LucideIcons.usersRound,
+                size: 15,
+                color: AppColors.muted,
+              ),
+              const SizedBox(width: 4),
+              Text(
+                '${job.openings} opening${job.openings == 1 ? '' : 's'}',
+                style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
+              ),
+            ],
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _JobMetrics extends StatelessWidget {
+  const _JobMetrics({required this.values});
+
+  final List<(String, int, IconData)> values;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final width = (constraints.maxWidth - 8) / 2;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: values
+            .map(
+              (item) => SizedBox(
+                width: width,
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(item.$3, size: 17, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.$1,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${item.$2}',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      );
+    },
+  );
+}
+
 class _JobManageScreenState extends State<JobManageScreen> {
   bool loading = true;
   String? error;
@@ -344,76 +471,15 @@ class _JobManageScreenState extends State<JobManageScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Row(
-            children: [
-              BrandChip(job.category),
-              const SizedBox(width: 7),
-              StatusPill(job.status),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Text(
-            job.title,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-          Text(
-            '${job.wage} · ${job.openings} openings · Posted 2d ago',
-            style: TextStyle(fontSize: 12.5, color: colors.onSurfaceVariant),
-          ),
+          _JobSummaryCard(job: job),
           const SectionTitle('Performance'),
-          ...[
-            ('Views', 124),
-            ('Applied', job.applied),
-            ('Shortlisted', job.shortlisted),
-            ('Interview', 3),
-            ('Hired', job.hired),
-          ].map(
-            (e) => Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: Stack(
-                children: [
-                  Container(
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  FractionallySizedBox(
-                    widthFactor: (e.$2 / 124).clamp(.07, 1),
-                    child: Container(
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: .25),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 36,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            e.$1,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            '${e.$2}',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          _JobMetrics(
+            values: [
+              ('Views', 124, LucideIcons.eye),
+              ('Applied', job.applied, LucideIcons.fileText),
+              ('Shortlisted', job.shortlisted, LucideIcons.bookmarkCheck),
+              ('Hired', job.hired, LucideIcons.circleCheck),
+            ],
           ),
           const SectionTitle('Applicants'),
           if (job.id != 0) ...[
@@ -429,33 +495,30 @@ class _JobManageScreenState extends State<JobManageScreen> {
             ),
             const SizedBox(height: 12),
           ],
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children:
-                  const [
-                    ('all', 'All'),
-                    ('pending', 'Pending'),
-                    ('shortlisted', 'Shortlisted'),
-                    ('interview', 'Interview'),
-                    ('hired', 'Hired'),
-                    ('rejected', 'Rejected'),
-                  ].map((item) {
-                    final selected = stage == item.$1;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 7),
-                      child: ChoiceChip(
-                        selected: selected,
-                        label: Text('${item.$2} (${counts[item.$1] ?? 0})'),
-                        onSelected: (_) {
-                          if (selected) return;
-                          setState(() => stage = item.$1);
-                          _load();
-                        },
-                      ),
-                    );
-                  }).toList(),
-            ),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children:
+                const [
+                  ('all', 'All'),
+                  ('pending', 'Pending'),
+                  ('shortlisted', 'Shortlisted'),
+                  ('interview', 'Interview'),
+                  ('hired', 'Hired'),
+                  ('rejected', 'Rejected'),
+                ].map((item) {
+                  final selected = stage == item.$1;
+                  return ChoiceChip(
+                    selected: selected,
+                    showCheckmark: false,
+                    label: Text('${item.$2} (${counts[item.$1] ?? 0})'),
+                    onSelected: (_) {
+                      if (selected) return;
+                      setState(() => stage = item.$1);
+                      _load();
+                    },
+                  );
+                }).toList(),
           ),
           const SizedBox(height: 12),
           if (loading)
@@ -514,6 +577,8 @@ class _JobManageScreenState extends State<JobManageScreen> {
                           '${applicant.ai?['recommendation'] ?? ''}',
                         ),
                       ),
+                    const SizedBox(height: 8),
+
                     if (applicant.resume != null)
                       SizedBox(
                         width: double.infinity,
