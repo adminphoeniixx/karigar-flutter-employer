@@ -78,7 +78,7 @@ class _MatchedWorkersScreenState extends State<MatchedWorkersScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Matched workers')),
+    appBar: AppBar(title: const Text('Matched karigars')),
     body: loading && rows.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : error != null && rows.isEmpty
@@ -95,7 +95,7 @@ class _MatchedWorkersScreenState extends State<MatchedWorkersScreen> {
                       Padding(
                         padding: EdgeInsets.all(24),
                         child: Text(
-                          'No matching workers are available right now.',
+                          'No matching karigars are available right now.',
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -206,11 +206,11 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
     'no_caller_id': 'No calling number is configured yet.',
     'application_closed': 'This application is closed.',
     'interview_already_scheduled': 'An interview is already scheduled.',
-    'no_phone_number': 'This worker has no phone number on file.',
-    'worker_opted_out': 'The worker opted out of automated calls.',
-    'worker_unavailable': 'This worker is not available for work right now.',
+    'no_phone_number': 'This karigar has no phone number on file.',
+    'worker_opted_out': 'The karigar opted out of automated calls.',
+    'worker_unavailable': 'This karigar is not available for work right now.',
     'call_in_progress': 'A screening call is already in progress.',
-    'already_screened': 'This worker has already been screened.',
+    'already_screened': 'This karigar has already been screened.',
   };
 
   @override
@@ -246,9 +246,53 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
 
   Future<void> _placeCall() async {
     try {
+      final action = await showModalBottomSheet<String>(
+        context: context,
+        builder: (context) => SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(LucideIcons.phoneCall),
+                title: const Text('Call now'),
+                subtitle: const Text('The AI will call the karigar now.'),
+                onTap: () => Navigator.pop(context, 'now'),
+              ),
+              ListTile(
+                leading: const Icon(LucideIcons.calendarDays),
+                title: const Text('Pick date and time'),
+                subtitle: const Text('Calls run between 10 AM and 7 PM IST.'),
+                onTap: () => Navigator.pop(context, 'schedule'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (action == null) return;
+      String? at;
+      if (action == 'schedule') {
+        final date = await showDatePicker(
+          context: context,
+          firstDate: DateTime.now(),
+          lastDate: DateTime.now().add(const Duration(days: 15)),
+        );
+        if (date == null || !mounted) return;
+        final time = await showTimePicker(
+          context: context,
+          initialTime: const TimeOfDay(hour: 10, minute: 0),
+        );
+        if (time == null) return;
+        at = DateTime(
+          date.year,
+          date.month,
+          date.day,
+          time.hour,
+          time.minute,
+        ).toIso8601String();
+      }
       final response = await AppScope.of(
         context,
-      ).api.placeScreeningCall(widget.applicantId);
+      ).api.placeScreeningCall(widget.applicantId, at: at);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${response['message'] ?? 'Call queued.'}')),
@@ -345,6 +389,20 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
                               FilledButton(
                                 onPressed: () => _confirm(call),
                                 child: const Text('Confirm interview'),
+                              ),
+                            ],
+                            if (call['can_cancel'] == true) ...[
+                              const SizedBox(height: 8),
+                              TextButton(
+                                onPressed: () async {
+                                  await AppScope.of(
+                                    context,
+                                  ).api.cancelScreeningCall(
+                                    (call['id'] as num).toInt(),
+                                  );
+                                  await _load();
+                                },
+                                child: const Text('Cancel booked call'),
                               ),
                             ],
                           ],

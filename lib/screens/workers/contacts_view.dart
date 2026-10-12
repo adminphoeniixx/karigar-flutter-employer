@@ -256,8 +256,8 @@ class _ContactsViewState extends State<ContactsView> {
       MaterialPageRoute(
         builder: (_) => WorkerProfileScreen(
           worker: Worker(
-            '${row['name'] ?? 'Worker'}',
-            skills.firstOrNull ?? 'Worker',
+            '${row['name'] ?? 'Karigar'}',
+            skills.firstOrNull ?? 'Karigar',
             asInt(row['experience_years']),
             0,
             0,
@@ -329,7 +329,7 @@ class _ContactsViewState extends State<ContactsView> {
                         ),
                       ] else ...[
                         Text(
-                          '${usage['plan']} · ${asInt(usage['limit']) == 0 ? 'Unlimited' : usage['limit']} contact unlocks per month',
+                          '${usage['plan']} · ${asInt(usage['limit']) == 0 ? 'Unlimited' : usage['limit']} database unlocks per month',
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 6),
@@ -367,7 +367,7 @@ class _ContactsViewState extends State<ContactsView> {
             const Padding(
               padding: EdgeInsets.all(32),
               child: Text(
-                'No contacts found. Try changing your filters or unlock a worker contact.',
+                'No contacts found. Try changing your filters or unlock a karigar contact.',
                 textAlign: TextAlign.center,
               ),
             ),
@@ -381,7 +381,7 @@ class _ContactsViewState extends State<ContactsView> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        '${row['name'] ?? 'Worker'}',
+                        '${row['name'] ?? 'Karigar'}',
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,

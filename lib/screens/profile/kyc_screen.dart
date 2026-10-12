@@ -3,6 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/app_scope.dart';
 import '../../core/theme.dart';
@@ -19,6 +20,8 @@ class _KycScreenState extends State<KycScreen> {
   List<Map<String, dynamic>> types = const [];
   Map<String, Map<String, dynamic>> docs = const {};
   Map<String, dynamic> kyc = const {};
+  Map<String, dynamic> fieldErrors = const {};
+  Map<String, dynamic> digilocker = const {};
   String? type, error;
   bool loading = true, submitting = false;
 
@@ -59,6 +62,9 @@ class _KycScreenState extends State<KycScreen> {
       };
       kyc = response['kyc'] is Map
           ? Map<String, dynamic>.from(response['kyc'] as Map)
+          : const {};
+      digilocker = response['digilocker'] is Map
+          ? Map<String, dynamic>.from(response['digilocker'] as Map)
           : const {};
       final business = response['business'] is Map
           ? Map<String, dynamic>.from(response['business'] as Map)
@@ -125,6 +131,7 @@ class _KycScreenState extends State<KycScreen> {
     final files = <String, File>{};
     for (final entry in forms.entries) {
       final key = entry.key, form = entry.value;
+      if (key == 'aadhaar' && digilocker['verified'] == true) continue;
       if (form.missing) {
         if (form.alternate == null || form.reason.text.trim().isEmpty) {
           _message(
@@ -154,14 +161,58 @@ class _KycScreenState extends State<KycScreen> {
     }
     setState(() => submitting = true);
     try {
-      await AppScope.of(context).api.submitKyc(fields: fields, files: files);
+      final response = await AppScope.of(
+        context,
+      ).api.submitKyc(fields: fields, files: files);
       if (!mounted) return;
-      _message('Business verification submitted for review.');
+      final verification = response['verification'] as Map?;
+      if (verification?['can_post_jobs'] == true) {
+        _message('Your business is verified. You can post jobs now.');
+      } else {
+        _message(
+          '${response['message'] ?? 'Business verification submitted for review.'}',
+        );
+      }
       Navigator.pop(context, true);
     } on ApiException catch (e) {
+      if (mounted && e.errors != null) {
+        setState(() => fieldErrors = e.errors!);
+      }
       _message(e.message);
     } finally {
       if (mounted) setState(() => submitting = false);
+    }
+  }
+
+  String? _fieldError(String key) {
+    final value = fieldErrors[key];
+    if (value is List && value.isNotEmpty) return '${value.first}';
+    return value?.toString();
+  }
+
+  Future<void> _verifyDigiLocker() async {
+    try {
+      final response = await AppScope.of(context).api.startKycDigiLocker();
+      final url = Uri.tryParse('${response['authorization_url'] ?? ''}');
+      final reference = '${response['reference'] ?? ''}';
+      if (url == null || reference.isEmpty)
+        throw const ApiException('Unable to start DigiLocker verification.');
+      await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+      if (!mounted) return;
+      final status = await AppScope.of(
+        context,
+      ).api.kycDigiLockerStatus(reference);
+      if (!mounted) return;
+      setState(() => digilocker = status);
+      if (status['status'] == 'verified') {
+        _message('Aadhaar verified with DigiLocker.');
+      } else {
+        _message(
+          '${status['message'] ?? 'Complete verification in DigiLocker, then check again.'}',
+        );
+      }
+    } catch (e) {
+      if (mounted) _message('$e');
     }
   }
 
@@ -253,15 +304,42 @@ class _KycScreenState extends State<KycScreen> {
                 'Documents',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
               ),
-              ...forms.entries.map(
-                (e) => _DocumentCard(
+              ...forms.entries.map((e) {
+                final saved = _first(
+                  (kyc['documents'] as List? ?? const []).whereType<Map>().map(
+                    (item) => Map<String, dynamic>.from(item),
+                  ),
+                  (item) => '${item['type']}' == e.key,
+                );
+                return _DocumentCard(
                   label: '${docs[e.key]?['label'] ?? e.key}',
                   config: docs[e.key] ?? const {},
                   form: e.value,
                   pick: () => _pick(e.value),
                   changed: () => setState(() {}),
+                  check: saved?['check'] is Map
+                      ? Map<String, dynamic>.from(saved!['check'] as Map)
+                      : null,
+                  errorText: _fieldError(
+                    '${docs[e.key]?['number_field'] ?? '${e.key}_number'}',
+                  ),
+                );
+              }),
+              if ((type == 'individual' || type == 'proprietorship') &&
+                  forms.containsKey('aadhaar')) ...[
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: digilocker['verified'] == true
+                      ? null
+                      : _verifyDigiLocker,
+                  icon: const Icon(LucideIcons.shieldCheck),
+                  label: Text(
+                    digilocker['verified'] == true
+                        ? 'Aadhaar verified with DigiLocker'
+                        : 'Verify with DigiLocker',
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: 16),
               FilledButton.icon(
                 onPressed: submitting ? null : _submit,
@@ -293,11 +371,15 @@ class _DocumentCard extends StatelessWidget {
     required this.form,
     required this.pick,
     required this.changed,
+    this.check,
+    this.errorText,
   });
   final String label;
   final Map<String, dynamic> config;
   final _DocumentForm form;
   final VoidCallback pick, changed;
+  final Map<String, dynamic>? check;
+  final String? errorText;
   @override
   Widget build(BuildContext context) {
     final alternatives = (config['alternates'] as List? ?? const [])
@@ -310,6 +392,21 @@ class _DocumentCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+            if (check != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  check!['verified'] == true
+                      ? 'Checked with government records'
+                      : 'Our team will check this',
+                  style: TextStyle(
+                    color: check!['verified'] == true
+                        ? AppColors.green
+                        : AppColors.muted,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text("I don't have this"),
@@ -357,6 +454,7 @@ class _DocumentCard extends StatelessWidget {
                 decoration: InputDecoration(
                   labelText: '$label number',
                   hintText: '${config['hint'] ?? ''}',
+                  errorText: errorText,
                 ),
               ),
             const SizedBox(height: 8),
@@ -365,7 +463,7 @@ class _DocumentCard extends StatelessWidget {
               icon: const Icon(LucideIcons.upload, size: 18),
               label: Text(
                 form.file == null
-                    ? 'Upload photo or PDF'
+                    ? 'Upload photo or PDF (optional)'
                     : form.file!.path.split(Platform.pathSeparator).last,
               ),
             ),

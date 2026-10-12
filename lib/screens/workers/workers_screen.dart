@@ -22,6 +22,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
   int tab = 0;
   Json contactCounts = {};
   int? unlocking;
+  int? rejecting;
   String query = '';
   String category = 'All';
   Map<String, dynamic> advancedFilters = {};
@@ -96,6 +97,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
       if (query.trim().isNotEmpty) 'q': query.trim(),
       if (activeCategory != 'All') 'skill': activeCategory,
       ...advancedFilters,
+      if (tab == 3) 'rejected': 1,
     };
     final needsLocation =
         filters['radius_km'] != null || filters['sort'] == 'nearest';
@@ -139,7 +141,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
             profile: item,
             worker: Worker(
               item.name,
-              item.skills.isEmpty ? 'Worker' : item.skills.first,
+              item.skills.isEmpty ? 'Karigar' : item.skills.first,
               item.experienceYears,
               item.rating.average,
               item.distanceKm ?? 0,
@@ -203,6 +205,15 @@ class _WorkersScreenState extends State<WorkersScreen> {
                 ),
                 const SizedBox(width: 7),
                 _DirectoryTab(
+                  label: 'Rejected (${contactCounts['rejected_count'] ?? 0})',
+                  selected: tab == 3,
+                  onSelected: () {
+                    setState(() => tab = 3);
+                    _search();
+                  },
+                ),
+                const SizedBox(width: 7),
+                _DirectoryTab(
                   label: 'Database (${contactCounts['database_total'] ?? 0})',
                   selected: tab == 1,
                   onSelected: () => setState(() => tab = 1),
@@ -219,7 +230,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
           ),
         ),
       ),
-      body: tab != 0
+      body: tab != 0 && tab != 3
           ? ContactsView(
               key: ValueKey(tab),
               source: tab == 1 ? 'database' : 'applicants',
@@ -354,6 +365,9 @@ class _WorkersScreenState extends State<WorkersScreen> {
                             data: item,
                             busy: unlocking == item.profileId,
                             onUnlock: () => _unlock(item.profile),
+                            rejected: item.profile.rejected,
+                            rejecting: rejecting == item.profileId,
+                            onReject: () => _reject(item.profile),
                             onTap: () => Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -397,6 +411,27 @@ class _WorkersScreenState extends State<WorkersScreen> {
       if (mounted) setState(() => unlocking = null);
     }
   }
+
+  Future<void> _reject(WorkerProfile profile) async {
+    if (rejecting != null) return;
+    setState(() => rejecting = profile.id);
+    try {
+      if (profile.rejected) {
+        await AppScope.of(context).api.restoreWorker(profile.id);
+      } else {
+        await AppScope.of(context).api.rejectWorker(profile.id);
+      }
+      if (mounted) await _search();
+    } catch (error) {
+      if (mounted) _message('$error');
+    } finally {
+      if (mounted) setState(() => rejecting = null);
+    }
+  }
+
+  void _message(String value) => ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text(value)));
 
   Future<void> _showFilters(BuildContext context) async {
     final result = await showModalBottomSheet<Map<String, dynamic>>(
@@ -532,10 +567,15 @@ class _WorkerResultCard extends StatelessWidget {
     required this.data,
     required this.onTap,
     required this.onUnlock,
+    required this.onReject,
     required this.busy,
+    required this.rejected,
+    required this.rejecting,
   });
   final VoidCallback onUnlock;
+  final VoidCallback onReject;
   final bool busy;
+  final bool rejected, rejecting;
   final _WorkerView data;
   final VoidCallback onTap;
 
@@ -616,7 +656,13 @@ class _WorkerResultCard extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            '${data.distance} km',
+                            [
+                                  data.profile.distanceLabel,
+                                  data.profile.locationLabel,
+                                ]
+                                .whereType<String>()
+                                .where((value) => value.isNotEmpty)
+                                .join(' · '),
                             style: const TextStyle(
                               color: AppColors.muted,
                               fontSize: 11.5,
@@ -658,6 +704,14 @@ class _WorkerResultCard extends StatelessWidget {
                   .toList(),
             ),
             const SizedBox(height: 10),
+            if (data.profile.unlockedByCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Unlocked by ${data.profile.unlockedByCount} other HR${data.profile.unlockedByCount == 1 ? '' : 's'}',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+              ),
             if (data.profile.contactUnlocked) ...[
               const Divider(height: 18),
               Row(
@@ -686,16 +740,37 @@ class _WorkerResultCard extends StatelessWidget {
                 expanded: true,
               ),
             ] else if (data.profile.canUnlock)
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: busy ? null : onUnlock,
-                  icon: const Icon(Icons.lock_open, size: 18),
-                  label: Text(busy ? 'Unlocking…' : 'Unlock contact'),
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: busy ? null : onUnlock,
+                      icon: const Icon(Icons.lock_open, size: 18),
+                      label: Text(busy ? 'Unlocking…' : 'Unlock contact'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: rejecting ? null : onReject,
+                    icon: const Icon(LucideIcons.thumbsDown, size: 17),
+                    label: Text(rejecting ? 'Please wait' : 'Not interested'),
+                  ),
+                ],
               )
             else
-              const Text('Contact locked · view profile for plan access'),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Contact locked · view profile for plan access',
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: rejecting ? null : onReject,
+                    child: Text(rejected ? 'Undo' : 'Not interested'),
+                  ),
+                ],
+              ),
           ],
         ),
       ),
@@ -779,7 +854,7 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Filter workers',
+                'Filter karigars',
                 style: TextStyle(fontSize: 19, fontWeight: FontWeight.w700),
               ),
             ),

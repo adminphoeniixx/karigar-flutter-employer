@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../models/api_models.dart';
 import '../../core/api/api_exception.dart';
 import '../profile/plans_screen.dart';
@@ -6,6 +8,8 @@ import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:flutter/services.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
@@ -33,6 +37,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
   String? category;
   String? state;
   String? city;
+  String? contactPhoneError;
   bool loading = false;
   bool referenceLoading = true;
   bool suggesting = false;
@@ -71,13 +76,17 @@ class _PostJobScreenState extends State<PostJobScreen> {
   final addressController = TextEditingController();
   final shiftStartController = TextEditingController();
   final shiftEndController = TextEditingController();
+  TimeOfDay? shiftStartTime;
+  TimeOfDay? shiftEndTime;
   final contactNameController = TextEditingController();
   final contactDesignationController = TextEditingController();
   final perkController = TextEditingController();
+  Timer? _addressDebounce;
 
   @override
   void initState() {
     super.initState();
+    addressController.addListener(_addressChanged);
 
     final job = widget.job;
     if (job == null) return;
@@ -95,6 +104,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
     addressController.text = job.address ?? '';
     shiftStartController.text = job.shiftStart ?? '';
     shiftEndController.text = job.shiftEnd ?? '';
+    shiftStartTime = _parseTime(job.shiftStart);
+    shiftEndTime = _parseTime(job.shiftEnd);
     contactNameController.text = job.contactName ?? '';
     contactDesignationController.text = job.contactDesignation ?? '';
     category = job.category.isEmpty ? null : job.category;
@@ -116,6 +127,67 @@ class _PostJobScreenState extends State<PostJobScreen> {
     liveStatus = job.status == 'closed' ? 'closed' : 'active';
     aiShortlistEnabled = job.aiShortlistEnabled;
     aiCallEnabled = job.aiCallEnabled;
+  }
+
+  TimeOfDay? _parseTime(String? value) {
+    final parts = (value ?? '').split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    if (hour == null || minute == null || hour > 23 || minute > 59) return null;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+
+  Future<void> _pickTime({required bool start}) async {
+    final initial = start ? shiftStartTime : shiftEndTime;
+    final selected = await showTimePicker(
+      context: context,
+      initialTime:
+          initial ??
+          (start
+              ? const TimeOfDay(hour: 9, minute: 0)
+              : const TimeOfDay(hour: 17, minute: 0)),
+    );
+    if (selected == null || !mounted) return;
+    final value =
+        '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}';
+    setState(() {
+      if (start) {
+        shiftStartTime = selected;
+        shiftStartController.text = value;
+      } else {
+        shiftEndTime = selected;
+        shiftEndController.text = value;
+      }
+    });
+  }
+
+  void _addressChanged() {
+    _addressDebounce?.cancel();
+    _addressDebounce = Timer(const Duration(milliseconds: 700), _pinAddress);
+  }
+
+  Future<void> _pinAddress() async {
+    final address = addressController.text.trim();
+    if (address.length < 4) return;
+    try {
+      final places = await locationFromAddress(
+        '$address, ${city ?? ''}, ${state ?? ''}, India',
+      );
+      if (!mounted ||
+          places.isEmpty ||
+          address != addressController.text.trim()) {
+        return;
+      }
+      setState(
+        () => selectedLocation = LatLng(
+          places.first.latitude,
+          places.first.longitude,
+        ),
+      );
+    } catch (_) {
+      // Keep the current pin when geocoding cannot resolve a landmark.
+    }
   }
 
   @override
@@ -150,6 +222,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
         }.toList();
         perks = {...apiPerks, ...selectedPerks}.toList();
       });
+      if (state != null) unawaited(_loadCities(state!, keepSelectedCity: true));
       try {
         final options = await AppScope.of(context).api.jobFormOptions();
         final ai = options['ai'];
@@ -177,16 +250,21 @@ class _PostJobScreenState extends State<PostJobScreen> {
       .where((item) => item.isNotEmpty)
       .toList();
 
-  Future<void> _loadCities(String value) async {
+  Future<void> _loadCities(
+    String value, {
+    bool keepSelectedCity = false,
+  }) async {
     setState(() {
       state = value;
-      city = null;
-      selectedLocation = null;
+      if (!keepSelectedCity) city = null;
+      if (!keepSelectedCity) selectedLocation = null;
       cities = const [];
     });
     try {
       final result = await AppScope.of(context).api.cities(value);
-      if (mounted && state == value) setState(() => cities = result);
+      if (mounted && state == value) {
+        setState(() => cities = {...result, if (city != null) city!}.toList());
+      }
     } catch (_) {
       _message('Could not load cities.');
     }
@@ -300,6 +378,35 @@ class _PostJobScreenState extends State<PostJobScreen> {
         context,
       ).api.saveJob(values, id: widget.job?.id);
       if (!mounted) return;
+      if (response['code'] == 'job_under_review') {
+        final rawJob = response['job'];
+        final moderation = rawJob is Map && rawJob['moderation'] is Map
+            ? Map<String, dynamic>.from(rawJob['moderation'] as Map)
+            : const <String, dynamic>{};
+        final reasons = (moderation['reasons'] as List? ?? const [])
+            .map((item) => '$item')
+            .where((item) => item.isNotEmpty)
+            .join('\n• ');
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const Icon(LucideIcons.shieldAlert, color: AppColors.amber),
+            title: const Text('Job under review'),
+            content: Text(
+              '${response['message'] ?? 'Your job needs a quick review before it goes live.'}'
+              '${reasons.isEmpty ? '' : '\n\nReason:\n• $reasons'}',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Okay'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) Navigator.pop(context, true);
+        return;
+      }
       _message(
         '${response['message'] ?? (draft ? 'Draft saved.' : 'Job posted.')}',
       );
@@ -458,6 +565,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
 
   @override
   void dispose() {
+    _addressDebounce?.cancel();
+    addressController.removeListener(_addressChanged);
     titleController.dispose();
     openingsController.dispose();
     experienceController.dispose();
@@ -546,7 +655,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                         },
                       ),
                       const _Hint(
-                        'Tap to add. Workers with these skills are matched first.',
+                        'Tap to add. Karigars with these skills are matched first.',
                       ),
                       const SizedBox(height: 14),
                       Row(
@@ -569,11 +678,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const _Label('Max experience'),
+                                const _Label('Min experience'),
                                 _Input(
-                                  hint: '5',
+                                  hint: '1',
                                   suffix: 'yrs',
-                                  controller: experienceMaxController,
+                                  controller: experienceController,
                                   number: true,
                                 ),
                               ],
@@ -584,11 +693,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const _Label('Min experience'),
+                                const _Label('Max experience'),
                                 _Input(
-                                  hint: '1',
+                                  hint: '5',
                                   suffix: 'yrs',
-                                  controller: experienceController,
+                                  controller: experienceMaxController,
                                   number: true,
                                 ),
                               ],
@@ -644,20 +753,22 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           setState(() => shift = value);
                         },
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 14),
                       Row(
                         children: [
                           Expanded(
-                            child: _Input(
-                              hint: 'Start time (09:00)',
-                              controller: shiftStartController,
+                            child: _TimeInput(
+                              label: 'Start time',
+                              value: shiftStartTime,
+                              onTap: () => _pickTime(start: true),
                             ),
                           ),
                           const SizedBox(width: 10),
                           Expanded(
-                            child: _Input(
-                              hint: 'End time (18:00)',
-                              controller: shiftEndController,
+                            child: _TimeInput(
+                              label: 'End time',
+                              value: shiftEndTime,
+                              onTap: () => _pickTime(start: false),
                             ),
                           ),
                         ],
@@ -771,14 +882,13 @@ class _PostJobScreenState extends State<PostJobScreen> {
                                     if (state == null) {
                                       _message('Select a state first.');
                                     } else {
-                                      _choose(
-                                        'Select city',
-                                        cities,
-                                        (value) => setState(() {
+                                      _choose('Select city', cities, (value) {
+                                        setState(() {
                                           city = value;
                                           selectedLocation = null;
-                                        }),
-                                      );
+                                        });
+                                        unawaited(_pinAddress());
+                                      });
                                     }
                                   },
                                 ),
@@ -798,7 +908,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       SizedBox(
                         height: 190,
                         child: LocationMap(
-                          key: ValueKey('$state/$city'),
+                          key: ValueKey(
+                            '$state/$city/${selectedLocation?.latitude}/${selectedLocation?.longitude}',
+                          ),
                           initialLocation:
                               selectedLocation ??
                               const LatLng(22.5937, 78.9629),
@@ -813,7 +925,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                         style: TextStyle(fontSize: 12, color: AppColors.muted),
                       ),
                       const SizedBox(height: 14),
-                      const _Label('How should workers reach you?'),
+                      const _Label('How should karigars reach you?'),
                       _singleChips(
                         ['Apply + Call', 'Apply only', 'Call only'],
                         contact,
@@ -826,6 +938,15 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           hint: '9876543210',
                           controller: contactPhoneController,
                           number: true,
+                          maxLength: 10,
+                          errorText: contactPhoneError,
+                          onChanged: (value) => setState(
+                            () => contactPhoneError =
+                                value.isEmpty ||
+                                    RegExp(r'^[6-9]\d{9}$').hasMatch(value)
+                                ? null
+                                : 'Enter a valid 10-digit number.',
+                          ),
                         ),
                         const SizedBox(height: 12),
                         const _Label('Who picks up the call?'),
@@ -1091,6 +1212,9 @@ class _Input extends StatelessWidget {
     this.suffix,
     this.controller,
     this.number = false,
+    this.maxLength,
+    this.errorText,
+    this.onChanged,
     this.onSubmitted,
   });
   final String hint;
@@ -1099,15 +1223,28 @@ class _Input extends StatelessWidget {
   final String? suffix;
   final TextEditingController? controller;
   final bool number;
+  final int? maxLength;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
     onSubmitted: onSubmitted,
+    onChanged: onChanged,
     keyboardType: number ? TextInputType.number : TextInputType.text,
+    inputFormatters: number
+        ? [
+            FilteringTextInputFormatter.digitsOnly,
+            if (maxLength != null) LengthLimitingTextInputFormatter(maxLength),
+          ]
+        : null,
     maxLines: lines,
+    maxLength: maxLength,
     decoration: InputDecoration(
       hintText: hint,
+      errorText: errorText,
+      counterText: '',
       prefixIconConstraints: const BoxConstraints(minWidth: 34),
       prefixIcon: prefix == null
           ? null
@@ -1127,6 +1264,37 @@ class _Input extends StatelessWidget {
                 ),
               ),
             ),
+    ),
+  );
+}
+
+class _TimeInput extends StatelessWidget {
+  const _TimeInput({
+    required this.label,
+    required this.value,
+    required this.onTap,
+  });
+  final String label;
+  final TimeOfDay? value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(12),
+    child: InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        suffixIcon: const Icon(LucideIcons.clock3, size: 19),
+      ),
+      child: Text(
+        value == null ? 'Select time' : value!.format(context),
+        style: TextStyle(
+          color: value == null
+              ? AppColors.muted
+              : Theme.of(context).colorScheme.onSurface,
+        ),
+      ),
     ),
   );
 }

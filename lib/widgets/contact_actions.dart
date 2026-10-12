@@ -24,9 +24,27 @@ class ContactActions extends StatelessWidget {
     this.phone,
     this.email,
     this.expanded = false,
+    this.onChat,
+    this.compact = false,
   });
   final String? phone, email;
   final bool expanded;
+  final VoidCallback? onChat;
+  final bool compact;
+
+  ButtonStyle _actionStyle(BuildContext context) {
+    if (!compact) return const ButtonStyle();
+    final colors = Theme.of(context).colorScheme;
+    return OutlinedButton.styleFrom(
+      minimumSize: const Size(0, 42),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+      backgroundColor: colors.surfaceContainerHighest.withValues(alpha: .55),
+      side: BorderSide(color: colors.outlineVariant),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+    );
+  }
+
   Future<void> _open(BuildContext context, Uri uri) async {
     try {
       if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
@@ -54,13 +72,26 @@ class ContactActions extends StatelessWidget {
                       _open(context, Uri(scheme: 'tel', path: '+$digits')),
                   icon: const Icon(Icons.call, size: 17),
                   label: const Text('Call'),
+                  style: _actionStyle(context),
                 ),
               ),
+              if (onChat != null) ...[
+                const SizedBox(width: 8),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: onChat,
+                    icon: const Icon(Icons.chat_bubble_outline, size: 17),
+                    label: const Text('Chat'),
+                    style: _actionStyle(context),
+                  ),
+                ),
+              ],
               const SizedBox(width: 8),
               Expanded(
                 child: OutlinedButton(
                   onPressed: () =>
                       _open(context, Uri.https('wa.me', '/$digits')),
+                  style: _actionStyle(context),
                   child: const Text('WhatsApp'),
                 ),
               ),
@@ -102,6 +133,12 @@ class ContactActions extends StatelessWidget {
             onPressed: () => _open(context, Uri(scheme: 'mailto', path: email)),
             icon: const Icon(Icons.email_outlined, size: 18),
             label: const Text('Email'),
+          ),
+        if (onChat != null)
+          OutlinedButton.icon(
+            onPressed: onChat,
+            icon: const Icon(Icons.chat_bubble_outline, size: 18),
+            label: const Text('Chat'),
           ),
       ],
     );

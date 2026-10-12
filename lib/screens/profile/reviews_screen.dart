@@ -87,7 +87,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                                 ),
                               ),
                               Text(
-                                'Based on ${summary['count'] ?? 0} worker reviews',
+                                'Based on ${summary['count'] ?? 0} karigar reviews',
                                 style: const TextStyle(
                                   fontSize: 12.5,
                                   color: AppColors.muted,
@@ -111,7 +111,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: _Review(
-                        '${reviewer['name'] ?? 'Worker'}',
+                        '${reviewer['name'] ?? 'Karigar'}',
                         '${item['comment'] ?? ''}',
                         '${item['created_ago'] ?? ''}',
                         (item['rating'] as num?)?.toInt() ?? 0,

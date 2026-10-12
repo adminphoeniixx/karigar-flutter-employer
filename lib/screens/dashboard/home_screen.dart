@@ -7,11 +7,13 @@ import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/app_strings.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/theme.dart';
+import 'package:employer_kariger_app/models/api_models.dart';
 import 'package:employer_kariger_app/screens/dashboard/main_shell.dart';
 import 'package:employer_kariger_app/screens/jobs/job_manage_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/jobs_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/post_job_screen.dart';
 import 'package:employer_kariger_app/screens/messages/messages_screen.dart';
+import 'package:employer_kariger_app/screens/messages/chat_screen.dart';
 import 'package:employer_kariger_app/screens/profile/kyc_screen.dart';
 import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
 import 'package:employer_kariger_app/screens/profile/profile_screen.dart';
@@ -58,10 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _applicantAction(int applicantId, String action) async {
     try {
       final api = AppScope.of(context).api;
-      if (action == 'unlock') {
-        await api.unlock(applicantId);
-        _message('Contact unlocked.');
-      } else if (action == 'shortlist') {
+      if (action == 'shortlist') {
         await api.shortlist(applicantId);
         _message('Applicant shortlisted.');
       } else if (action == 'interview') {
@@ -94,7 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('Hire applicant?'),
-            content: const Text('The worker will receive your hire offer.'),
+            content: const Text('The karigar will receive your hire offer.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
@@ -120,14 +119,110 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<String?> _unlockForProfile(int applicantId) async {
-    final response = await AppScope.of(context).api.unlock(applicantId);
-    final applicant = response['applicant'];
-    final worker = applicant is Map ? applicant['worker'] : null;
-    final phone = worker is Map ? worker['phone']?.toString() : null;
-    await controller.load();
-    return phone;
+  Future<void> _chatApplicant(Applicant applicant, Worker worker) async {
+    try {
+      final response = await AppScope.of(context).api.startConversation(
+        workerId: applicant.worker.userId,
+        jobId: (applicant.job?['id'] as num?)?.toInt(),
+      );
+      final conversation = response['conversation'];
+      final id = conversation is Map
+          ? (conversation['id'] as num?)?.toInt()
+          : null;
+      if (!mounted || id == null) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(worker: worker, conversationId: id),
+        ),
+      );
+    } catch (exception) {
+      if (mounted) _message('$exception');
+    }
   }
+
+  Future<void> _hireApplicant(Applicant applicant) async {
+    final wage = TextEditingController(
+      text: applicant.expectedWage?.toStringAsFixed(0) ?? '',
+    );
+    final message = TextEditingController();
+    var startDate = DateTime.now().add(const Duration(days: 1));
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setSheetState) => AlertDialog(
+          title: Text('Hire ${applicant.worker.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: wage,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Monthly salary * (₹ / month)',
+                ),
+              ),
+              TextField(
+                controller: message,
+                maxLines: 3,
+                maxLength: 1000,
+                decoration: const InputDecoration(
+                  labelText: 'Message (optional)',
+                ),
+              ),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 730)),
+                  );
+                  if (date != null) setSheetState(() => startDate = date);
+                },
+                icon: const Icon(LucideIcons.calendarDays),
+                label: Text('Joining date * · ${_dateValue(startDate)}'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Send offer'),
+            ),
+          ],
+        ),
+      ),
+    );
+    final offeredWage = num.tryParse(wage.text.trim());
+    final offerMessage = message.text.trim();
+    wage.dispose();
+    message.dispose();
+    if (confirmed != true || offeredWage == null) {
+      if (confirmed == true) _message('Enter a valid monthly salary.');
+      return;
+    }
+    if (!mounted) return;
+    try {
+      await AppScope.of(context).api.applicantStatus(
+        applicant.id,
+        'accepted',
+        offeredWage: offeredWage,
+        startDate: _dateValue(startDate),
+        message: offerMessage.isEmpty ? null : offerMessage,
+      );
+      _message('Hire offer sent.');
+      await controller.load();
+    } catch (exception) {
+      if (mounted) _message('$exception');
+    }
+  }
+
+  String _dateValue(DateTime value) =>
+      '${value.year.toString().padLeft(4, '0')}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
 
   @override
   void dispose() {
@@ -306,7 +401,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 16),
                 _DatabaseCard(
-                  title: data?.database.title ?? 'Worker Database',
+                  title: (data?.database.title ?? 'Karigar Database')
+                      .replaceAll('Worker', 'Karigar')
+                      .replaceAll('worker', 'karigar'),
                   subtitle:
                       data?.database.subtitle ??
                       'Buy a database plan to see karigar numbers',
@@ -341,7 +438,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   final profile = applicant.worker;
                   final worker = Worker(
                     profile.name,
-                    profile.skills.isEmpty ? 'Worker' : profile.skills.first,
+                    profile.skills.isEmpty ? 'Karigar' : profile.skills.first,
                     profile.experienceYears,
                     profile.rating.average,
                     profile.distanceKm ?? 0,
@@ -357,13 +454,13 @@ class _HomeScreenState extends State<HomeScreen> {
                       displayName: profile.name,
                       status: applicant.statusLabel,
                       skills: profile.skills,
-                      contactUnlocked: applicant.contactUnlocked,
-                      onUnlock: () => _applicantAction(applicant.id, 'unlock'),
+                      phone: profile.phone,
+                      onChat: () => _chatApplicant(applicant, worker),
                       onPrimary: () => _applicantAction(
                         applicant.id,
                         applicant.shortlisted ? 'interview' : 'shortlist',
                       ),
-                      onHire: () => _applicantAction(applicant.id, 'hire'),
+                      onHire: () => _hireApplicant(applicant),
                       onReject: () => _applicantAction(applicant.id, 'reject'),
                       onTap: () => Navigator.push(
                         context,
@@ -374,11 +471,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             workerUserId: profile.userId,
                             jobId: (applicant.job?['id'] as num?)?.toInt(),
                             phone: profile.phone,
-                            contactUnlocked: applicant.contactUnlocked,
+                            contactUnlocked: true,
                             canMessage: true,
-                            onUnlock: applicant.contactUnlocked
-                                ? null
-                                : () => _unlockForProfile(applicant.id),
+                            alwaysShowContact: true,
                           ),
                         ),
                       ),
@@ -499,7 +594,7 @@ class _PostJobBanner extends StatelessWidget {
             ),
             SizedBox(height: 3),
             Text(
-              'Post a job free — reach workers instantly',
+              'Post a job free — reach karigars instantly',
               style: TextStyle(color: Colors.white, fontSize: 11.5),
             ),
           ],
@@ -776,8 +871,8 @@ class _ApplicantCard extends StatelessWidget {
     required this.displayName,
     required this.status,
     required this.skills,
-    required this.contactUnlocked,
-    required this.onUnlock,
+    required this.phone,
+    required this.onChat,
     required this.onPrimary,
     required this.onHire,
     required this.onReject,
@@ -787,21 +882,40 @@ class _ApplicantCard extends StatelessWidget {
   final String displayName;
   final String status;
   final List<String> skills;
-  final bool contactUnlocked;
-  final VoidCallback onUnlock, onPrimary, onHire, onReject;
+  final String? phone;
+  final VoidCallback onChat, onPrimary, onHire, onReject;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final normalizedStatus = status.toLowerCase();
+    final statusColor = normalizedStatus == 'shortlisted'
+        ? AppColors.indigo
+        : normalizedStatus == 'accepted' || normalizedStatus == 'hired'
+        ? AppColors.green
+        : normalizedStatus == 'rejected'
+        ? AppColors.rose
+        : AppColors.amber;
+    final statusBackground = normalizedStatus == 'shortlisted'
+        ? AppColors.indigoBg
+        : normalizedStatus == 'accepted' || normalizedStatus == 'hired'
+        ? AppColors.greenBg
+        : normalizedStatus == 'rejected'
+        ? AppColors.roseBg
+        : AppColors.amberBg;
+    final visibleSkills = skills.take(2).toList();
     return Card(
+      elevation: 0,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -836,49 +950,58 @@ class _ApplicantCard extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 5),
-                            const Icon(
-                              LucideIcons.badgeCheck,
-                              size: 15,
-                              color: AppColors.green,
-                            ),
+                            if (worker.verified)
+                              const Icon(
+                                LucideIcons.badgeCheck,
+                                size: 15,
+                                color: AppColors.green,
+                              ),
                           ],
                         ),
                         Text(
-                          '${worker.trade} · ${worker.experience} yrs exp · ★ ${worker.rating}',
+                          [
+                            worker.trade,
+                            if (worker.experience > 0)
+                              '${worker.experience} yrs experience',
+                            if (worker.rating > 0)
+                              '★ ${worker.rating.toStringAsFixed(1)}',
+                          ].join(' · '),
                           style: TextStyle(
-                            fontSize: 11,
+                            fontSize: 12,
                             color: colors.onSurfaceVariant,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '⌖ ${worker.distance} km   ${monthlyWage(worker.wage)}',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
+                        if (worker.distance > 0 || worker.wage > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            [
+                              if (worker.distance > 0)
+                                '⌖ ${worker.distance.toStringAsFixed(1)} km away',
+                              if (worker.wage > 0) monthlyWage(worker.wage),
+                            ].join('   ·   '),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
+                      horizontal: 9,
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: status == 'Shortlisted'
-                          ? AppColors.indigoBg
-                          : AppColors.amberBg,
-                      borderRadius: BorderRadius.circular(20),
+                      color: statusBackground,
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       status,
                       style: TextStyle(
-                        color: status == 'Shortlisted'
-                            ? AppColors.indigo
-                            : AppColors.amber,
-                        fontSize: 10.5,
+                        color: statusColor,
+                        fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -886,107 +1009,128 @@ class _ApplicantCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: Wrap(
-                  spacing: 7,
-                  runSpacing: 8,
-                  children: skills
-                      .map((e) => BrandChip(e, neutral: true))
-                      .toList(),
-                ),
-              ),
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: contactUnlocked ? null : onUnlock,
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: contactUnlocked
-                        ? (isDark
-                              ? AppColors.green.withValues(alpha: .20)
-                              : AppColors.greenBg)
-                        : (isDark
-                              ? colors.primary.withValues(alpha: .18)
-                              : AppColors.brand50),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        contactUnlocked
-                            ? LucideIcons.lockOpen
-                            : LucideIcons.lockKeyhole,
-                        size: 16,
-                        color: contactUnlocked
-                            ? AppColors.green
-                            : AppColors.primary,
-                      ),
-                      const SizedBox(width: 7),
-                      Text(
-                        contactUnlocked ? 'Contact unlocked' : 'View contact',
-                        style: TextStyle(
-                          color: contactUnlocked
-                              ? AppColors.green
-                              : colors.primary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
+              const Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: onPrimary,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(38),
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                      ),
-                      icon: Icon(
-                        status == 'Shortlisted'
-                            ? LucideIcons.calendarDays
-                            : LucideIcons.star,
-                        size: 16,
-                      ),
-                      label: Text(
-                        status == 'Shortlisted' ? 'Interview' : 'Shortlist',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: onHire,
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(38),
-                      ),
-                      child: const Text('Hire'),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  SizedBox(
-                    width: 46,
-                    child: OutlinedButton(
-                      onPressed: onReject,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(38),
-                        padding: EdgeInsets.zero,
-                        foregroundColor: Colors.redAccent,
-                      ),
-                      child: const Icon(LucideIcons.x, size: 17),
+                  Icon(LucideIcons.sparkles, size: 13, color: AppColors.muted),
+                  SizedBox(width: 5),
+                  Text(
+                    'Skills',
+                    style: TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
               ),
+              const SizedBox(height: 7),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  ...visibleSkills.map(_ApplicantSkill.new),
+                  if (skills.length > visibleSkills.length)
+                    _ApplicantSkill(
+                      '+${skills.length - visibleSkills.length} more',
+                    ),
+                ],
+              ),
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Divider(height: 1),
+              ),
+              ContactActions(
+                phone: phone,
+                expanded: true,
+                onChat: onChat,
+                compact: true,
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? colors.surfaceContainerHighest
+                      : AppColors.brand50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: onPrimary,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(38),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          backgroundColor: colors.surface,
+                        ),
+                        icon: Icon(
+                          normalizedStatus == 'shortlisted'
+                              ? LucideIcons.calendarDays
+                              : LucideIcons.star,
+                          size: 16,
+                        ),
+                        label: Text(
+                          normalizedStatus == 'shortlisted'
+                              ? 'Interview'
+                              : 'Shortlist',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: onHire,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(38),
+                        ),
+                        child: const Text('Hire'),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    SizedBox(
+                      width: 40,
+                      child: IconButton.outlined(
+                        onPressed: onReject,
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(40, 38),
+                          foregroundColor: AppColors.rose,
+                          side: const BorderSide(color: AppColors.line),
+                        ),
+                        icon: const Icon(LucideIcons.x, size: 18),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ApplicantSkill extends StatelessWidget {
+  const _ApplicantSkill(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      constraints: const BoxConstraints(minHeight: 30),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerHighest.withValues(alpha: .7),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: colors.onSurfaceVariant,
+          fontSize: 11.5,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );
@@ -1016,6 +1160,13 @@ Widget jobCard(Job job, VoidCallback onTap) => Card(
             '${job.wage} · ${job.openings} openings · 2 days ago',
             style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
           ),
+          if (job.moderationNote?.trim().isNotEmpty == true) ...[
+            const SizedBox(height: 6),
+            Text(
+              job.moderationNote!,
+              style: const TextStyle(fontSize: 12, color: AppColors.rose),
+            ),
+          ],
           const SizedBox(height: 10),
           Row(
             children: [

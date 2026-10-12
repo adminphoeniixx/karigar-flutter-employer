@@ -21,7 +21,7 @@ class AppStrings {
   }
 
   static const _employerHi = <String, String>{
-    'Find Workers': 'कारीगर खोजें',
+    'Find Karigars': 'कारीगर खोजें',
     'Find karigars': 'कारीगर खोजें',
     'Database contacts': 'डेटाबेस संपर्क',
     'Applicant contacts': 'आवेदक संपर्क',
@@ -33,7 +33,7 @@ class AppStrings {
     'Reset': 'रीसेट करें',
     'Contact locked · view profile for plan access':
         'संपर्क लॉक है · प्लान एक्सेस के लिए प्रोफाइल देखें',
-    'Worker Profile': 'कारीगर प्रोफाइल',
+    'Karigar Profile': 'कारीगर प्रोफाइल',
     'Messages': 'संदेश',
     'Message': 'संदेश',
     'Notifications': 'सूचनाएं',
@@ -46,8 +46,8 @@ class AppStrings {
     'Manage Job': 'जॉब प्रबंधित करें',
     'Edit job': 'जॉब बदलें',
     'Save as draft': 'ड्राफ्ट सेव करें',
-    'View matched workers': 'मिलान वाले कारीगर देखें',
-    'Matched workers': 'मिलान वाले कारीगर',
+    'View matched karigars': 'मिलान वाले कारीगर देखें',
+    'Matched karigars': 'मिलान वाले कारीगर',
     'Business Verification': 'बिज़नेस सत्यापन',
     'Business verification required': 'बिज़नेस सत्यापन आवश्यक है',
     'Verify business': 'बिज़नेस सत्यापित करें',
@@ -109,9 +109,9 @@ class AppStrings {
     'Log out': 'Log out',
     'Home': 'Home',
     'Post': 'Post karein',
-    'Workers': 'Karigar',
+    'Karigars': 'Karigar',
     'Profile': 'Profile',
-    'Find Workers': 'Karigar khojein',
+    'Find Karigars': 'Karigar khojein',
     'Find karigars': 'Karigar khojein',
     'Search skill, trade, name...': 'Skill, kaam ya naam khojein...',
     'All': 'Sabhi',
@@ -122,9 +122,9 @@ class AppStrings {
     'Post Job': 'Job post karein',
     'Business Profile': 'Business profile',
     'Edit Business Profile': 'Business profile badlein',
-    'Shortlisted Workers': 'Shortlist kiye karigar',
+    'Shortlisted Karigars': 'Shortlist kiye karigar',
     'Reviews & Ratings': 'Reviews aur ratings',
-    'Plans & Worker Database': 'Plans aur worker database',
+    'Plans & Karigar Database': 'Plans aur karigar database',
     'Order History': 'Order history',
     'Invoices': 'Invoices',
     'Retry': 'Dobara try karein',
@@ -144,6 +144,7 @@ class AppStrings {
     'Get notified on new applications': 'नए आवेदनों की सूचना पाएं',
     'Message alerts': 'संदेश सूचनाएं',
     'Get notified about worker messages': 'कारीगर के संदेशों की सूचना पाएं',
+    'Get notified about karigar messages': 'कारीगर के संदेशों की सूचना पाएं',
     'Account & Security': 'खाता और सुरक्षा',
     'Login & security': 'लॉगिन और सुरक्षा',
     'OTP · device sessions': 'OTP · डिवाइस सेशन',
@@ -155,7 +156,7 @@ class AppStrings {
     'Super Karigar Employer · v1.0.0': 'सुपर कारीगर एम्प्लॉयर · v1.0.0',
     'Home': 'होम',
     'Post': 'पोस्ट करें',
-    'Workers': 'कारीगर',
+    'Karigars': 'कारीगर',
     'Profile': 'प्रोफाइल',
     'Welcome back 👋': 'वापस आने पर स्वागत है 👋',
     'Active Jobs': 'चालू जॉब्स',
@@ -165,7 +166,7 @@ class AppStrings {
     'Recent applicants': 'हाल के आवेदक',
     'Your active jobs': 'आपकी चालू जॉब्स',
     'Hiring today?': 'आज भर्ती करनी है?',
-    'Post a job free — reach workers instantly':
+    'Post a job free — reach karigars instantly':
         'मुफ्त जॉब पोस्ट करें — कारीगरों तक तुरंत पहुंचें',
     'Post Job': 'जॉब पोस्ट करें',
     'Retry': 'फिर कोशिश करें',
@@ -176,7 +177,7 @@ class AppStrings {
     'Contact unlocked.': 'संपर्क अनलॉक हो गया।',
     'Applicant shortlisted.': 'आवेदक शॉर्टलिस्ट हो गया।',
     'Hire applicant?': 'आवेदक को नियुक्त करें?',
-    'The worker will receive your hire offer.':
+    'The karigar will receive your hire offer.':
         'कारीगर को आपका नियुक्ति प्रस्ताव मिलेगा।',
     'Cancel': 'रद्द करें',
     'Send offer': 'प्रस्ताव भेजें',
@@ -187,7 +188,7 @@ class AppStrings {
     'Business Profile': 'बिज़नेस प्रोफाइल',
     'Edit Business Profile': 'बिज़नेस प्रोफाइल बदलें',
     'Business Verification': 'बिज़नेस सत्यापन',
-    'Shortlisted Workers': 'शॉर्टलिस्ट किए कारीगर',
+    'Shortlisted Karigars': 'शॉर्टलिस्ट किए कारीगर',
     'Reviews & Ratings': 'रेटिंग और समीक्षा',
   };
 }

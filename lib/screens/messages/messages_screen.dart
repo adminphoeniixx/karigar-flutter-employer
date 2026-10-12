@@ -80,8 +80,8 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 final last = item['last_message'] is Map
                     ? Map<String, dynamic>.from(item['last_message'])
                     : <String, dynamic>{};
-                final name = '${participant['name'] ?? 'Worker'}';
-                final worker = Worker(name, 'Worker', 0, 0, 0, 0, const []);
+                final name = '${participant['name'] ?? 'Karigar'}';
+                final worker = Worker(name, 'Karigar', 0, 0, 0, 0, const []);
                 final unread = (item['unread'] as num?)?.toInt() ?? 0;
                 return _ConversationTile(
                   worker: worker,

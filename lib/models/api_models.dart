@@ -139,7 +139,7 @@ class DatabaseAccess {
     this.unlocksUsed = 0,
     this.unlocksRemaining,
     this.renewsAt,
-    this.title = 'Worker Database',
+    this.title = 'Karigar Database',
     this.subtitle = 'Buy a database plan to see karigar numbers',
     this.cta = 'Buy Database',
   });
@@ -159,7 +159,7 @@ class DatabaseAccess {
           ? null
           : asInt(json['unlocks_remaining']),
       renewsAt: DateTime.tryParse('${json['renews_at'] ?? ''}'),
-      title: '${json['title'] ?? 'Worker Database'}',
+      title: '${json['title'] ?? 'Karigar Database'}',
       subtitle:
           '${json['subtitle'] ?? 'Buy a database plan to see karigar numbers'}',
       cta: '${json['cta'] ?? 'Buy Database'}',
@@ -215,6 +215,7 @@ class EmployerJob {
     this.shareUrl = '',
     this.boost = const {},
     this.stats = const {},
+    this.moderation,
   });
   factory EmployerJob.fromJson(Json json) => EmployerJob(
     id: asInt(json['id']),
@@ -266,6 +267,9 @@ class EmployerJob {
     stats: json['stats'] is Map
         ? Map<String, dynamic>.from(json['stats'])
         : const {},
+    moderation: json['moderation'] is Map
+        ? Map<String, dynamic>.from(json['moderation'])
+        : null,
   );
   final int id, vacancies, experienceMin;
   final int? experienceMax;
@@ -281,6 +285,7 @@ class EmployerJob {
   final bool requiresWorkerFee;
   final bool aiShortlistEnabled, aiCallEnabled;
   final Json stats, boost;
+  final Json? moderation;
 }
 
 class WorkerProfile {
@@ -306,6 +311,10 @@ class WorkerProfile {
     this.avatarUrl,
     this.education,
     this.distanceKm,
+    this.distanceLabel,
+    this.locationLabel,
+    this.unlockedByCount = 0,
+    this.rejected = false,
     this.rating = const Rating(),
   });
   factory WorkerProfile.fromJson(Json json) => WorkerProfile(
@@ -332,6 +341,10 @@ class WorkerProfile {
     distanceKm: json['distance_km'] == null
         ? null
         : asDouble(json['distance_km']),
+    distanceLabel: json['distance_label']?.toString(),
+    locationLabel: json['location_label']?.toString(),
+    unlockedByCount: asInt(json['unlocked_by_count']),
+    rejected: json['rejected'] == true,
     rating: Rating.fromJson(json['rating']),
   );
   final int id, userId, experienceYears, expectedWage;
@@ -340,6 +353,9 @@ class WorkerProfile {
   final List<String> skills, languages;
   final bool available, verified, locked, canUnlock, contactUnlocked;
   final double? distanceKm;
+  final String? distanceLabel, locationLabel;
+  final int unlockedByCount;
+  final bool rejected;
   final Rating rating;
 }
 

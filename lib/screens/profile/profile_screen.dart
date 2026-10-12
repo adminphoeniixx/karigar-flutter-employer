@@ -172,7 +172,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     _ProfileRow(
                       icon: LucideIcons.star,
-                      title: context.tr('Shortlisted Workers'),
+                      title: context.tr('Shortlisted Karigars'),
                       subtitle: 'Candidates saved across all jobs',
                       trailing: '→',
                       onTap: () => _open(const ShortlistedScreen()),
@@ -180,15 +180,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     _ProfileRow(
                       icon: LucideIcons.star,
                       title: context.tr('Reviews & Ratings'),
-                      subtitle: 'How workers rated you',
+                      subtitle: 'How karigars rated you',
                       trailing:
                           '★ ${profile?.rating.average.toStringAsFixed(1) ?? '0.0'} →',
                       onTap: () => _open(const ReviewsScreen()),
                     ),
                     _ProfileRow(
                       icon: LucideIcons.layers,
-                      title: 'Plans & Worker Database',
-                      subtitle: 'Subscriptions and worker contacts',
+                      title: 'Plans & Karigar Database',
+                      subtitle: 'Subscriptions and karigar contacts',
                       trailing: '→',
                       onTap: () => _open(const PlansScreen()),
                     ),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
 import '../profile/plans_screen.dart';
-import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/data.dart';
@@ -21,12 +20,13 @@ class WorkerProfileScreen extends StatefulWidget {
     this.phone,
     this.contactUnlocked = false,
     this.canMessage = false,
+    this.alwaysShowContact = false,
     this.onUnlock,
   });
   final Worker worker;
   final int? workerUserId, profileId, jobId;
   final String? phone;
-  final bool contactUnlocked, canMessage;
+  final bool contactUnlocked, canMessage, alwaysShowContact;
   final Future<String?> Function()? onUnlock;
   @override
   State<WorkerProfileScreen> createState() => _WorkerProfileScreenState();
@@ -43,7 +43,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   @override
   void initState() {
     super.initState();
-    unlocked = widget.contactUnlocked;
+    unlocked = widget.contactUnlocked || widget.alwaysShowContact;
     phone = widget.phone;
     loadingProfile = widget.profileId != null;
   }
@@ -69,6 +69,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         profile = loaded;
         phone = loaded.phone;
         unlocked =
+            widget.alwaysShowContact ||
             loaded.contactUnlocked ||
             (!loaded.locked && loaded.phone?.isNotEmpty == true);
       });
@@ -144,16 +145,6 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
     }
   }
 
-  Future<void> _copyPhone() async {
-    if (phone == null || phone!.isEmpty) return;
-    await Clipboard.setData(ClipboardData(text: phone!));
-    if (mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Phone number copied.')));
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final w = widget.worker;
@@ -194,13 +185,30 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  w.name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                Row(
+                                  children: [
+                                    Flexible(
+                                      child: Text(
+                                        w.name,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ),
+                                    if (widget.alwaysShowContact ||
+                                        details?.verified == true ||
+                                        w.verified) ...[
+                                      const SizedBox(width: 6),
+                                      const Icon(
+                                        LucideIcons.badgeCheck,
+                                        size: 18,
+                                        color: Colors.white,
+                                      ),
+                                    ],
+                                  ],
                                 ),
                                 Text(
                                   '${w.trade} · ${w.experience} yrs experience',
@@ -210,28 +218,12 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   ),
                                 ),
                                 const SizedBox(height: 5),
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 4,
-                                  children: [
-                                    Text(
-                                      '${details?.city ?? 'Location unavailable'}'
-                                      '${w.distance > 0 ? ' · ${w.distance.toStringAsFixed(1)} km' : ''}',
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    if ((details?.rating.count ?? 0) > 0)
-                                      Text(
-                                        '★ ${details!.rating.average.toStringAsFixed(1)}',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                  ],
+                                Text(
+                                  '${details?.city ?? 'Location unavailable'}${w.distance > 0 ? ' · ${w.distance.toStringAsFixed(1)} km' : ''}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                  ),
                                 ),
                               ],
                             ),
@@ -239,23 +231,25 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            if (AppScope.of(context)
-                                        .dashboard
-                                        .data
-                                        ?.workerVerificationEnabled !=
-                                    false &&
-                                details?.verified == true)
-                              const StatusPill('Verified'),
-                            if (details?.available == true)
-                              const BrandChip('● Available'),
-                            if (w.wage > 0) BrandChip(monthlyWage(w.wage)),
-                          ],
+                      SizedBox(
+                        height: 29,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              if (widget.alwaysShowContact ||
+                                  details?.verified == true)
+                                const StatusPill('Verified'),
+                              if (details?.available == true) ...[
+                                const SizedBox(width: 8),
+                                const BrandChip('● Available'),
+                              ],
+                              if (w.wage > 0) ...[
+                                const SizedBox(width: 8),
+                                BrandChip(monthlyWage(w.wage)),
+                              ],
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -267,11 +261,23 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Card(
+                        elevation: 0,
+                        clipBehavior: Clip.antiAlias,
                         child: Padding(
                           padding: const EdgeInsets.all(14),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              const Text(
+                                'CONTACT & ACTIONS',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  letterSpacing: .7,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.muted,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                               Row(
                                 children: [
                                   Container(
@@ -357,6 +363,8 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   phone: phone,
                                   email: details?.email,
                                   expanded: true,
+                                  compact: true,
+                                  onChat: busy ? null : () => _message(),
                                 ),
                               ],
                             ],
@@ -364,11 +372,17 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         ),
                       ),
                       const SectionTitle('About'),
-                      Text(
-                        details?.bio.isNotEmpty == true
-                            ? details!.bio
-                            : 'Karigar profile details are not available.',
-                        style: const TextStyle(fontSize: 14.5, height: 1.55),
+                      Card(
+                        elevation: 0,
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Text(
+                            details?.bio.isNotEmpty == true
+                                ? details!.bio
+                                : 'Karigar profile details are not available.',
+                            style: const TextStyle(fontSize: 14, height: 1.55),
+                          ),
+                        ),
                       ),
                       const SectionTitle('Skills'),
                       Wrap(
@@ -393,6 +407,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                           '${details?.experienceYears ?? w.experience} years',
                                     ),
                                   ),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: _InfoTile(
                                       icon: LucideIcons.indianRupee,
@@ -407,7 +422,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   ),
                                 ],
                               ),
-                              const Divider(height: 24),
+                              const Divider(height: 26),
                               Row(
                                 children: [
                                   Expanded(
@@ -419,6 +434,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                           : 'Not provided',
                                     ),
                                   ),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: _InfoTile(
                                       icon: LucideIcons.graduationCap,
@@ -436,47 +452,68 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         ),
                       ),
                       const SectionTitle('Languages'),
-                      if (languages.isEmpty)
-                        const Text(
-                          'Not provided',
-                          style: TextStyle(
-                            color: AppColors.muted,
-                            fontSize: 13,
+                      Card(
+                        margin: EdgeInsets.zero,
+                        child: Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                width: 38,
+                                height: 38,
+                                decoration: BoxDecoration(
+                                  color: AppColors.brand50,
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                child: const Icon(
+                                  LucideIcons.languages,
+                                  size: 19,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      'Spoken languages',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.muted,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 7),
+                                    if (languages.isEmpty)
+                                      const Text(
+                                        'Not provided',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      )
+                                    else
+                                      Wrap(
+                                        spacing: 7,
+                                        runSpacing: 7,
+                                        children: languages
+                                            .map(
+                                              (value) => BrandChip(
+                                                value,
+                                                neutral: true,
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        )
-                      else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: languages
-                              .map((value) => BrandChip(value, neutral: true))
-                              .toList(),
                         ),
-                      const SizedBox(height: 18),
-                      if (widget.canMessage || unlocked)
-                        Row(
-                          children: [
-                            if (widget.canMessage || unlocked)
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: busy ? null : _message,
-                                  icon: const Icon(LucideIcons.messageCircle),
-                                  label: const Text('Message'),
-                                ),
-                              ),
-                            if (unlocked) const SizedBox(width: 8),
-                            if (unlocked)
-                              Expanded(
-                                child: FilledButton.icon(
-                                  onPressed: phone?.isNotEmpty == true
-                                      ? _copyPhone
-                                      : null,
-                                  icon: const Icon(LucideIcons.copy),
-                                  label: const Text('Copy phone'),
-                                ),
-                              ),
-                          ],
-                        ),
+                      ),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),

@@ -13,6 +13,7 @@ import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
 import 'package:employer_kariger_app/screens/jobs/applicant_features_screen.dart';
 import 'package:employer_kariger_app/screens/workers/worker_profile_screen.dart';
+import 'package:employer_kariger_app/screens/messages/chat_screen.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 
 class JobManageScreen extends StatefulWidget {
@@ -21,6 +22,43 @@ class JobManageScreen extends StatefulWidget {
 
   @override
   State<JobManageScreen> createState() => _JobManageScreenState();
+}
+
+class _OfferSentCard extends StatelessWidget {
+  const _OfferSentCard({required this.offer});
+  final Map<String, dynamic> offer;
+
+  @override
+  Widget build(BuildContext context) {
+    final wage = num.tryParse('${offer['wage'] ?? ''}');
+    final date = DateTime.tryParse('${offer['start_date'] ?? ''}');
+    final message = offer['message']?.toString().trim();
+    return Card(
+      margin: const EdgeInsets.only(top: 10),
+      color: AppColors.greenBg,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Offer sent',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            if (wage != null) Text('Salary · ${monthlyWage(wage)}'),
+            if (date != null)
+              Text(
+                'Joining · ${MaterialLocalizations.of(context).formatMediumDate(date)}',
+              ),
+            if (message?.isNotEmpty == true) ...[
+              const SizedBox(height: 4),
+              Text(message!),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _JobSummaryCard extends StatelessWidget {
@@ -224,7 +262,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
       text: applicant.expectedWage?.toStringAsFixed(0) ?? '',
     );
     final offerMessage = TextEditingController();
-    DateTime? startDate;
+    DateTime startDate = DateTime.now().add(const Duration(days: 1));
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => StatefulBuilder(
@@ -233,18 +271,27 @@ class _JobManageScreenState extends State<JobManageScreen> {
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'For: ${job.title}',
+                  style: const TextStyle(color: AppColors.muted, fontSize: 13),
+                ),
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: wage,
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
-                  labelText: 'Offered wage (₹ / month)',
+                  labelText: 'Monthly salary * (₹ / month)',
                   hintText: 'e.g. 23400',
                 ),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: offerMessage,
-                maxLines: 2,
+                maxLines: 3,
+                maxLength: 1000,
                 decoration: const InputDecoration(
                   labelText: 'Message (optional)',
                   hintText: 'Reporting time or site instructions',
@@ -258,16 +305,10 @@ class _JobManageScreenState extends State<JobManageScreen> {
                     firstDate: DateTime.now(),
                     lastDate: DateTime.now().add(const Duration(days: 730)),
                   );
-                  if (value != null) {
-                    setDialogState(() => startDate = value);
-                  }
+                  if (value != null) setDialogState(() => startDate = value);
                 },
                 icon: const Icon(LucideIcons.calendarDays),
-                label: Text(
-                  startDate == null
-                      ? 'Select start date'
-                      : _dateValue(startDate!),
-                ),
+                label: Text('Joining date * · ${_dateValue(startDate)}'),
               ),
             ],
           ),
@@ -277,9 +318,18 @@ class _JobManageScreenState extends State<JobManageScreen> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: startDate == null
-                  ? null
-                  : () => Navigator.pop(dialogContext, true),
+              onPressed: () {
+                if (num.tryParse(wage.text.trim()) == null ||
+                    num.parse(wage.text.trim()) < 0) {
+                  ScaffoldMessenger.of(dialogContext).showSnackBar(
+                    const SnackBar(
+                      content: Text('Enter a valid monthly salary.'),
+                    ),
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, true);
+              },
               child: const Text('Send offer'),
             ),
           ],
@@ -290,13 +340,13 @@ class _JobManageScreenState extends State<JobManageScreen> {
     final message = offerMessage.text.trim();
     wage.dispose();
     offerMessage.dispose();
-    if (confirmed != true || startDate == null) return;
+    if (confirmed != true) return;
     try {
       await api.applicantStatus(
         applicant.id,
         'accepted',
         offeredWage: offeredWage,
-        startDate: _dateValue(startDate!),
+        startDate: _dateValue(startDate),
         message: message.isEmpty ? null : message,
       );
       await _load();
@@ -348,23 +398,213 @@ class _JobManageScreenState extends State<JobManageScreen> {
     }
   }
 
-  Future<void> _unlock(Applicant applicant) async {
+  Future<void> _chat(Applicant applicant, Worker worker) async {
     try {
-      await AppScope.of(context).api.unlock(applicant.id);
-      await _load();
-      _message('Contact unlocked.');
+      final response = await AppScope.of(
+        context,
+      ).api.startConversation(workerId: applicant.worker.userId, jobId: job.id);
+      final conversation = response['conversation'];
+      final id = conversation is Map
+          ? (conversation['id'] as num?)?.toInt()
+          : null;
+      if (!mounted || id == null) return;
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ChatScreen(worker: worker, conversationId: id),
+        ),
+      );
     } catch (exception) {
-      if (mounted) await showContactError(context, exception);
+      if (mounted) _message('$exception');
     }
   }
 
-  Future<String?> _unlockFromProfile(Applicant applicant) async {
-    final response = await AppScope.of(context).api.unlock(applicant.id);
-    final applicantJson = response['applicant'];
-    final workerJson = applicantJson is Map ? applicantJson['worker'] : null;
-    final phone = workerJson is Map ? workerJson['phone']?.toString() : null;
-    await _load();
-    return phone;
+  Future<void> _aiShortlist() async {
+    var count = 5;
+    var autoCall = true;
+    DateTime? callAt;
+    final messageController = TextEditingController();
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      constraints: const BoxConstraints(maxWidth: 640),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => Padding(
+          padding: EdgeInsets.fromLTRB(
+            20,
+            4,
+            20,
+            20 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'AI shortlist from database',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 6),
+              const Text('We will rank relevant karigars for this job.'),
+              const SizedBox(height: 18),
+              const Text(
+                'How many karigars?',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: [3, 5, 10]
+                    .map(
+                      (value) => ChoiceChip(
+                        label: Text('$value'),
+                        selected: count == value,
+                        onSelected: (_) => setSheetState(() => count = value),
+                      ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 12),
+              SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Schedule AI screening call'),
+                subtitle: const Text(
+                  'Book a screening call for selected matches',
+                ),
+                value: autoCall,
+                onChanged: (value) => setSheetState(() => autoCall = value),
+              ),
+              if (autoCall)
+                OutlinedButton.icon(
+                  onPressed: () async {
+                    final date = await showDatePicker(
+                      context: context,
+                      firstDate: DateTime.now(),
+                      lastDate: DateTime.now().add(const Duration(days: 15)),
+                      initialDate:
+                          callAt ?? DateTime.now().add(const Duration(days: 1)),
+                    );
+                    if (date == null || !context.mounted) return;
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(
+                        callAt ?? DateTime.now(),
+                      ),
+                    );
+                    if (time != null) {
+                      setSheetState(
+                        () => callAt = DateTime(
+                          date.year,
+                          date.month,
+                          date.day,
+                          time.hour,
+                          time.minute,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(LucideIcons.calendarClock),
+                  label: Text(
+                    callAt == null
+                        ? 'Choose call time (optional)'
+                        : MaterialLocalizations.of(
+                                context,
+                              ).formatMediumDate(callAt!) +
+                              ' · ' +
+                              MaterialLocalizations.of(context).formatTimeOfDay(
+                                TimeOfDay.fromDateTime(callAt!),
+                              ),
+                  ),
+                ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: messageController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: 'Invite message (optional)',
+                  hintText: 'We found your profile suitable for this job.',
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.pop(sheetContext, true),
+                  icon: const Icon(LucideIcons.sparkles),
+                  label: const Text('Find matching karigars'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (confirmed != true) {
+      messageController.dispose();
+      return;
+    }
+    try {
+      final response = await AppScope.of(context).api.aiShortlist(
+        job.id,
+        count: count,
+        autoCall: autoCall,
+        callAt: callAt?.toIso8601String(),
+        message: messageController.text.trim().isEmpty
+            ? null
+            : messageController.text.trim(),
+      );
+      if (!mounted) return;
+      final picked = response['picked'] as List? ?? const [];
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('AI shortlist from database'),
+          content: SizedBox(
+            width: 360,
+            child: picked.isEmpty
+                ? Text('${response['message'] ?? 'No good matches found.'}')
+                : ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: picked.length,
+                    separatorBuilder: (_, _) => const Divider(height: 18),
+                    itemBuilder: (_, index) {
+                      final item = Map<String, dynamic>.from(
+                        picked[index] as Map,
+                      );
+                      final details = [
+                        if ('${item['location_label'] ?? ''}'.isNotEmpty)
+                          '${item['location_label']}',
+                        if ('${item['summary'] ?? ''}'.isNotEmpty)
+                          '${item['summary']}',
+                      ];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${item['name'] ?? 'Karigar'}',
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          Text('${item['score'] ?? 0}/100 match'),
+                          if (details.isNotEmpty) Text(details.join(' · ')),
+                        ],
+                      );
+                    },
+                  ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) _message('$e');
+    } finally {
+      messageController.dispose();
+    }
   }
 
   Future<void> _downloadResume(Applicant applicant) async {
@@ -483,6 +723,12 @@ class _JobManageScreenState extends State<JobManageScreen> {
           ),
           const SectionTitle('Applicants'),
           if (job.id != 0) ...[
+            FilledButton.icon(
+              onPressed: _aiShortlist,
+              icon: const Icon(LucideIcons.sparkles, size: 18),
+              label: const Text('AI shortlist from database'),
+            ),
+            const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: () => Navigator.push(
                 context,
@@ -491,7 +737,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
                 ),
               ),
               icon: const Icon(LucideIcons.sparkles, size: 18),
-              label: const Text('View matched workers'),
+              label: const Text('View matched karigars'),
             ),
             const SizedBox(height: 12),
           ],
@@ -535,7 +781,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
               final profile = applicant.worker;
               final worker = Worker(
                 profile.name,
-                profile.skills.isEmpty ? 'Worker' : profile.skills.first,
+                profile.skills.isEmpty ? 'Karigar' : profile.skills.first,
                 profile.experienceYears,
                 profile.rating.average,
                 profile.distanceKm ?? 0,
@@ -559,11 +805,9 @@ class _JobManageScreenState extends State<JobManageScreen> {
                             workerUserId: profile.userId,
                             jobId: job.id,
                             phone: profile.phone,
-                            contactUnlocked: applicant.contactUnlocked,
+                            contactUnlocked: true,
                             canMessage: true,
-                            onUnlock: applicant.contactUnlocked
-                                ? null
-                                : () => _unlockFromProfile(applicant),
+                            alwaysShowContact: true,
                           ),
                         ),
                       ),
@@ -606,15 +850,13 @@ class _JobManageScreenState extends State<JobManageScreen> {
                         label: const Text('AI screening calls'),
                       ),
                     ),
-                    if (!applicant.contactUnlocked)
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _unlock(applicant),
-                          icon: const Icon(LucideIcons.lockOpen, size: 17),
-                          label: const Text('Unlock contact'),
-                        ),
-                      ),
+                    const SizedBox(height: 8),
+                    ContactActions(
+                      phone: profile.phone,
+                      email: profile.email,
+                      expanded: true,
+                      onChat: () => _chat(applicant, worker),
+                    ),
                     Row(
                       children: [
                         Expanded(
@@ -662,6 +904,8 @@ class _JobManageScreenState extends State<JobManageScreen> {
                           child: const Text('Cancel interview'),
                         ),
                       ),
+                    if (applicant.stage == 'hired' && applicant.offer != null)
+                      _OfferSentCard(offer: applicant.offer!),
                   ],
                 ),
               );

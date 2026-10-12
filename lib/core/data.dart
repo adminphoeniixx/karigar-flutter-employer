@@ -9,6 +9,7 @@ class Job {
     this.hired,
     this.status, {
     this.id = 0,
+    this.moderationNote,
   });
 
   final String title;
@@ -20,6 +21,7 @@ class Job {
   final int shortlisted;
   final int hired;
   final int id;
+  final String? moderationNote;
 }
 
 class Worker {

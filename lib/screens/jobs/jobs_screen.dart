@@ -3,11 +3,11 @@ import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
-import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/core/app_strings.dart';
 import 'package:employer_kariger_app/screens/dashboard/home_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/job_manage_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/post_job_screen.dart';
+import 'package:employer_kariger_app/screens/jobs/ai_interviews_screen.dart';
 
 class JobsScreen extends StatefulWidget {
   const JobsScreen({super.key});
@@ -45,10 +45,15 @@ class _JobsScreenState extends State<JobsScreen> {
               job.stats['applicants'] as int? ?? 0,
               job.stats['shortlisted'] as int? ?? 0,
               job.stats['hired'] as int? ?? 0,
-              job.status.isEmpty
+              job.moderation?['status'] == 'pending'
+                  ? 'Under review'
+                  : job.moderation?['status'] == 'rejected'
+                  ? 'Not approved'
+                  : job.status.isEmpty
                   ? ''
                   : '${job.status[0].toUpperCase()}${job.status.substring(1)}',
               id: job.id,
+              moderationNote: job.moderation?['note']?.toString(),
             ),
           )
           .toList();
@@ -84,6 +89,14 @@ class _JobsScreenState extends State<JobsScreen> {
     appBar: AppBar(
       title: Text(context.tr('My Jobs')),
       actions: [
+        IconButton(
+          tooltip: 'AI Interviews',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AiInterviewsScreen()),
+          ),
+          icon: const Icon(LucideIcons.botMessageSquare),
+        ),
         Padding(
           padding: const EdgeInsets.only(right: 16),
           child: IconButton(

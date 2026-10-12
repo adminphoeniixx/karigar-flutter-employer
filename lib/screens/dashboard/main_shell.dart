@@ -109,27 +109,24 @@ class _BottomNav extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     if (center)
-                      Transform.translate(
-                        offset: const Offset(0, -9),
-                        child: Container(
-                          width: 50,
-                          height: 50,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(18),
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x45F4470F),
-                                blurRadius: 12,
-                                offset: Offset(0, 5),
-                              ),
-                            ],
-                          ),
-                          child: const Icon(
-                            LucideIcons.plus,
-                            color: Colors.white,
-                            size: 28,
-                          ),
+                      Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(18),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x45F4470F),
+                              blurRadius: 12,
+                              offset: Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          LucideIcons.plus,
+                          color: Colors.white,
+                          size: 28,
                         ),
                       )
                     else
@@ -140,21 +137,23 @@ class _BottomNav extends StatelessWidget {
                             ? colors.primary
                             : colors.onSurfaceVariant,
                       ),
-                    SizedBox(height: center ? 1 : 5),
-                    Text(
-                      context.tr(items[i].$2),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: selected
-                            ? colors.primary
-                            : colors.onSurfaceVariant,
-                        fontSize: 10.5,
-                        fontWeight: selected
-                            ? FontWeight.w600
-                            : FontWeight.w500,
+                    if (!center) ...[
+                      const SizedBox(height: 5),
+                      Text(
+                        context.tr(items[i].$2),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: selected
+                              ? colors.primary
+                              : colors.onSurfaceVariant,
+                          fontSize: 10.5,
+                          fontWeight: selected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                        ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),

@@ -234,8 +234,32 @@ class EmployerApiService {
         ApiConstants.applicantScreeningCalls(applicantId),
         query: {'with_transcript': transcript ? 1 : null},
       );
-  Future<Json> placeScreeningCall(int applicantId) =>
-      client.post(ApiConstants.applicantScreeningCalls(applicantId));
+  Future<Json> placeScreeningCall(int applicantId, {String? at}) => client.post(
+    ApiConstants.applicantScreeningCalls(applicantId),
+    body: {'at': ?at},
+  );
+  Future<Json> cancelScreeningCall(int callId) =>
+      client.delete('/employer/screening-calls/$callId');
+  Future<Json> aiInterviews({String filter = 'upcoming', int page = 1}) =>
+      client.get(
+        '/employer/ai-interviews',
+        query: {'filter': filter, 'page': page},
+      );
+  Future<Json> aiShortlist(
+    int jobId, {
+    int count = 5,
+    bool autoCall = true,
+    String? callAt,
+    String? message,
+  }) => client.post(
+    '/employer/jobs/$jobId/ai-shortlist',
+    body: {
+      'count': count,
+      'auto_call': autoCall,
+      'call_at': ?callAt,
+      'message': ?message,
+    },
+  );
   Future<Json> confirmScreeningCall(
     int callId, {
     String? interviewAt,
@@ -254,6 +278,10 @@ class EmployerApiService {
       client.get('/employer/workers', query: filters);
   Future<Json> unlockWorker(int profileId) =>
       client.post('/employer/workers/$profileId/unlock');
+  Future<Json> rejectWorker(int profileId) =>
+      client.post('/employer/workers/$profileId/reject');
+  Future<Json> restoreWorker(int profileId) =>
+      client.delete('/employer/workers/$profileId/reject');
 
   Future<Json> contacts(String source, Map<String, dynamic> filters) =>
       client.get('/employer/contacts/$source', query: filters);
@@ -268,6 +296,9 @@ class EmployerApiService {
     required Map<String, String> fields,
     required Map<String, File> files,
   }) => client.multipart('/employer/kyc', fields: fields, files: files);
+  Future<Json> startKycDigiLocker() => client.post('/employer/kyc/digilocker');
+  Future<Json> kycDigiLockerStatus(String reference) =>
+      client.get('/employer/kyc/digilocker/$reference');
 
   Future<Json> notifications({int page = 1}) =>
       client.get('/notifications', query: {'page': page});

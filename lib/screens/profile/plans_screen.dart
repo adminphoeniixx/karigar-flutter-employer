@@ -293,7 +293,9 @@ class _PlansScreenState extends State<PlansScreen> {
   String _usageLabel(BuildContext context) {
     final usage = jobPosts!;
     final reset = DateTime.tryParse('${usage['resets_at'] ?? ''}');
-    return '${usage['used'] ?? 0} of ${usage['limit'] ?? 0} job posts used this month'
+    final used = usage['used'] ?? 0;
+    final limit = usage['limit'] ?? 0;
+    return '$used of $limit job post${limit == 1 ? '' : 's'} used · 30-day period'
         '${reset == null ? '' : ' · resets ${MaterialLocalizations.of(context).formatShortDate(reset.toLocal())}'}';
   }
 
@@ -387,7 +389,7 @@ class _PlansScreenState extends State<PlansScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Plans & Worker Database')),
+    appBar: AppBar(title: const Text('Plans & Karigar Database')),
     body: loading && plans.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : error != null && plans.isEmpty
@@ -426,10 +428,12 @@ class _PlansScreenState extends State<PlansScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              database?['title']?.toString() ??
-                                  (unlocks['unmetered'] == true
-                                      ? 'Unlimited unlocks'
-                                      : '${unlocks['plan_remaining'] ?? 0} unlocks'),
+                              (database?['title']?.toString() ??
+                                      (unlocks['unmetered'] == true
+                                          ? 'Unlimited unlocks'
+                                          : '${unlocks['plan_remaining'] ?? 0} unlocks'))
+                                  .replaceAll('Worker', 'Karigar')
+                                  .replaceAll('worker', 'karigar'),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 18,
@@ -437,8 +441,10 @@ class _PlansScreenState extends State<PlansScreen> {
                               ),
                             ),
                             Text(
-                              database?['subtitle']?.toString() ??
-                                  'Choose a plan to unlock worker contacts',
+                              (database?['subtitle']?.toString() ??
+                                      'Choose a plan to unlock karigar contacts')
+                                  .replaceAll('Worker', 'Karigar')
+                                  .replaceAll('worker', 'karigar'),
                               style: const TextStyle(
                                 color: Colors.white70,
                                 fontSize: 13,
@@ -455,12 +461,12 @@ class _PlansScreenState extends State<PlansScreen> {
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Text(
-                      'Contact unlocks renew on ${MaterialLocalizations.of(context).formatMediumDate(reset.toLocal())}',
+                      'Database unlocks renew on ${MaterialLocalizations.of(context).formatMediumDate(reset.toLocal())}',
                     ),
                   ),
                 if (jobPosts != null && jobPosts!['unlimited'] != true)
                   Padding(
-                    padding: const EdgeInsets.only(top: 12,bottom: 12),
+                    padding: const EdgeInsets.only(top: 12, bottom: 12),
                     child: Text(_usageLabel(context)),
                   ),
                 _ActivePlanBanner(plans: plans),
@@ -468,7 +474,7 @@ class _PlansScreenState extends State<PlansScreen> {
                 _PlanSection(
                   title: 'Job plans',
                   subtitle:
-                      'Post jobs, see applicants and open the Worker Database.',
+                      'Post jobs, see applicants and open the Karigar Database.',
                   plans: plans
                       .where((plan) => plan['type'] != 'database')
                       .toList(),
@@ -481,7 +487,7 @@ class _PlansScreenState extends State<PlansScreen> {
                   _PlanSection(
                     title: 'Database plans',
                     subtitle:
-                        'Get worker contacts on their own or alongside a job plan.',
+                        'Get karigar contacts on their own or alongside a job plan.',
                     plans: plans
                         .where((plan) => plan['type'] == 'database')
                         .toList(),
@@ -713,7 +719,7 @@ class _PlanState extends State<_Plan> {
             ],
           ),
           Text(
-            '${plan['interval'] ?? ''}',
+            '${plan['interval_label'] ?? plan['interval'] ?? ''}',
             style: TextStyle(color: colors.onSurfaceVariant),
           ),
           if (widget.gstPercent > 0 &&

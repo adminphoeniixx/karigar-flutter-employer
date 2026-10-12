@@ -171,7 +171,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     } else if (step == 2 && (state == null || city == null)) {
       error = 'Select your state and city.';
     } else if (step == 3 && selectedTrades.isEmpty) {
-      error = 'Select at least one worker category.';
+      error = 'Select at least one karigar category.';
     }
     if (error != null) _message(error);
     return error == null;
@@ -278,7 +278,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       case 0:
         return _section(
           title: 'Who are you hiring as?',
-          subtitle: 'Workers will see this contact name on your jobs.',
+          subtitle: 'Karigars will see this contact name on your jobs.',
           children: [
             const _FieldLabel('Your full name'),
             _Input(hint: 'e.g. Anil Sharma', controller: nameController),
@@ -339,7 +339,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       case 2:
         return _section(
           title: 'Where are you based?',
-          subtitle: "We'll show your jobs to workers near this location.",
+          subtitle: "We'll show your jobs to karigars near this location.",
           children: [
             Container(
               height: 46,
@@ -398,9 +398,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         );
       case 3:
         return _section(
-          title: 'What kind of workers do you hire?',
+          title: 'What kind of karigars do you hire?',
           subtitle:
-              "Pick the trades you usually need. We'll suggest matching workers. Choose all that apply.",
+              "Pick the trades you usually need. We'll suggest matching karigars. Choose all that apply.",
           children: [
             Wrap(
               spacing: 8,

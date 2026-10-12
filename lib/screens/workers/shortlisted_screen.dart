@@ -45,18 +45,9 @@ class _ShortlistedScreenState extends State<ShortlistedScreen> {
     }
   }
 
-  Future<String?> _unlockApplicant(Applicant applicant) async {
-    final response = await AppScope.of(context).api.unlock(applicant.id);
-    final applicantJson = response['applicant'];
-    final workerJson = applicantJson is Map ? applicantJson['worker'] : null;
-    final phone = workerJson is Map ? workerJson['phone']?.toString() : null;
-    await _load();
-    return phone;
-  }
-
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Shortlisted workers')),
+    appBar: AppBar(title: const Text('Shortlisted karigars')),
     body: loading && applicants.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : error != null && applicants.isEmpty
@@ -73,7 +64,7 @@ class _ShortlistedScreenState extends State<ShortlistedScreen> {
                       Padding(
                         padding: EdgeInsets.all(32),
                         child: Text(
-                          'No shortlisted workers yet.',
+                          'No shortlisted karigars yet.',
                           textAlign: TextAlign.center,
                         ),
                       ),
@@ -83,7 +74,7 @@ class _ShortlistedScreenState extends State<ShortlistedScreen> {
                       final worker = Worker(
                         profile.name,
                         profile.skills.isEmpty
-                            ? 'Worker'
+                            ? 'Karigar'
                             : profile.skills.first,
                         profile.experienceYears,
                         profile.rating.average,
@@ -121,11 +112,9 @@ class _ShortlistedScreenState extends State<ShortlistedScreen> {
                                     jobId: (applicant.job?['id'] as num?)
                                         ?.toInt(),
                                     phone: profile.phone,
-                                    contactUnlocked: applicant.contactUnlocked,
+                                    contactUnlocked: true,
                                     canMessage: true,
-                                    onUnlock: applicant.contactUnlocked
-                                        ? null
-                                        : () => _unlockApplicant(applicant),
+                                    alwaysShowContact: true,
                                   ),
                                 ),
                               ),

@@ -53,7 +53,7 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Hire skilled\nworkers, fast.',
+                        'Hire skilled\nkarigars, fast.',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 32,
@@ -106,7 +106,7 @@ class OnboardingScreen extends StatelessWidget {
                                 text: 'For employers · Looking for work? ',
                               ),
                               TextSpan(
-                                text: 'Karigar Worker app',
+                                text: 'Karigar app',
                                 style: TextStyle(fontWeight: FontWeight.w700),
                               ),
                             ],

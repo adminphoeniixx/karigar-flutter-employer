@@ -182,7 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 _SettingsRow(
                   icon: LucideIcons.messageSquare,
                   title: context.tr('Message alerts'),
-                  subtitle: context.tr('Get notified about worker messages'),
+                  subtitle: context.tr('Get notified about karigar messages'),
                   trailing: _CompactSwitch(
                     value: messageAlerts,
                     onChanged: (value) =>
