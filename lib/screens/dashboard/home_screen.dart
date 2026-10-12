@@ -453,13 +453,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       worker: worker,
                       displayName: profile.name,
                       status: applicant.statusLabel,
+                      stage: applicant.stage,
                       skills: profile.skills,
                       phone: profile.phone,
+                      distanceLabel: profile.distanceLabel,
+                      locationLabel: profile.locationLabel,
                       onChat: () => _chatApplicant(applicant, worker),
-                      onPrimary: () => _applicantAction(
-                        applicant.id,
-                        applicant.shortlisted ? 'interview' : 'shortlist',
-                      ),
+                      onPrimary: () =>
+                          _applicantAction(applicant.id, 'shortlist'),
                       onHire: () => _hireApplicant(applicant),
                       onReject: () => _applicantAction(applicant.id, 'reject'),
                       onTap: () => Navigator.push(
@@ -870,8 +871,11 @@ class _ApplicantCard extends StatelessWidget {
     required this.worker,
     required this.displayName,
     required this.status,
+    required this.stage,
     required this.skills,
     required this.phone,
+    this.distanceLabel,
+    this.locationLabel,
     required this.onChat,
     required this.onPrimary,
     required this.onHire,
@@ -881,8 +885,10 @@ class _ApplicantCard extends StatelessWidget {
   final Worker worker;
   final String displayName;
   final String status;
+  final String stage;
   final List<String> skills;
   final String? phone;
+  final String? distanceLabel, locationLabel;
   final VoidCallback onChat, onPrimary, onHire, onReject;
   final VoidCallback onTap;
 
@@ -890,7 +896,12 @@ class _ApplicantCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final normalizedStatus = status.toLowerCase();
+    final normalizedStatus = stage.toLowerCase();
+    final canManage = !{'hired', 'rejected'}.contains(normalizedStatus);
+    final place = [
+      if (distanceLabel?.trim().isNotEmpty == true) distanceLabel!.trim(),
+      if (locationLabel?.trim().isNotEmpty == true) locationLabel!.trim(),
+    ];
     final statusColor = normalizedStatus == 'shortlisted'
         ? AppColors.indigo
         : normalizedStatus == 'accepted' || normalizedStatus == 'hired'
@@ -971,14 +982,10 @@ class _ApplicantCard extends StatelessWidget {
                             color: colors.onSurfaceVariant,
                           ),
                         ),
-                        if (worker.distance > 0 || worker.wage > 0) ...[
+                        if (place.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Text(
-                            [
-                              if (worker.distance > 0)
-                                '⌖ ${worker.distance.toStringAsFixed(1)} km away',
-                              if (worker.wage > 0) monthlyWage(worker.wage),
-                            ].join('   ·   '),
+                            place.join(' · '),
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -1045,64 +1052,68 @@ class _ApplicantCard extends StatelessWidget {
                 onChat: onChat,
                 compact: true,
               ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? colors.surfaceContainerHighest
-                      : AppColors.brand50,
-                  borderRadius: BorderRadius.circular(12),
+              if (canManage) ...[
+                const SizedBox(height: 10),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? colors.surfaceContainerHighest
+                        : AppColors.brand50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onPrimary,
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(38),
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            backgroundColor: colors.surface,
+                          ),
+                          icon: Icon(
+                            normalizedStatus == 'shortlisted' ||
+                                    normalizedStatus == 'interview'
+                                ? LucideIcons.star
+                                : LucideIcons.star,
+                            size: 16,
+                          ),
+                          label: Text(
+                            normalizedStatus == 'shortlisted' ||
+                                    normalizedStatus == 'interview'
+                                ? 'Shortlisted'
+                                : 'Shortlist',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: onHire,
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(38),
+                          ),
+                          child: const Text('Hire'),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      SizedBox(
+                        width: 40,
+                        child: IconButton.outlined(
+                          onPressed: onReject,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(40, 38),
+                            foregroundColor: AppColors.rose,
+                            side: const BorderSide(color: AppColors.line),
+                          ),
+                          icon: const Icon(LucideIcons.x, size: 18),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: onPrimary,
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(38),
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          backgroundColor: colors.surface,
-                        ),
-                        icon: Icon(
-                          normalizedStatus == 'shortlisted'
-                              ? LucideIcons.calendarDays
-                              : LucideIcons.star,
-                          size: 16,
-                        ),
-                        label: Text(
-                          normalizedStatus == 'shortlisted'
-                              ? 'Interview'
-                              : 'Shortlist',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: onHire,
-                        style: FilledButton.styleFrom(
-                          minimumSize: const Size.fromHeight(38),
-                        ),
-                        child: const Text('Hire'),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    SizedBox(
-                      width: 40,
-                      child: IconButton.outlined(
-                        onPressed: onReject,
-                        style: IconButton.styleFrom(
-                          minimumSize: const Size(40, 38),
-                          foregroundColor: AppColors.rose,
-                          side: const BorderSide(color: AppColors.line),
-                        ),
-                        icon: const Icon(LucideIcons.x, size: 18),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             ],
           ),
         ),

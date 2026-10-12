@@ -857,45 +857,36 @@ class _JobManageScreenState extends State<JobManageScreen> {
                       expanded: true,
                       onChat: () => _chat(applicant, worker),
                     ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed:
-                                applicant.stage == 'shortlisted' ||
-                                    applicant.stage == 'interview'
-                                ? () => _interview(applicant)
-                                : () => _shortlist(applicant),
-                            child: Text(
-                              applicant.stage == 'interview'
-                                  ? 'Reschedule'
-                                  : applicant.stage == 'shortlisted'
-                                  ? 'Interview'
-                                  : 'Shortlist',
+                    if (applicant.stage != 'hired' &&
+                        applicant.stage != 'rejected')
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => _shortlist(applicant),
+                              child: Text(
+                                applicant.stage == 'interview' ||
+                                        applicant.stage == 'shortlisted'
+                                    ? 'Shortlisted ★'
+                                    : 'Shortlist',
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: FilledButton(
-                            onPressed: applicant.stage == 'hired'
-                                ? null
-                                : () => _hire(applicant),
-                            child: Text(
-                              applicant.stage == 'hired' ? 'Hired' : 'Hire',
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: FilledButton(
+                              onPressed: () => _hire(applicant),
+                              child: const Text('Hire'),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton.outlined(
-                          onPressed: applicant.stage == 'rejected'
-                              ? null
-                              : () => _reject(applicant),
-                          color: Colors.red,
-                          icon: const Icon(LucideIcons.x, size: 18),
-                        ),
-                      ],
-                    ),
+                          const SizedBox(width: 8),
+                          IconButton.outlined(
+                            onPressed: () => _reject(applicant),
+                            color: Colors.red,
+                            icon: const Icon(LucideIcons.x, size: 18),
+                          ),
+                        ],
+                      ),
                     if (applicant.stage == 'interview')
                       SizedBox(
                         width: double.infinity,
