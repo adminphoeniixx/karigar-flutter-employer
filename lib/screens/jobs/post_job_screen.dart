@@ -263,7 +263,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
     try {
       final result = await AppScope.of(context).api.cities(value);
       if (mounted && state == value) {
-        setState(() => cities = {...result, if (city != null) city!}.toList());
+        setState(() => cities = {...result, ?city}.toList());
       }
     } catch (_) {
       _message('Could not load cities.');
@@ -595,7 +595,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
               : editingDraft
               ? 'Edit draft'
               : 'Edit job',
-          style: const TextStyle(fontSize: 16),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ),
       body: referenceLoading
@@ -606,6 +606,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                     children: [
+                      _PostJobHeader(
+                        editing: widget.job != null,
+                        draft: editingDraft,
+                      ),
+                      const _SectionLabel('Role details'),
                       if (!canDraft) ...[
                         const _Label('Status'),
                         _singleChips(
@@ -657,7 +662,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       const _Hint(
                         'Tap to add. Karigars with these skills are matched first.',
                       ),
-                      const SizedBox(height: 14),
+                      const _SectionLabel('Work setup'),
                       Row(
                         children: [
                           Expanded(
@@ -705,7 +710,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           ),
                         ],
                       ),
-                      const _SectionLabel('Wage'),
+                      const _SectionLabel('Salary'),
                       const Text(
                         'Enter monthly salary in rupees',
                         style: TextStyle(color: AppColors.muted, fontSize: 12),
@@ -924,7 +929,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                         'Move the map or tap to pin the exact work site.',
                         style: TextStyle(fontSize: 12, color: AppColors.muted),
                       ),
-                      const SizedBox(height: 14),
+                      const _SectionLabel('Applicant reach'),
                       const _Label('How should karigars reach you?'),
                       _singleChips(
                         ['Apply + Call', 'Apply only', 'Call only'],
@@ -1094,6 +1099,76 @@ class _PostJobScreenState extends State<PostJobScreen> {
   }
 }
 
+class _PostJobHeader extends StatelessWidget {
+  const _PostJobHeader({required this.editing, required this.draft});
+  final bool editing, draft;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [AppColors.brandDark, AppColors.gradientEnd],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(22),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x294F1B0D),
+          blurRadius: 16,
+          offset: Offset(0, 7),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                editing ? (draft ? 'DRAFT JOB' : 'JOB LISTING') : 'NEW JOB',
+                style: const TextStyle(
+                  color: Color(0xFFFBECE5),
+                  fontSize: 10.5,
+                  letterSpacing: 1.1,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                editing ? 'Complete your listing' : 'Find the right karigar',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                'Add clear details to get better applications.',
+                style: TextStyle(color: Color(0xFFFBECE5), fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0x1FFFFFFF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0x40FFFFFF)),
+          ),
+          child: const Icon(LucideIcons.filePenLine, color: Colors.white),
+        ),
+      ],
+    ),
+  );
+}
+
 class _AiHelpCard extends StatelessWidget {
   const _AiHelpCard({
     required this.shortlistEnabled,
@@ -1109,6 +1184,7 @@ class _AiHelpCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Card(
+    color: AppColors.brand50,
     child: Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       child: Column(
@@ -1142,6 +1218,11 @@ class _AiHelpCard extends StatelessWidget {
                 ? 'Needs AI shortlist on.'
                 : null,
           ),
+          const SizedBox(height: 8),
+          const Text(
+            'Your AI preferences are applied when you save or publish this job.',
+            style: TextStyle(color: AppColors.muted, fontSize: 11.5),
+          ),
         ],
       ),
     ),
@@ -1163,31 +1244,47 @@ class _AiSwitch extends StatelessWidget {
   final String? note;
 
   @override
-  Widget build(BuildContext context) => Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-            const SizedBox(height: 3),
-            Text(
-              description,
-              style: const TextStyle(color: AppColors.muted, fontSize: 12),
+  Widget build(BuildContext context) => InkWell(
+    onTap: onChanged == null ? null : () => onChanged!(!value),
+    borderRadius: BorderRadius.circular(12),
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: onChanged == null ? AppColors.muted : null,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  description,
+                  style: const TextStyle(color: AppColors.muted, fontSize: 12),
+                ),
+                if (note != null) ...[
+                  const SizedBox(height: 5),
+                  Text(
+                    note!,
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            if (note != null) ...[
-              const SizedBox(height: 5),
-              Text(
-                note!,
-                style: const TextStyle(color: AppColors.muted, fontSize: 12),
-              ),
-            ],
-          ],
-        ),
+          ),
+          Switch(value: value, onChanged: onChanged),
+        ],
       ),
-      Switch(value: value, onChanged: onChanged),
-    ],
+    ),
   );
 }
 
@@ -1199,7 +1296,11 @@ class _Label extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 7),
     child: Text(
       text,
-      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+      style: const TextStyle(
+        color: AppColors.foreground,
+        fontSize: 12.5,
+        fontWeight: FontWeight.w700,
+      ),
     ),
   );
 }
@@ -1310,11 +1411,11 @@ class _Select extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        height: 48,
+        height: 50,
         padding: const EdgeInsets.symmetric(horizontal: 13),
         decoration: BoxDecoration(
-          color: colors.surfaceContainerHighest,
-          border: Border.all(color: colors.outlineVariant),
+          color: colors.surface,
+          border: Border.all(color: AppColors.line),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
@@ -1346,15 +1447,29 @@ class _SectionLabel extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
-    child: Text(
-      text.toUpperCase(),
-      style: const TextStyle(
-        color: AppColors.muted,
-        fontSize: 13,
-        fontWeight: FontWeight.w700,
-        letterSpacing: .6,
-      ),
+    padding: const EdgeInsets.only(top: 24, bottom: 12),
+    child: Row(
+      children: [
+        Container(
+          width: 4,
+          height: 19,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: const TextStyle(
+            color: AppColors.foreground,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(width: 10),
+        const Expanded(child: Divider(color: AppColors.line2, height: 1)),
+      ],
     ),
   );
 }
@@ -1375,18 +1490,18 @@ class _Choice extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
       decoration: BoxDecoration(
-        color: selected ? AppColors.brand50 : AppColors.card,
+        color: selected ? AppColors.primary : AppColors.card,
         border: Border.all(
-          color: selected ? AppColors.brand100 : AppColors.line,
+          color: selected ? AppColors.primary : AppColors.line,
         ),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: selected ? AppColors.brandDark : AppColors.muted,
+          color: selected ? Colors.white : AppColors.muted,
           fontSize: 12,
-          fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
         ),
       ),
     ),

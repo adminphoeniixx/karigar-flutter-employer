@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/app_scope.dart';
 import '../../core/data.dart';
 import '../../core/theme.dart';
@@ -11,9 +12,15 @@ import '../profile/plans_screen.dart';
 import 'worker_profile_screen.dart';
 
 class ContactsView extends StatefulWidget {
-  const ContactsView({super.key, required this.source, required this.onUsage});
+  const ContactsView({
+    super.key,
+    required this.source,
+    required this.onUsage,
+    this.initialFilters = const {},
+  });
   final String source;
   final ValueChanged<Json> onUsage;
+  final Json initialFilters;
   @override
   State<ContactsView> createState() => _ContactsViewState();
 }
@@ -25,6 +32,13 @@ class _ContactsViewState extends State<ContactsView> {
   bool loading = false, started = false;
   String? error;
   int page = 1, lastPage = 1, generation = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    filters = Json.from(widget.initialFilters);
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -283,15 +297,20 @@ class _ContactsViewState extends State<ContactsView> {
         padding: const EdgeInsets.all(16),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
+          _ContactsHeader(
+            applicants: widget.source == 'applicants',
+            count: rows.length,
+          ),
+          const SizedBox(height: 14),
           TextField(
             controller: search,
             onSubmitted: (_) => _load(),
             decoration: InputDecoration(
               hintText: 'Search name or phone',
-              prefixIcon: const Icon(Icons.search),
+              prefixIcon: const Icon(LucideIcons.search, size: 18),
               suffixIcon: IconButton(
                 onPressed: _load,
-                icon: const Icon(Icons.arrow_forward),
+                icon: const Icon(LucideIcons.arrowRight, size: 18),
               ),
             ),
           ),
@@ -309,6 +328,7 @@ class _ContactsViewState extends State<ContactsView> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Card(
+                clipBehavior: Clip.antiAlias,
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -380,29 +400,110 @@ class _ContactsViewState extends State<ContactsView> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        '${row['name'] ?? 'Karigar'}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                      Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 22,
+                            backgroundColor: AppColors.brand100,
+                            child: Text(
+                              '${row['name'] ?? 'K'}'
+                                  .split(RegExp(r'\s+'))
+                                  .where((v) => v.isNotEmpty)
+                                  .map((v) => v[0])
+                                  .take(2)
+                                  .join()
+                                  .toUpperCase(),
+                              style: const TextStyle(
+                                color: AppColors.brandDark,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 11),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${row['name'] ?? 'Karigar'}',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  [row['city'], row['state']]
+                                      .where(
+                                        (v) => v != null && '$v'.isNotEmpty,
+                                      )
+                                      .join(', '),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.muted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (widget.source == 'applicants')
+                            _StageTag('${row['stage'] ?? 'Applicant'}'),
+                        ],
+                      ),
+                      if (row['job'] is Map) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 9,
+                            vertical: 5,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.brand50,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            'Applied for ${row['job']['title']}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.brandDark,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      ),
-                      Text(
-                        [
-                          row['city'],
-                          row['state'],
-                        ].where((v) => v != null && '$v'.isNotEmpty).join(', '),
-                      ),
-                      if (row['job'] is Map)
-                        Text('${row['job']['title']} · ${row['stage'] ?? ''}'),
+                      ],
                       const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 8,
-                        children: asStrings(
-                          row['skills'],
-                        ).map((s) => BrandChip(s, neutral: true)).toList(),
-                      ),
+                      if (asStrings(row['skills']).isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        const Row(
+                          children: [
+                            Icon(
+                              LucideIcons.sparkles,
+                              size: 13,
+                              color: AppColors.muted,
+                            ),
+                            SizedBox(width: 5),
+                            Text(
+                              'Skills',
+                              style: TextStyle(
+                                color: AppColors.muted,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: asStrings(row['skills'])
+                              .take(2)
+                              .map((s) => BrandChip(s, neutral: true))
+                              .toList(),
+                        ),
+                      ],
                       const SizedBox(height: 8),
                       if (row['phone'] != null) ...[
                         const Divider(height: 18),
@@ -462,4 +563,92 @@ class _ContactsViewState extends State<ContactsView> {
       ),
     );
   }
+}
+
+class _ContactsHeader extends StatelessWidget {
+  const _ContactsHeader({required this.applicants, required this.count});
+  final bool applicants;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      color: AppColors.brand50,
+      border: Border.all(color: AppColors.brand200),
+      borderRadius: BorderRadius.circular(18),
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: AppColors.brand100,
+            borderRadius: BorderRadius.circular(13),
+          ),
+          child: Icon(
+            applicants ? LucideIcons.usersRound : LucideIcons.contact,
+            color: AppColors.brandDark,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: 11),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                applicants ? 'APPLICATIONS' : 'SAVED CONTACTS',
+                style: const TextStyle(
+                  color: AppColors.muted,
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: .8,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                applicants
+                    ? '$count ${count == 1 ? 'application' : 'applications'}'
+                    : '$count ${count == 1 ? 'contact' : 'contacts'}',
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                applicants
+                    ? 'Review every candidate in one place.'
+                    : 'Your unlocked karigar contacts.',
+                style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
+              ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _StageTag extends StatelessWidget {
+  const _StageTag(this.stage);
+  final String stage;
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+    decoration: BoxDecoration(
+      color: AppColors.indigoBg,
+      borderRadius: BorderRadius.circular(8),
+    ),
+    child: Text(
+      stage,
+      style: const TextStyle(
+        color: AppColors.indigo,
+        fontSize: 10.5,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
 }

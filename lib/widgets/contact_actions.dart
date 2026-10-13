@@ -2,6 +2,7 @@ import 'package:flutter/material.dart' hide Text;
 import 'localized_text.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../core/api/api_exception.dart';
+import '../core/theme.dart';
 import '../screens/profile/plans_screen.dart';
 
 Future<void> showContactError(BuildContext context, Object error) async {
@@ -25,25 +26,14 @@ class ContactActions extends StatelessWidget {
     this.email,
     this.expanded = false,
     this.onChat,
+    this.showChat = false,
     this.compact = false,
   });
   final String? phone, email;
   final bool expanded;
   final VoidCallback? onChat;
+  final bool showChat;
   final bool compact;
-
-  ButtonStyle _actionStyle(BuildContext context) {
-    if (!compact) return const ButtonStyle();
-    final colors = Theme.of(context).colorScheme;
-    return OutlinedButton.styleFrom(
-      minimumSize: const Size(0, 42),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-      backgroundColor: colors.surfaceContainerHighest.withValues(alpha: .55),
-      side: BorderSide(color: colors.outlineVariant),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-    );
-  }
 
   Future<void> _open(BuildContext context, Uri uri) async {
     try {
@@ -62,54 +52,58 @@ class ContactActions extends StatelessWidget {
     var digits = (phone ?? '').replaceAll(RegExp(r'\D'), '');
     if (digits.length == 10) digits = '91$digits';
     if (expanded && digits.isNotEmpty) {
-      return Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () =>
-                      _open(context, Uri(scheme: 'tel', path: '+$digits')),
-                  icon: const Icon(Icons.call, size: 17),
-                  label: const Text('Call'),
-                  style: _actionStyle(context),
-                ),
-              ),
-              if (onChat != null) ...[
-                const SizedBox(width: 8),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: onChat,
-                    icon: const Icon(Icons.chat_bubble_outline, size: 17),
-                    label: const Text('Chat'),
-                    style: _actionStyle(context),
-                  ),
-                ),
-              ],
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () =>
-                      _open(context, Uri.https('wa.me', '/$digits')),
-                  style: _actionStyle(context),
-                  child: const Text('WhatsApp'),
-                ),
-              ),
-            ],
+      final actions = <_ContactActionData>[
+        _ContactActionData(
+          label: 'Call',
+          caption: 'Phone call',
+          icon: Icons.call_outlined,
+          color: AppColors.primary,
+          background: AppColors.brand50,
+          onTap: () => _open(context, Uri(scheme: 'tel', path: '+$digits')),
+        ),
+        if (onChat != null || showChat)
+          _ContactActionData(
+            label: 'Chat',
+            caption: 'In-app message',
+            icon: Icons.chat_bubble_outline,
+            color: AppColors.indigo,
+            background: AppColors.indigoBg,
+            onTap: onChat,
           ),
-          if (email?.trim().isNotEmpty == true) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () =>
-                    _open(context, Uri(scheme: 'mailto', path: email)),
-                icon: const Icon(Icons.email_outlined, size: 17),
-                label: const Text('Email'),
-              ),
-            ),
-          ],
-        ],
+        _ContactActionData(
+          label: 'WhatsApp',
+          caption: 'Quick message',
+          icon: Icons.chat_outlined,
+          color: AppColors.green,
+          background: AppColors.greenBg,
+          onTap: () => _open(context, Uri.https('wa.me', '/$digits')),
+        ),
+        if (email?.trim().isNotEmpty == true)
+          _ContactActionData(
+            label: 'Email',
+            caption: 'Send an email',
+            icon: Icons.email_outlined,
+            color: AppColors.amber,
+            background: AppColors.amberBg,
+            onTap: () => _open(context, Uri(scheme: 'mailto', path: email)),
+          ),
+      ];
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final width = (constraints.maxWidth - 8) / 2;
+          return Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: actions
+                .map(
+                  (action) => SizedBox(
+                    width: width,
+                    child: _ContactActionTile(action: action),
+                  ),
+                )
+                .toList(),
+          );
+        },
       );
     }
     return Wrap(
@@ -143,4 +137,79 @@ class ContactActions extends StatelessWidget {
       ],
     );
   }
+}
+
+class _ContactActionData {
+  const _ContactActionData({
+    required this.label,
+    required this.caption,
+    required this.icon,
+    required this.color,
+    required this.background,
+    required this.onTap,
+  });
+  final String label, caption;
+  final IconData icon;
+  final Color color, background;
+  final VoidCallback? onTap;
+}
+
+class _ContactActionTile extends StatelessWidget {
+  const _ContactActionTile({required this.action});
+  final _ContactActionData action;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: action.onTap == null
+        ? action.background.withValues(alpha: .52)
+        : action.background,
+    borderRadius: BorderRadius.circular(13),
+    child: InkWell(
+      onTap: action.onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 11),
+        child: Row(
+          children: [
+            Container(
+              width: 31,
+              height: 31,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: .72),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(action.icon, size: 16, color: action.color),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    action.label,
+                    style: TextStyle(
+                      color: action.color,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    action.caption,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

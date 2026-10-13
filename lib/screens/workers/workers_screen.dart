@@ -12,7 +12,13 @@ import 'package:employer_kariger_app/screens/workers/worker_profile_screen.dart'
 import 'package:employer_kariger_app/widgets/common.dart';
 
 class WorkersScreen extends StatefulWidget {
-  const WorkersScreen({super.key});
+  const WorkersScreen({
+    super.key,
+    this.initialTab = 0,
+    this.initialContactFilters = const {},
+  });
+  final int initialTab;
+  final Map<String, dynamic> initialContactFilters;
 
   @override
   State<WorkersScreen> createState() => _WorkersScreenState();
@@ -32,6 +38,12 @@ class _WorkersScreenState extends State<WorkersScreen> {
   bool _loaded = false;
 
   List<String> categories = const ['All'];
+
+  @override
+  void initState() {
+    super.initState();
+    tab = widget.initialTab.clamp(0, 3);
+  }
 
   @override
   void didChangeDependencies() {
@@ -196,36 +208,40 @@ class _WorkersScreenState extends State<WorkersScreen> {
           preferredSize: const Size.fromHeight(52),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-            child: Row(
-              children: [
-                _DirectoryTab(
-                  label: 'Find',
-                  selected: tab == 0,
-                  onSelected: () => setState(() => tab = 0),
-                ),
-                const SizedBox(width: 7),
-                _DirectoryTab(
-                  label: 'Rejected (${contactCounts['rejected_count'] ?? 0})',
-                  selected: tab == 3,
-                  onSelected: () {
-                    setState(() => tab = 3);
-                    _search();
-                  },
-                ),
-                const SizedBox(width: 7),
-                _DirectoryTab(
-                  label: 'Database (${contactCounts['database_total'] ?? 0})',
-                  selected: tab == 1,
-                  onSelected: () => setState(() => tab = 1),
-                ),
-                const SizedBox(width: 7),
-                _DirectoryTab(
-                  label:
-                      'Applicants (${contactCounts['applicants_total'] ?? 0})',
-                  selected: tab == 2,
-                  onSelected: () => setState(() => tab = 2),
-                ),
-              ],
+            child: SizedBox(
+              height: 38,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _DirectoryTab(
+                    label: 'Find',
+                    selected: tab == 0,
+                    onSelected: () => setState(() => tab = 0),
+                  ),
+                  const SizedBox(width: 8),
+                  _DirectoryTab(
+                    label: 'Rejected · ${contactCounts['rejected_count'] ?? 0}',
+                    selected: tab == 3,
+                    onSelected: () {
+                      setState(() => tab = 3);
+                      _search();
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _DirectoryTab(
+                    label: 'Database · ${contactCounts['database_total'] ?? 0}',
+                    selected: tab == 1,
+                    onSelected: () => setState(() => tab = 1),
+                  ),
+                  const SizedBox(width: 8),
+                  _DirectoryTab(
+                    label:
+                        'Applicants · ${contactCounts['applicants_total'] ?? 0}',
+                    selected: tab == 2,
+                    onSelected: () => setState(() => tab = 2),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -234,6 +250,9 @@ class _WorkersScreenState extends State<WorkersScreen> {
           ? ContactsView(
               key: ValueKey(tab),
               source: tab == 1 ? 'database' : 'applicants',
+              initialFilters: tab == 2
+                  ? widget.initialContactFilters
+                  : const {},
               onUsage: (usage) {
                 if (mounted) setState(() => contactCounts = usage);
               },
@@ -472,36 +491,26 @@ class _DirectoryTab extends StatelessWidget {
   final VoidCallback onSelected;
 
   @override
-  Widget build(BuildContext context) => Expanded(
-    child: ChoiceChip(
-      label: SizedBox(
-        width: double.infinity,
-        child: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: TextAlign.center,
-        ),
-      ),
-      selected: selected,
-      showCheckmark: false,
-      onSelected: (_) => onSelected(),
-      selectedColor: AppColors.primary,
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      side: BorderSide(
-        color: selected
-            ? AppColors.primary
-            : Theme.of(context).colorScheme.outlineVariant,
-      ),
-      labelStyle: TextStyle(
-        color: selected
-            ? Colors.white
-            : Theme.of(context).colorScheme.onSurfaceVariant,
-        fontSize: 11.5,
-        fontWeight: FontWeight.w600,
-      ),
-      padding: EdgeInsets.zero,
+  Widget build(BuildContext context) => ChoiceChip(
+    label: Text(label),
+    selected: selected,
+    showCheckmark: false,
+    onSelected: (_) => onSelected(),
+    selectedColor: AppColors.primary,
+    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+    side: BorderSide(
+      color: selected
+          ? AppColors.primary
+          : Theme.of(context).colorScheme.outlineVariant,
     ),
+    labelStyle: TextStyle(
+      color: selected
+          ? Colors.white
+          : Theme.of(context).colorScheme.onSurfaceVariant,
+      fontSize: 11.5,
+      fontWeight: FontWeight.w600,
+    ),
+    padding: const EdgeInsets.symmetric(horizontal: 10),
   );
 }
 

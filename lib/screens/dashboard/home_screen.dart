@@ -19,7 +19,7 @@ import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
 import 'package:employer_kariger_app/screens/profile/profile_screen.dart';
 import 'package:employer_kariger_app/screens/workers/worker_profile_screen.dart';
 import 'package:employer_kariger_app/screens/workers/shortlisted_screen.dart';
-import 'package:employer_kariger_app/widgets/common.dart';
+import 'package:employer_kariger_app/screens/workers/workers_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -359,7 +359,9 @@ class _HomeScreenState extends State<HomeScreen> {
                         iconBackground: AppColors.indigoBg,
                         onTap: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const JobsScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const WorkersScreen(initialTab: 2),
+                          ),
                         ),
                       ),
                     ),
@@ -393,7 +395,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         iconBackground: AppColors.greenBg,
                         onTap: () => Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (_) => const JobsScreen()),
+                          MaterialPageRoute(
+                            builder: (_) => const WorkersScreen(
+                              initialTab: 2,
+                              initialContactFilters: {'stage': 'hired'},
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -430,7 +437,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   context.tr('Recent applicants'),
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const JobsScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const WorkersScreen(initialTab: 2),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -575,9 +584,9 @@ class _PostJobBanner extends StatelessWidget {
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
-        colors: [AppColors.primary, AppColors.gradientEnd],
+        colors: [AppColors.brandDark, AppColors.gradientEnd],
       ),
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(22),
     ),
     child: LayoutBuilder(
       builder: (context, constraints) {
@@ -596,7 +605,7 @@ class _PostJobBanner extends StatelessWidget {
             SizedBox(height: 3),
             Text(
               'Post a job free — reach karigars instantly',
-              style: TextStyle(color: Colors.white, fontSize: 11.5),
+              style: TextStyle(color: Color(0xFFFBECE5), fontSize: 11.5),
             ),
           ],
         );
@@ -607,7 +616,7 @@ class _PostJobBanner extends StatelessWidget {
             style: FilledButton.styleFrom(
               minimumSize: Size.zero,
               backgroundColor: Colors.white,
-              foregroundColor: AppColors.primary,
+              foregroundColor: AppColors.brandDark,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(13),
@@ -986,9 +995,10 @@ class _ApplicantCard extends StatelessWidget {
                           const SizedBox(height: 4),
                           Text(
                             place.join(' · '),
-                            style: const TextStyle(
+                            style: TextStyle(
+                              color: colors.onSurfaceVariant,
                               fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
                         ],
@@ -1148,67 +1158,178 @@ class _ApplicantSkill extends StatelessWidget {
   }
 }
 
-Widget jobCard(Job job, VoidCallback onTap) => Card(
-  child: InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(16),
-    child: Padding(
-      padding: const EdgeInsets.all(15),
+Widget jobCard(Job job, VoidCallback onTap) {
+  final status = job.status.toLowerCase();
+  final statusColor = switch (status) {
+    'active' => AppColors.green,
+    'draft' => AppColors.indigo,
+    'under review' => AppColors.amber,
+    'not approved' => AppColors.rose,
+    _ => AppColors.muted,
+  };
+  final statusBackground = switch (status) {
+    'active' => AppColors.greenBg,
+    'draft' => AppColors.indigoBg,
+    'under review' => AppColors.amberBg,
+    'not approved' => AppColors.roseBg,
+    _ => AppColors.brand50,
+  };
+  return Card(
+    clipBehavior: Clip.antiAlias,
+    child: InkWell(
+      onTap: onTap,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [BrandChip(job.category), StatusPill(job.status)],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            job.title,
-            style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            '${job.wage} · ${job.openings} openings · 2 days ago',
-            style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
-          ),
-          if (job.moderationNote?.trim().isNotEmpty == true) ...[
-            const SizedBox(height: 6),
-            Text(
-              job.moderationNote!,
-              style: const TextStyle(fontSize: 12, color: AppColors.rose),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(17, 16, 15, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    job.category.toUpperCase(),
+                    style: const TextStyle(
+                      color: AppColors.muted,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .7,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusBackground,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    job.status,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              const Icon(
-                LucideIcons.userRound,
-                size: 15,
-                color: AppColors.indigo,
-              ),
-              const SizedBox(width: 5),
-              Text(
-                '${job.applied} applied',
-                style: const TextStyle(fontSize: 11.5),
-              ),
-              const SizedBox(width: 12),
-              const Icon(LucideIcons.star, size: 15, color: AppColors.amber),
-              const SizedBox(width: 5),
-              Text(
-                '${job.shortlisted} shortlisted',
-                style: const TextStyle(fontSize: 11.5),
-              ),
-              const SizedBox(width: 12),
-              const Icon(LucideIcons.check, size: 15, color: AppColors.green),
-              const SizedBox(width: 5),
-              Text(
-                '${job.hired} hired',
-                style: const TextStyle(fontSize: 11.5),
-              ),
-            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(17, 8, 15, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    job.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 17,
+                      height: 1.18,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  LucideIcons.chevronRight,
+                  size: 19,
+                  color: AppColors.muted2,
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(17, 11, 15, 0),
+            child: Wrap(
+              spacing: 14,
+              runSpacing: 6,
+              children: [
+                _HomeJobDetail(icon: LucideIcons.indianRupee, label: job.wage),
+                _HomeJobDetail(
+                  icon: LucideIcons.briefcaseBusiness,
+                  label:
+                      '${job.openings} opening${job.openings == 1 ? '' : 's'}',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.fromLTRB(17, 12, 17, 13),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8F5F0),
+              border: Border(top: BorderSide(color: AppColors.line2)),
+            ),
+            child: Row(
+              children: [
+                _HomeJobMetric(value: job.applied, label: 'Applicants'),
+                const _HomeMetricDivider(),
+                _HomeJobMetric(value: job.shortlisted, label: 'Shortlisted'),
+                const _HomeMetricDivider(),
+                _HomeJobMetric(value: job.hired, label: 'Hired'),
+              ],
+            ),
           ),
         ],
       ),
     ),
-  ),
-);
+  );
+}
+
+class _HomeJobDetail extends StatelessWidget {
+  const _HomeJobDetail({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 14, color: AppColors.muted),
+      const SizedBox(width: 5),
+      Text(
+        label,
+        style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
+      ),
+    ],
+  );
+}
+
+class _HomeJobMetric extends StatelessWidget {
+  const _HomeJobMetric({required this.value, required this.label});
+  final int value;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$value',
+          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: AppColors.muted),
+        ),
+      ],
+    ),
+  );
+}
+
+class _HomeMetricDivider extends StatelessWidget {
+  const _HomeMetricDivider();
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 1,
+    height: 28,
+    margin: const EdgeInsets.only(right: 12),
+    color: AppColors.line,
+  );
+}

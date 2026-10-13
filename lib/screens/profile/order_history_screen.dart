@@ -105,35 +105,32 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             onRefresh: _load,
             child: orders.isEmpty
                 ? ListView(
-                    children: const [
-                      SizedBox(height: 170),
-                      Icon(LucideIcons.receiptText, size: 42),
-                      SizedBox(height: 12),
-                      Center(child: Text('No orders yet')),
-                      SizedBox(height: 5),
-                      Center(
-                        child: Text(
-                          'Your plan checkouts and invoices will appear here.',
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [_EmptyOrders()],
+                  )
+                : ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      _OrdersHeader(count: orders.length),
+                      const SizedBox(height: 16),
+                      ...orders.map(
+                        (order) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _OrderCard(
+                            order: order,
+                            downloadingInvoices: downloadingInvoices,
+                            onView: (id) => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => InvoiceScreen(invoiceId: id),
+                              ),
+                            ),
+                            onDownload: _download,
+                          ),
                         ),
                       ),
                     ],
-                  )
-                : ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    itemCount: orders.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 12),
-                    itemBuilder: (_, index) => _OrderCard(
-                      order: orders[index],
-                      downloadingInvoices: downloadingInvoices,
-                      onView: (id) => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => InvoiceScreen(invoiceId: id),
-                        ),
-                      ),
-                      onDownload: _download,
-                    ),
                   ),
           ),
   );
@@ -168,6 +165,20 @@ class _OrderCard extends StatelessWidget {
           children: [
             Row(
               children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.brand50,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    LucideIcons.receiptText,
+                    size: 19,
+                    color: AppColors.brandDark,
+                  ),
+                ),
                 Expanded(
                   child: Text(
                     '${order['plan'] ?? 'Plan'} · ${order['plan_type'] == 'database' ? 'Database plan' : 'Job plan'}',
@@ -242,6 +253,101 @@ class _OrderCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OrdersHeader extends StatelessWidget {
+  const _OrdersHeader({required this.count});
+  final int count;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(20),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [AppColors.brandDark, AppColors.gradientEnd],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(22),
+    ),
+    child: Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'PAYMENTS & RENEWALS',
+                style: TextStyle(
+                  color: Color(0xFFFBECE5),
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 1,
+                ),
+              ),
+              const SizedBox(height: 7),
+              Text(
+                '$count ${count == 1 ? 'order' : 'orders'}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 5),
+              const Text(
+                'Review payments and download invoices.',
+                style: TextStyle(color: Color(0xFFFBECE5), fontSize: 12.5),
+              ),
+            ],
+          ),
+        ),
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: const Color(0x1FFFFFFF),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: const Icon(LucideIcons.receiptText, color: Colors.white),
+        ),
+      ],
+    ),
+  );
+}
+
+class _EmptyOrders extends StatelessWidget {
+  const _EmptyOrders();
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(top: 150, left: 36, right: 36),
+    child: Column(
+      children: [
+        Container(
+          width: 68,
+          height: 68,
+          decoration: const BoxDecoration(
+            color: AppColors.brand100,
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(
+            LucideIcons.receiptText,
+            color: AppColors.brandDark,
+            size: 27,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text('No orders yet', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 6),
+        const Text(
+          'Your plan checkouts, renewals and invoices will appear here.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.muted, height: 1.35),
+        ),
+      ],
+    ),
+  );
 }
 
 class _PaymentRow extends StatelessWidget {

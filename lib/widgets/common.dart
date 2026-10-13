@@ -169,16 +169,45 @@ class WorkerCard extends StatelessWidget {
                           ),
                           if (worker.distance > 0 || worker.wage > 0) ...[
                             const SizedBox(height: 5),
-                            Text(
-                              [
-                                if (worker.distance > 0)
-                                  '⌖ ${worker.distance.toStringAsFixed(1)} km',
-                                if (worker.wage > 0) monthlyWage(worker.wage),
-                              ].join('     '),
-                              style: const TextStyle(
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            Row(
+                              children: [
+                                if (worker.distance > 0) ...[
+                                  const Icon(
+                                    LucideIcons.mapPin,
+                                    size: 13,
+                                    color: AppColors.muted,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${worker.distance.toStringAsFixed(1)} km away',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.muted,
+                                    ),
+                                  ),
+                                ],
+                                if (worker.distance > 0 && worker.wage > 0)
+                                  const Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                    ),
+                                    child: Text(
+                                      '·',
+                                      style: TextStyle(color: AppColors.muted),
+                                    ),
+                                  ),
+                                if (worker.wage > 0)
+                                  Flexible(
+                                    child: Text(
+                                      monthlyWage(worker.wage),
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: AppColors.muted,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ],
                         ],
@@ -194,21 +223,42 @@ class WorkerCard extends StatelessWidget {
                     child: StatusPill(worker.status),
                   ),
                 ],
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    ...worker.skills
-                        .take(maxSkills)
-                        .map((s) => BrandChip(s, neutral: true)),
-                    if (worker.skills.length > maxSkills)
-                      BrandChip(
-                        '+${worker.skills.length - maxSkills} more',
-                        neutral: true,
+                if (worker.skills.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Row(
+                    children: [
+                      Icon(
+                        LucideIcons.sparkles,
+                        size: 13,
+                        color: AppColors.muted,
                       ),
-                  ],
-                ),
+                      SizedBox(width: 5),
+                      Text(
+                        'Skills',
+                        style: TextStyle(
+                          color: AppColors.muted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ...worker.skills
+                          .take(maxSkills)
+                          .map((s) => BrandChip(s, neutral: true)),
+                      if (worker.skills.length > maxSkills)
+                        BrandChip(
+                          '+${worker.skills.length - maxSkills} more',
+                          neutral: true,
+                        ),
+                    ],
+                  ),
+                ],
               ],
             );
           },

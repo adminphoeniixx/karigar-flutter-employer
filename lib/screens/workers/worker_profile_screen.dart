@@ -174,7 +174,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                             child: Text(
                               w.initials,
                               style: const TextStyle(
-                                fontSize: 20,
+                                fontSize: 18,
                                 fontWeight: FontWeight.w700,
                                 color: AppColors.brandDark,
                               ),
@@ -219,7 +219,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                 ),
                                 const SizedBox(height: 5),
                                 Text(
-                                  '${details?.city ?? 'Location unavailable'}${w.distance > 0 ? ' · ${w.distance.toStringAsFixed(1)} km' : ''}',
+                                  '${[details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ').isNotEmpty ? [details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ') : 'Location unavailable'}${w.distance > 0 ? ' · ${w.distance.toStringAsFixed(1)} km' : ''}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13,
@@ -364,6 +364,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   email: details?.email,
                                   expanded: true,
                                   compact: true,
+                                  showChat: true,
                                   onChat: busy ? null : () => _message(),
                                 ),
                               ],
@@ -445,6 +446,48 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                           : 'Not provided',
                                     ),
                                   ),
+                                ],
+                              ),
+                              const Divider(height: 26),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _InfoTile(
+                                      icon: LucideIcons.circleCheck,
+                                      label: 'Availability',
+                                      value: details?.available == true
+                                          ? 'Available for work'
+                                          : 'Not confirmed',
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: _InfoTile(
+                                      icon: LucideIcons.navigation,
+                                      label: 'Distance',
+                                      value: w.distance > 0
+                                          ? '${w.distance.toStringAsFixed(1)} km away'
+                                          : 'Not available',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 26),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: _InfoTile(
+                                      icon: LucideIcons.walletCards,
+                                      label: 'Wage type',
+                                      value:
+                                          details?.wageType.isNotEmpty == true
+                                          ? details!.wageType == 'monthly'
+                                                ? 'Monthly'
+                                                : details.wageType
+                                          : 'Not provided',
+                                    ),
+                                  ),
+                                  const Spacer(),
                                 ],
                               ),
                             ],

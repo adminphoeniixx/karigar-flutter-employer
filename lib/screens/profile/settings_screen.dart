@@ -149,7 +149,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context, _) => loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
-              padding: EdgeInsets.zero,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
               children: [
                 _SectionHeader(context.tr('Preferences')),
                 _SettingsRow(
@@ -343,19 +343,15 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      height: 59,
-      padding: const EdgeInsets.fromLTRB(20, 29, 20, 7),
-      color: colors.surfaceContainerLow,
-      alignment: Alignment.bottomLeft,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
       child: Text(
         text.toUpperCase(),
-        style: TextStyle(
-          color: colors.onSurfaceVariant,
-          fontSize: 13,
+        style: const TextStyle(
+          color: AppColors.muted,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
-          letterSpacing: .4,
+          letterSpacing: .8,
         ),
       ),
     );
@@ -379,62 +375,67 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 69),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          border: Border(bottom: BorderSide(color: colors.outlineVariant)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 20),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 76),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.line),
+              borderRadius: BorderRadius.circular(16),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: AppColors.brand50,
+                    borderRadius: BorderRadius.circular(13),
                   ),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle!,
-                      style: TextStyle(
-                        color: colors.onSurfaceVariant,
-                        fontSize: 11.5,
+                  child: Icon(icon, color: AppColors.primary, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            trailing ??
-                Text(
-                  '→',
-                  style: TextStyle(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 12,
+                      if (subtitle != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle!,
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 11.5,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-          ],
+                trailing ??
+                    const Icon(
+                      LucideIcons.chevronRight,
+                      size: 18,
+                      color: AppColors.muted2,
+                    ),
+              ],
+            ),
+          ),
         ),
       ),
     );

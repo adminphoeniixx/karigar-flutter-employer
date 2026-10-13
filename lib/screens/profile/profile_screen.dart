@@ -95,52 +95,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onRefresh: controller.load,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.zero,
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                   children: [
                     _BusinessHeader(profile: profile),
-                    Container(
-                      color: Theme.of(context).colorScheme.surfaceContainerLow,
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
                       child: OutlinedButton.icon(
                         onPressed: () =>
                             _open(const ProfileEditScreen(), refresh: true),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(44),
-                          foregroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primary,
-                          backgroundColor: Theme.of(
-                            context,
-                          ).colorScheme.primaryContainer,
-                          side: BorderSide(
-                            color: Theme.of(context).colorScheme.outlineVariant,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        icon: const Icon(LucideIcons.pencil, size: 19),
+                        icon: const Icon(LucideIcons.pencil, size: 18),
                         label: Text(context.tr('Edit Business Profile')),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.brandDark,
+                          side: const BorderSide(color: AppColors.brand200),
+                        ),
                       ),
                     ),
-                    Container(
-                      color: Theme.of(context).colorScheme.surfaceContainerLow,
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 22),
+                    const SizedBox(height: 20),
+                    _ProfileSection(
+                      title: 'Usually hiring for',
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'USUALLY HIRING FOR',
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.onSurfaceVariant,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: .5,
-                            ),
-                          ),
-                          SizedBox(height: 10),
                           Wrap(
                             spacing: 8,
                             runSpacing: 8,
@@ -152,7 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    const _ProfileSectionTitle('Business & hiring'),
                     _ProfileRow(
                       icon: LucideIcons.briefcaseBusiness,
                       title: context.tr('My Jobs'),
@@ -170,6 +147,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         verified: profile?.verified == true,
                         onTap: () => _open(const KycScreen(), refresh: true),
                       ),
+                    const _ProfileSectionTitle('Account'),
                     _ProfileRow(
                       icon: LucideIcons.star,
                       title: context.tr('Shortlisted Karigars'),
@@ -234,6 +212,7 @@ class _BusinessHeader extends StatelessWidget {
         end: Alignment.bottomRight,
         colors: [AppColors.primary, AppColors.gradientEnd],
       ),
+      borderRadius: BorderRadius.all(Radius.circular(22)),
     ),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -265,9 +244,11 @@ class _BusinessHeader extends StatelessWidget {
                   profile?.companyName.isNotEmpty == true
                       ? profile!.companyName
                       : 'Your business',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 20,
+                    fontSize: 18,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -285,14 +266,18 @@ class _BusinessHeader extends StatelessWidget {
                       size: 15,
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      [profile?.city, profile?.state]
-                          .whereType<String>()
-                          .where((value) => value.isNotEmpty)
-                          .join(', '),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.5,
+                    Expanded(
+                      child: Text(
+                        [profile?.city, profile?.state]
+                            .whereType<String>()
+                            .where((value) => value.isNotEmpty)
+                            .join(', '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12.5,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -348,6 +333,58 @@ class _VerifiedEmployerPill extends StatelessWidget {
   );
 }
 
+class _ProfileSection extends StatelessWidget {
+  const _ProfileSection({required this.title, required this.child});
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: AppColors.line),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            color: AppColors.muted,
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            letterSpacing: .8,
+          ),
+        ),
+        const SizedBox(height: 12),
+        child,
+      ],
+    ),
+  );
+}
+
+class _ProfileSectionTitle extends StatelessWidget {
+  const _ProfileSectionTitle(this.title);
+  final String title;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(4, 22, 4, 10),
+    child: Text(
+      title.toUpperCase(),
+      style: const TextStyle(
+        color: AppColors.muted,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+        letterSpacing: .8,
+      ),
+    ),
+  );
+}
+
 class _ProfileRow extends StatelessWidget {
   const _ProfileRow({
     required this.icon,
@@ -366,82 +403,96 @@ class _ProfileRow extends StatelessWidget {
   final bool verified;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        height: 69,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: colors.surface,
-          border: Border(bottom: BorderSide(color: colors.outlineVariant)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: colors.primaryContainer,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: colors.onSurfaceVariant,
-                      fontSize: 11.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (verified)
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: Material(
+      color: AppColors.card,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 76),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            border: Border.all(color: AppColors.line),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 5,
-                ),
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: AppColors.greenBg,
-                  borderRadius: BorderRadius.circular(20),
+                  color: AppColors.brand50,
+                  borderRadius: BorderRadius.circular(13),
                 ),
-                child: const Text(
-                  'Verified',
-                  style: TextStyle(
-                    color: AppColors.green,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              )
-            else
-              Text(
-                trailing ?? '→',
-                style: TextStyle(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 11.5,
+                child: Icon(icon, color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 13),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 11.5,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-          ],
+              if (verified)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 9,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.greenBg,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Text(
+                    'Verified',
+                    style: TextStyle(
+                      color: AppColors.green,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                )
+              else ...[
+                if (trailing?.startsWith('★') == true)
+                  Text(
+                    trailing!.replaceAll(' →', ''),
+                    style: const TextStyle(
+                      color: AppColors.amber,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                const SizedBox(width: 6),
+                const Icon(
+                  LucideIcons.chevronRight,
+                  size: 18,
+                  color: AppColors.muted2,
+                ),
+              ],
+            ],
+          ),
         ),
       ),
-    );
-  }
+    ),
+  );
 }

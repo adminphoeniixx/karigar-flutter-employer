@@ -738,6 +738,12 @@ class _JobManageScreenState extends State<JobManageScreen> {
               ),
               icon: const Icon(LucideIcons.sparkles, size: 18),
               label: const Text('View matched karigars'),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(46),
+                backgroundColor: AppColors.brand50,
+                foregroundColor: AppColors.brandDark,
+                side: const BorderSide(color: AppColors.brand200),
+              ),
             ),
             const SizedBox(height: 12),
           ],
@@ -758,6 +764,16 @@ class _JobManageScreenState extends State<JobManageScreen> {
                     selected: selected,
                     showCheckmark: false,
                     label: Text('${item.$2} (${counts[item.$1] ?? 0})'),
+                    selectedColor: AppColors.primary,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    side: BorderSide(
+                      color: selected ? AppColors.primary : AppColors.line,
+                    ),
+                    labelStyle: TextStyle(
+                      color: selected ? Colors.white : AppColors.muted,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
                     onSelected: (_) {
                       if (selected) return;
                       setState(() => stage = item.$1);
@@ -813,90 +829,108 @@ class _JobManageScreenState extends State<JobManageScreen> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    if (applicant.ai != null)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: BrandChip(
-                          'AI match ${applicant.ai?['score'] ?? 0}% · '
-                          '${applicant.ai?['recommendation'] ?? ''}',
-                        ),
-                      ),
-                    const SizedBox(height: 8),
-
-                    if (applicant.resume != null)
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () => _downloadResume(applicant),
-                          icon: const Icon(LucideIcons.fileText, size: 17),
-                          label: Text(
-                            'Resume · ${applicant.resume?['name'] ?? 'PDF'}',
-                          ),
-                        ),
-                      ),
-                    SizedBox(
+                    Container(
                       width: double.infinity,
-                      child: TextButton.icon(
-                        onPressed: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ScreeningCallsScreen(
-                              applicantId: applicant.id,
-                              workerName: profile.name,
-                            ),
-                          ),
-                        ).then((_) => _load()),
-                        icon: const Icon(LucideIcons.phoneCall, size: 17),
-                        label: const Text('AI screening calls'),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        border: Border.all(color: AppColors.line),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    ContactActions(
-                      phone: profile.phone,
-                      email: profile.email,
-                      expanded: true,
-                      onChat: () => _chat(applicant, worker),
-                    ),
-                    if (applicant.stage != 'hired' &&
-                        applicant.stage != 'rejected')
-                      Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => _shortlist(applicant),
-                              child: Text(
-                                applicant.stage == 'interview' ||
-                                        applicant.stage == 'shortlisted'
-                                    ? 'Shortlisted ★'
-                                    : 'Shortlist',
+                          if (applicant.ai != null)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: BrandChip(
+                                'AI match ${applicant.ai?['score'] ?? 0}% · '
+                                '${applicant.ai?['recommendation'] ?? ''}',
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: FilledButton(
-                              onPressed: () => _hire(applicant),
-                              child: const Text('Hire'),
+                          const SizedBox(height: 8),
+
+                          if (applicant.resume != null)
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: () => _downloadResume(applicant),
+                                icon: const Icon(
+                                  LucideIcons.fileText,
+                                  size: 17,
+                                ),
+                                label: Text(
+                                  'Resume · ${applicant.resume?['name'] ?? 'PDF'}',
+                                ),
+                              ),
+                            ),
+                          SizedBox(
+                            width: double.infinity,
+                            child: TextButton.icon(
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => ScreeningCallsScreen(
+                                    applicantId: applicant.id,
+                                    workerName: profile.name,
+                                  ),
+                                ),
+                              ).then((_) => _load()),
+                              icon: const Icon(LucideIcons.phoneCall, size: 17),
+                              label: const Text('AI screening calls'),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          IconButton.outlined(
-                            onPressed: () => _reject(applicant),
-                            color: Colors.red,
-                            icon: const Icon(LucideIcons.x, size: 18),
+                          const SizedBox(height: 8),
+                          ContactActions(
+                            phone: profile.phone,
+                            email: profile.email,
+                            expanded: true,
+                            onChat: () => _chat(applicant, worker),
                           ),
+                          if (applicant.stage != 'hired' &&
+                              applicant.stage != 'rejected')
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => _shortlist(applicant),
+                                    child: Text(
+                                      applicant.stage == 'interview' ||
+                                              applicant.stage == 'shortlisted'
+                                          ? 'Shortlisted ★'
+                                          : 'Shortlist',
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: () => _hire(applicant),
+                                    child: const Text('Hire'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                IconButton.outlined(
+                                  onPressed: () => _reject(applicant),
+                                  color: Colors.red,
+                                  icon: const Icon(LucideIcons.x, size: 18),
+                                ),
+                              ],
+                            ),
+                          if (applicant.stage == 'interview')
+                            SizedBox(
+                              width: double.infinity,
+                              child: TextButton(
+                                onPressed: () => _cancelInterview(applicant),
+                                child: const Text('Cancel interview'),
+                              ),
+                            ),
+                          if (applicant.stage == 'hired' &&
+                              applicant.offer != null)
+                            _OfferSentCard(offer: applicant.offer!),
                         ],
                       ),
-                    if (applicant.stage == 'interview')
-                      SizedBox(
-                        width: double.infinity,
-                        child: TextButton(
-                          onPressed: () => _cancelInterview(applicant),
-                          child: const Text('Cancel interview'),
-                        ),
-                      ),
-                    if (applicant.stage == 'hired' && applicant.offer != null)
-                      _OfferSentCard(offer: applicant.offer!),
+                    ),
                   ],
                 ),
               );
