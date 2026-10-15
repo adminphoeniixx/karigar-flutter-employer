@@ -845,10 +845,16 @@ class _JobManageScreenState extends State<JobManageScreen> {
                               alignment: Alignment.centerLeft,
                               child: BrandChip(
                                 'AI match ${applicant.ai?['score'] ?? 0}% · '
-                                '${applicant.ai?['recommendation'] ?? ''}',
+                                '${applicant.ai?['recommendation_label'] ?? applicant.ai?['recommendation'] ?? ''}',
                               ),
                             ),
                           const SizedBox(height: 8),
+
+                          if (applicant.screeningCall != null)
+                            ApplicantScreeningCallPanel(
+                              call: applicant.screeningCall,
+                              workerName: profile.name,
+                            ),
 
                           if (applicant.resume != null)
                             SizedBox(

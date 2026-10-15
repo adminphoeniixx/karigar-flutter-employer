@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:employer_kariger_app/core/api/api_client.dart';
 import 'package:employer_kariger_app/services/employer_api_service.dart';
+import 'package:employer_kariger_app/models/api_models.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -56,6 +57,7 @@ void main() {
             'suggestions': ['Draft one'],
           }),
           200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
         );
       });
       final api = EmployerApiService(
@@ -74,5 +76,46 @@ void main() {
       ]);
       expect(requested.queryParameters['title'], 'Apartment plumber');
     });
+
+    test(
+      'reads the newest screening call and fetches its conversation',
+      () async {
+        late Uri requested;
+        final client = MockClient((request) async {
+          requested = request.url;
+          return http.Response(
+            jsonEncode({
+              'call': {
+                'id': 79,
+                'has_conversation': true,
+                'conversation': [
+                  {'speaker': 'agent', 'text': 'नमस्ते'},
+                ],
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        });
+        final api = EmployerApiService(
+          ApiClient(client: client, baseUrl: 'https://example.com/api/v1'),
+        );
+        final applicant = Applicant.fromJson({
+          'id': 14,
+          'worker': {'id': 9, 'name': 'Atul'},
+          'ai': {'score': 82, 'recommendation_label': 'Strong match'},
+          'screening_call': {
+            'id': 79,
+            'outcome_label': 'Interested',
+            'has_conversation': true,
+          },
+        });
+
+        expect(applicant.ai?['recommendation_label'], 'Strong match');
+        expect(applicant.screeningCall?['outcome_label'], 'Interested');
+        expect((await api.screeningCall(79))['call'], isA<Map>());
+        expect(requested.path, '/api/v1/employer/screening-calls/79');
+      },
+    );
   });
 }

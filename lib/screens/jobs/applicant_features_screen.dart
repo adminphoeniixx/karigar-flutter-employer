@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/api/api_exception.dart';
@@ -194,6 +195,245 @@ class ScreeningCallsScreen extends StatefulWidget {
   State<ScreeningCallsScreen> createState() => _ScreeningCallsScreenState();
 }
 
+/// Compact result panel shared by applicant lists. The full call record is
+/// loaded only when an employer asks to read the conversation.
+class ApplicantScreeningCallPanel extends StatelessWidget {
+  const ApplicantScreeningCallPanel({
+    super.key,
+    required this.call,
+    required this.workerName,
+  });
+
+  final Map<String, dynamic>? call;
+  final String workerName;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = call;
+    if (item == null) return const SizedBox.shrink();
+    final outcome = '${item['outcome_label'] ?? ''}'.trim();
+    final status = '${item['status_label'] ?? item['status'] ?? 'In progress'}'
+        .trim();
+    final label = outcome.isNotEmpty ? outcome : status;
+    final summary = '${item['summary'] ?? ''}'.trim();
+    final id = (item['id'] as num?)?.toInt() ?? 0;
+    final canRead = item['has_conversation'] == true && id != 0;
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.brand50,
+        border: Border.all(color: AppColors.brand200),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(LucideIcons.botMessageSquare, size: 16, color: AppColors.brandDark),
+              const SizedBox(width: 7),
+              const Expanded(
+                child: Text('AI screening call', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+              _CallOutcomeChip(label: label),
+            ],
+          ),
+          if (summary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(summary, style: const TextStyle(fontSize: 12.5, height: 1.35)),
+          ],
+          if (canRead) ...[
+            const SizedBox(height: 6),
+            TextButton.icon(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ScreeningConversationScreen(
+                    callId: id,
+                    workerName: workerName,
+                    initialSummary: summary,
+                  ),
+                ),
+              ),
+              icon: const Icon(LucideIcons.messagesSquare, size: 16),
+              label: const Text('View conversation'),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                foregroundColor: AppColors.brandDark,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CallOutcomeChip extends StatelessWidget {
+  const _CallOutcomeChip({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      border: Border.all(color: AppColors.brand200),
+      borderRadius: BorderRadius.circular(20),
+    ),
+    child: Text(
+      label,
+      style: const TextStyle(
+        color: AppColors.brandDark,
+        fontSize: 11,
+        fontWeight: FontWeight.w700,
+      ),
+    ),
+  );
+}
+
+class ScreeningConversationScreen extends StatefulWidget {
+  const ScreeningConversationScreen({
+    super.key,
+    required this.callId,
+    required this.workerName,
+    this.initialSummary = '',
+  });
+
+  final int callId;
+  final String workerName;
+  final String initialSummary;
+
+  @override
+  State<ScreeningConversationScreen> createState() =>
+      _ScreeningConversationScreenState();
+}
+
+class _ScreeningConversationScreenState extends State<ScreeningConversationScreen> {
+  bool loading = true;
+  String? error;
+  Map<String, dynamic> call = const {};
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (loading && call.isEmpty && error == null) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final response = await AppScope.of(context).api.screeningCall(widget.callId);
+      final raw = response['call'] ?? response['data'];
+      if (mounted) {
+        setState(() => call = raw is Map ? Map<String, dynamic>.from(raw) : const {});
+      }
+    } catch (exception) {
+      if (mounted) setState(() => error = '$exception');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = '${call['summary'] ?? widget.initialSummary}'.trim();
+    final turns = (call['conversation'] as List? ?? const [])
+        .whereType<Map>()
+        .map((turn) => Map<String, dynamic>.from(turn))
+        .where((turn) => '${turn['text'] ?? ''}'.trim().isNotEmpty)
+        .toList();
+    return Scaffold(
+      appBar: AppBar(title: const Text('AI screening conversation')),
+      body: loading && call.isEmpty
+          ? const Center(child: CircularProgressIndicator())
+          : error != null && call.isEmpty
+          ? Center(child: OutlinedButton(onPressed: _load, child: const Text('Retry')))
+          : RefreshIndicator(
+              onRefresh: _load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                children: [
+                  if (summary.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: AppColors.brand50,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.brand200),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('AI call summary', style: TextStyle(color: AppColors.brandDark, fontWeight: FontWeight.w800)),
+                          const SizedBox(height: 5),
+                          Text(summary, style: GoogleFonts.notoSansDevanagari(fontSize: 13, height: 1.42)),
+                        ],
+                      ),
+                    ),
+                  if (summary.isNotEmpty) const SizedBox(height: 18),
+                  if (turns.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Text('The conversation is not available yet.', textAlign: TextAlign.center),
+                    )
+                  else
+                    ...turns.map((turn) => _ConversationBubble(
+                      text: '${turn['text']}',
+                      agent: '${turn['speaker']}'.toLowerCase() == 'agent',
+                      workerName: widget.workerName,
+                    )),
+                ],
+              ),
+            ),
+    );
+  }
+}
+
+class _ConversationBubble extends StatelessWidget {
+  const _ConversationBubble({required this.text, required this.agent, required this.workerName});
+  final String text;
+  final bool agent;
+  final String workerName;
+
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: agent ? Alignment.centerLeft : Alignment.centerRight,
+    child: ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 310),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: agent ? Colors.white : AppColors.brand100,
+          border: Border.all(color: agent ? AppColors.line : AppColors.brand200),
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(14),
+            topRight: const Radius.circular(14),
+            bottomLeft: Radius.circular(agent ? 3 : 14),
+            bottomRight: Radius.circular(agent ? 14 : 3),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(agent ? 'AI assistant' : workerName, style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text(text, style: GoogleFonts.notoSansDevanagari(fontSize: 14, height: 1.4)),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
 class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
   bool loading = true;
   bool canCall = false;
@@ -377,6 +617,24 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
                             ),
                             const SizedBox(height: 5),
                             Text('${call['summary'] ?? 'No summary yet.'}'),
+                            if (call['has_conversation'] == true &&
+                                (call['id'] as num?) != null) ...[
+                              const SizedBox(height: 4),
+                              TextButton.icon(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ScreeningConversationScreen(
+                                      callId: (call['id'] as num).toInt(),
+                                      workerName: widget.workerName,
+                                      initialSummary: '${call['summary'] ?? ''}',
+                                    ),
+                                  ),
+                                ),
+                                icon: const Icon(LucideIcons.messagesSquare, size: 16),
+                                label: const Text('View conversation'),
+                              ),
+                            ],
                             if (call['proposed_interview_label'] != null) ...[
                               const SizedBox(height: 7),
                               Text(

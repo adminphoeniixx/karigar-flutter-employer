@@ -240,6 +240,8 @@ class EmployerApiService {
   );
   Future<Json> cancelScreeningCall(int callId) =>
       client.delete('/employer/screening-calls/$callId');
+  Future<Json> screeningCall(int callId) =>
+      client.get(ApiConstants.screeningCall(callId));
   Future<Json> aiInterviews({String filter = 'upcoming', int page = 1}) =>
       client.get(
         '/employer/ai-interviews',

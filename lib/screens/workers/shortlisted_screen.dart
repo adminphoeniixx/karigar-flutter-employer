@@ -7,6 +7,7 @@ import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
 import 'package:employer_kariger_app/screens/workers/worker_profile_screen.dart';
+import 'package:employer_kariger_app/screens/jobs/applicant_features_screen.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 
 class ShortlistedScreen extends StatefulWidget {
@@ -344,6 +345,20 @@ class _ShortlistedWorkerCard extends StatelessWidget {
                   if (worker.skills.length > 2)
                     _ShortlistSkill('+${worker.skills.length - 2} more'),
                 ],
+              ),
+            ],
+            if (applicant.ai != null) ...[
+              const SizedBox(height: 12),
+              BrandChip(
+                'AI match ${applicant.ai?['score'] ?? 0}% · '
+                '${applicant.ai?['recommendation_label'] ?? applicant.ai?['recommendation'] ?? ''}',
+              ),
+            ],
+            if (applicant.screeningCall != null) ...[
+              const SizedBox(height: 14),
+              ApplicantScreeningCallPanel(
+                call: applicant.screeningCall,
+                workerName: worker.name,
               ),
             ],
           ],

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
+import '../../widgets/common.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -10,6 +11,7 @@ import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
 import 'package:employer_kariger_app/screens/dashboard/main_shell.dart';
 import 'package:employer_kariger_app/screens/jobs/job_manage_screen.dart';
+import 'package:employer_kariger_app/screens/jobs/applicant_features_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/jobs_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/post_job_screen.dart';
 import 'package:employer_kariger_app/screens/messages/messages_screen.dart';
@@ -467,6 +469,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       phone: profile.phone,
                       distanceLabel: profile.distanceLabel,
                       locationLabel: profile.locationLabel,
+                      ai: applicant.ai,
+                      screeningCall: applicant.screeningCall,
                       onChat: () => _chatApplicant(applicant, worker),
                       onPrimary: () =>
                           _applicantAction(applicant.id, 'shortlist'),
@@ -885,6 +889,8 @@ class _ApplicantCard extends StatelessWidget {
     required this.phone,
     this.distanceLabel,
     this.locationLabel,
+    this.ai,
+    this.screeningCall,
     required this.onChat,
     required this.onPrimary,
     required this.onHire,
@@ -898,6 +904,7 @@ class _ApplicantCard extends StatelessWidget {
   final List<String> skills;
   final String? phone;
   final String? distanceLabel, locationLabel;
+  final Map<String, dynamic>? ai, screeningCall;
   final VoidCallback onChat, onPrimary, onHire, onReject;
   final VoidCallback onTap;
 
@@ -1052,6 +1059,20 @@ class _ApplicantCard extends StatelessWidget {
                     ),
                 ],
               ),
+              if (ai != null) ...[
+                const SizedBox(height: 12),
+                BrandChip(
+                  'AI match ${ai?['score'] ?? 0}% · '
+                  '${ai?['recommendation_label'] ?? ai?['recommendation'] ?? ''}',
+                ),
+              ],
+              if (screeningCall != null) ...[
+                const SizedBox(height: 10),
+                ApplicantScreeningCallPanel(
+                  call: screeningCall,
+                  workerName: displayName,
+                ),
+              ],
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Divider(height: 1),

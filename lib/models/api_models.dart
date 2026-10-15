@@ -374,6 +374,7 @@ class Applicant {
     this.interview,
     this.resume,
     this.ai,
+    this.screeningCall,
     this.job,
     this.createdAgo = '',
   });
@@ -398,6 +399,9 @@ class Applicant {
         ? Map<String, dynamic>.from(json['resume'])
         : null,
     ai: json['ai'] is Map ? Map<String, dynamic>.from(json['ai']) : null,
+    screeningCall: json['screening_call'] is Map
+        ? Map<String, dynamic>.from(json['screening_call'])
+        : null,
     job: json['job'] is Map ? Map<String, dynamic>.from(json['job']) : null,
     createdAgo: '${json['created_ago'] ?? ''}',
     worker: WorkerProfile.fromJson(
@@ -410,7 +414,7 @@ class Applicant {
   final double? expectedWage;
   final bool shortlisted, contactUnlocked;
   final WorkerProfile worker;
-  final Json? offer, interview, resume, ai, job;
+  final Json? offer, interview, resume, ai, screeningCall, job;
 }
 
 class DashboardData {

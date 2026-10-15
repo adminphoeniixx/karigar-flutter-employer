@@ -57,6 +57,7 @@ class ApiConstants {
   static String applicantResume(int id) => '${applicant(id)}/resume';
   static String applicantScreeningCalls(int id) =>
       '${applicant(id)}/screening-calls';
+  static String screeningCall(int id) => '$screeningCalls/$id';
   static String confirmScreeningCall(int id) => '$screeningCalls/$id/confirm';
   static String worker(int id) => '$workers/$id';
   static String notificationRead(String id) => '$notifications/$id/read';

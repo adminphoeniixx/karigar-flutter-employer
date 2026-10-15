@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
+import 'package:employer_kariger_app/screens/jobs/applicant_features_screen.dart';
 
 class AiInterviewsScreen extends StatefulWidget {
   const AiInterviewsScreen({super.key});
@@ -400,6 +401,26 @@ class _InterviewCard extends StatelessWidget {
                       'Interview · ${interview['at_label'] ?? ''} · ${interview['mode'] ?? ''}',
                 ),
               ),
+            if (item['has_conversation'] == true && id != 0) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ScreeningConversationScreen(
+                        callId: id,
+                        workerName: name,
+                        initialSummary: '${item['summary'] ?? ''}',
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(LucideIcons.messagesSquare, size: 17),
+                  label: const Text('View conversation'),
+                ),
+              ),
+            ],
             if (item['can_cancel'] == true ||
                 item['awaiting_confirmation'] == true) ...[
               const SizedBox(height: 10),
