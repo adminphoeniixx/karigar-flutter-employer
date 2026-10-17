@@ -31,6 +31,7 @@ class ApiConstants {
   static const team = '/employer/team';
   static const conversations = '/conversations';
   static const plans = '/employer/plans';
+  static const aiCredits = '/employer/ai-credits';
   static const orders = '/employer/orders';
   static const plansCallback = '/employer/plans/callback';
   static const invoices = '/employer/invoices';
@@ -66,6 +67,8 @@ class ApiConstants {
   static String conversationMessages(int id) => '${conversation(id)}/messages';
   static String conversationRead(int id) => '${conversation(id)}/read';
   static String subscribePlan(int id) => '$plans/$id/subscribe';
+  static String aiCreditsCheckout(int packId) =>
+      '$aiCredits/packs/$packId/checkout';
   static String invoice(int subscriptionId) => '$invoices/$subscriptionId';
   static String session(int id) => '$sessions/$id';
   static String legalDocument(String key) => '$legal/$key';

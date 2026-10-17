@@ -103,6 +103,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
   @override
   Widget build(BuildContext context) {
     final plan = _map(invoice['plan']);
+    final item = _map(invoice['item']);
     final period = _map(invoice['period']);
     return Scaffold(
       appBar: AppBar(title: const Text('Tax invoice')),
@@ -145,11 +146,19 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                     padding: const EdgeInsets.all(16),
                     child: Column(
                       children: [
-                        _line('Plan', '${plan['name'] ?? ''}'),
                         _line(
-                          'Period',
-                          '${period['from'] ?? ''} – ${period['to'] ?? ''}',
+                          item.isEmpty ? 'Plan' : '${item['title'] ?? 'Item'}',
+                          item.isEmpty
+                              ? '${plan['name'] ?? ''}'
+                              : '${item['detail'] ?? ''}',
                         ),
+                        if (item.isEmpty)
+                          _line(
+                            'Period',
+                            '${period['from'] ?? ''} – ${period['to'] ?? ''}',
+                          ),
+                        if (invoice['credits'] != null)
+                          _line('AI call credits', '${invoice['credits']}'),
                         _line('Subtotal', '₹${invoice['subtotal'] ?? 0}'),
                         if (invoice['discount'] != null)
                           _line('Discount', '-₹${invoice['discount']}'),

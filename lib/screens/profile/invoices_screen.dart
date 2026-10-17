@@ -84,7 +84,9 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                           ),
                           subtitle: Text(
                             [
-                              invoice['plan'],
+                              invoice['item'] is Map
+                                  ? (invoice['item'] as Map)['title']
+                                  : invoice['plan'],
                               invoice['date'],
                             ].where((value) => '$value'.isNotEmpty).join(' · '),
                           ),

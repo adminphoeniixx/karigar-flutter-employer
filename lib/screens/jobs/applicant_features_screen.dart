@@ -2,11 +2,14 @@ import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:just_audio/just_audio.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/api/api_exception.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
+import 'package:employer_kariger_app/widgets/common.dart';
+import 'ai_credits_screen.dart';
 
 class MatchedWorkersScreen extends StatefulWidget {
   const MatchedWorkersScreen({super.key, required this.jobId});
@@ -216,8 +219,10 @@ class ApplicantScreeningCallPanel extends StatelessWidget {
         .trim();
     final label = outcome.isNotEmpty ? outcome : status;
     final summary = '${item['summary'] ?? ''}'.trim();
+    final sourceLabel = _screeningCallSourceLabel(item['source']);
     final id = (item['id'] as num?)?.toInt() ?? 0;
     final canRead = item['has_conversation'] == true && id != 0;
+    final charged = item['credits_charged'];
 
     return Container(
       width: double.infinity,
@@ -233,18 +238,37 @@ class ApplicantScreeningCallPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(LucideIcons.botMessageSquare, size: 16, color: AppColors.brandDark),
+              const Icon(
+                LucideIcons.botMessageSquare,
+                size: 16,
+                color: AppColors.brandDark,
+              ),
               const SizedBox(width: 7),
               const Expanded(
-                child: Text('AI screening call', style: TextStyle(fontWeight: FontWeight.w700)),
+                child: Text(
+                  'AI screening call',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
               _CallOutcomeChip(label: label),
             ],
           ),
+          if (sourceLabel != null) ...[
+            const SizedBox(height: 8),
+            BrandChip(sourceLabel),
+          ],
           if (summary.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(summary, style: const TextStyle(fontSize: 12.5, height: 1.35)),
           ],
+          if (charged != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(
+                '${_duration(item['duration_seconds'])} · $charged credits',
+                style: const TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+            ),
           if (canRead) ...[
             const SizedBox(height: 6),
             TextButton.icon(
@@ -271,6 +295,14 @@ class ApplicantScreeningCallPanel extends StatelessWidget {
     );
   }
 }
+
+String _duration(Object? seconds) {
+  final value = (seconds as num?)?.toInt() ?? 0;
+  return '${value ~/ 60} min ${value % 60} s';
+}
+
+String? _screeningCallSourceLabel(Object? source) =>
+    '$source'.toLowerCase() == 'shortlist' ? 'After your shortlist' : null;
 
 class _CallOutcomeChip extends StatelessWidget {
   const _CallOutcomeChip({required this.label});
@@ -312,7 +344,8 @@ class ScreeningConversationScreen extends StatefulWidget {
       _ScreeningConversationScreenState();
 }
 
-class _ScreeningConversationScreenState extends State<ScreeningConversationScreen> {
+class _ScreeningConversationScreenState
+    extends State<ScreeningConversationScreen> {
   bool loading = true;
   String? error;
   Map<String, dynamic> call = const {};
@@ -329,10 +362,14 @@ class _ScreeningConversationScreenState extends State<ScreeningConversationScree
       error = null;
     });
     try {
-      final response = await AppScope.of(context).api.screeningCall(widget.callId);
+      final response = await AppScope.of(
+        context,
+      ).api.screeningCall(widget.callId);
       final raw = response['call'] ?? response['data'];
       if (mounted) {
-        setState(() => call = raw is Map ? Map<String, dynamic>.from(raw) : const {});
+        setState(
+          () => call = raw is Map ? Map<String, dynamic>.from(raw) : const {},
+        );
       }
     } catch (exception) {
       if (mounted) setState(() => error = '$exception');
@@ -354,13 +391,26 @@ class _ScreeningConversationScreenState extends State<ScreeningConversationScree
       body: loading && call.isEmpty
           ? const Center(child: CircularProgressIndicator())
           : error != null && call.isEmpty
-          ? Center(child: OutlinedButton(onPressed: _load, child: const Text('Retry')))
+          ? Center(
+              child: OutlinedButton(
+                onPressed: _load,
+                child: const Text('Retry'),
+              ),
+            )
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
                 children: [
+                  if ('${call['recording_url'] ?? ''}'.isNotEmpty) ...[
+                    _CallRecordingPlayer(
+                      url: '${call['recording_url']}',
+                      expectedDuration:
+                          (call['duration_seconds'] as num?)?.toInt() ?? 0,
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   if (summary.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.all(14),
@@ -372,9 +422,21 @@ class _ScreeningConversationScreenState extends State<ScreeningConversationScree
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text('AI call summary', style: TextStyle(color: AppColors.brandDark, fontWeight: FontWeight.w800)),
+                          const Text(
+                            'AI call summary',
+                            style: TextStyle(
+                              color: AppColors.brandDark,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
                           const SizedBox(height: 5),
-                          Text(summary, style: GoogleFonts.notoSansDevanagari(fontSize: 13, height: 1.42)),
+                          Text(
+                            summary,
+                            style: GoogleFonts.notoSansDevanagari(
+                              fontSize: 13,
+                              height: 1.42,
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -382,14 +444,19 @@ class _ScreeningConversationScreenState extends State<ScreeningConversationScree
                   if (turns.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(24),
-                      child: Text('The conversation is not available yet.', textAlign: TextAlign.center),
+                      child: Text(
+                        'The conversation is not available yet.',
+                        textAlign: TextAlign.center,
+                      ),
                     )
                   else
-                    ...turns.map((turn) => _ConversationBubble(
-                      text: '${turn['text']}',
-                      agent: '${turn['speaker']}'.toLowerCase() == 'agent',
-                      workerName: widget.workerName,
-                    )),
+                    ...turns.map(
+                      (turn) => _ConversationBubble(
+                        text: '${turn['text']}',
+                        agent: '${turn['speaker']}'.toLowerCase() == 'agent',
+                        workerName: widget.workerName,
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -397,8 +464,155 @@ class _ScreeningConversationScreenState extends State<ScreeningConversationScree
   }
 }
 
+class _CallRecordingPlayer extends StatefulWidget {
+  const _CallRecordingPlayer({
+    required this.url,
+    required this.expectedDuration,
+  });
+
+  final String url;
+  final int expectedDuration;
+
+  @override
+  State<_CallRecordingPlayer> createState() => _CallRecordingPlayerState();
+}
+
+class _CallRecordingPlayerState extends State<_CallRecordingPlayer> {
+  late final AudioPlayer _player;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _player = AudioPlayer();
+    _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CallRecordingPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) _load();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await _player.setUrl(widget.url);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Recording could not be loaded.');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _player.stop();
+    _player.dispose();
+    super.dispose();
+  }
+
+  String _time(Duration value) {
+    final seconds = value.inSeconds;
+    return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(14),
+    decoration: BoxDecoration(
+      color: AppColors.brand50,
+      border: Border.all(color: AppColors.brand200),
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: StreamBuilder<Duration>(
+      stream: _player.positionStream,
+      builder: (context, positionSnapshot) => StreamBuilder<PlayerState>(
+        stream: _player.playerStateStream,
+        builder: (context, stateSnapshot) {
+          final position = positionSnapshot.data ?? Duration.zero;
+          final duration =
+              _player.duration ?? Duration(seconds: widget.expectedDuration);
+          final playing = stateSnapshot.data?.playing ?? false;
+          final max = duration.inMilliseconds.toDouble();
+          final current = position.inMilliseconds.clamp(0, max).toDouble();
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(LucideIcons.audioLines, color: AppColors.brandDark),
+                  SizedBox(width: 8),
+                  Text(
+                    'Call recording',
+                    style: TextStyle(
+                      color: AppColors.brandDark,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 8),
+                Text(_error!, style: const TextStyle(color: AppColors.rose)),
+              ] else ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    IconButton.filled(
+                      onPressed: _loading
+                          ? null
+                          : () => playing ? _player.pause() : _player.play(),
+                      icon: _loading
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : Icon(playing ? Icons.pause : Icons.play_arrow),
+                    ),
+                    Expanded(
+                      child: Slider(
+                        value: current,
+                        max: max <= 0 ? 1 : max,
+                        onChanged: _loading || max <= 0
+                            ? null
+                            : (value) => _player.seek(
+                                Duration(milliseconds: value.round()),
+                              ),
+                      ),
+                    ),
+                    Text(
+                      '${_time(position)} / ${_time(duration)}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    ),
+  );
+}
+
 class _ConversationBubble extends StatelessWidget {
-  const _ConversationBubble({required this.text, required this.agent, required this.workerName});
+  const _ConversationBubble({
+    required this.text,
+    required this.agent,
+    required this.workerName,
+  });
   final String text;
   final bool agent;
   final String workerName;
@@ -413,7 +627,9 @@ class _ConversationBubble extends StatelessWidget {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: agent ? Colors.white : AppColors.brand100,
-          border: Border.all(color: agent ? AppColors.line : AppColors.brand200),
+          border: Border.all(
+            color: agent ? AppColors.line : AppColors.brand200,
+          ),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(14),
             topRight: const Radius.circular(14),
@@ -424,9 +640,19 @@ class _ConversationBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(agent ? 'AI assistant' : workerName, style: const TextStyle(fontSize: 11, color: AppColors.muted, fontWeight: FontWeight.w700)),
+            Text(
+              agent ? 'AI assistant' : workerName,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.muted,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 4),
-            Text(text, style: GoogleFonts.notoSansDevanagari(fontSize: 14, height: 1.4)),
+            Text(
+              text,
+              style: GoogleFonts.notoSansDevanagari(fontSize: 14, height: 1.4),
+            ),
           ],
         ),
       ),
@@ -451,6 +677,7 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
     'worker_unavailable': 'This karigar is not available for work right now.',
     'call_in_progress': 'A screening call is already in progress.',
     'already_screened': 'This karigar has already been screened.',
+    'no_credits': 'Not enough AI call credits.',
   };
 
   @override
@@ -538,6 +765,36 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
         SnackBar(content: Text('${response['message'] ?? 'Call queued.'}')),
       );
       await _load();
+    } on ApiException catch (exception) {
+      if (mounted && exception.code == 'no_credits') {
+        final recharge = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Not enough AI call credits'),
+            content: Text(exception.message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Later'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Recharge'),
+              ),
+            ],
+          ),
+        );
+        if (recharge == true && mounted) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AiCreditsScreen()),
+          );
+        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(exception.message)));
+      }
     } catch (exception) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -595,6 +852,16 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: AppColors.muted),
                   ),
+                  if (blockedBecause == 'no_credits')
+                    TextButton(
+                      onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AiCreditsScreen(),
+                        ),
+                      ),
+                      child: const Text('Recharge'),
+                    ),
                 ],
                 const SizedBox(height: 20),
                 if (calls.isEmpty)
@@ -617,6 +884,16 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
                             ),
                             const SizedBox(height: 5),
                             Text('${call['summary'] ?? 'No summary yet.'}'),
+                            if (call['credits_charged'] != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 5),
+                                child: Text(
+                                  '${_duration(call['duration_seconds'])} · ${call['credits_charged']} credits',
+                                  style: const TextStyle(
+                                    color: AppColors.muted,
+                                  ),
+                                ),
+                              ),
                             if (call['has_conversation'] == true &&
                                 (call['id'] as num?) != null) ...[
                               const SizedBox(height: 4),
@@ -627,11 +904,15 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
                                     builder: (_) => ScreeningConversationScreen(
                                       callId: (call['id'] as num).toInt(),
                                       workerName: widget.workerName,
-                                      initialSummary: '${call['summary'] ?? ''}',
+                                      initialSummary:
+                                          '${call['summary'] ?? ''}',
                                     ),
                                   ),
                                 ),
-                                icon: const Icon(LucideIcons.messagesSquare, size: 16),
+                                icon: const Icon(
+                                  LucideIcons.messagesSquare,
+                                  size: 16,
+                                ),
                                 label: const Text('View conversation'),
                               ),
                             ],

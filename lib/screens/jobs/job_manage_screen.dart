@@ -240,7 +240,10 @@ class _JobManageScreenState extends State<JobManageScreen> {
 
   Future<void> _shortlist(Applicant applicant) async {
     try {
-      await AppScope.of(context).api.shortlist(applicant.id);
+      final response = await AppScope.of(context).api.shortlist(applicant.id);
+      _message('${response['message'] ?? 'Applicant shortlisted.'}');
+      // Reload the applicant returned by the server so its new screening_call
+      // is rendered immediately (Dialing or Scheduled).
       await _load();
     } catch (exception) {
       _message('$exception');

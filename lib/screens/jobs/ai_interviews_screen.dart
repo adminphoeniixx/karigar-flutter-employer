@@ -299,6 +299,7 @@ class _InterviewCard extends StatelessWidget {
     final interview = item['interview'] as Map?;
     final id = (item['id'] as num?)?.toInt() ?? 0;
     final when = '${item['scheduled_label'] ?? item['called_label'] ?? ''}';
+    final sourceLabel = _sourceLabel(item['source']);
     final name = '${candidate['name'] ?? 'Karigar'}';
     final initials = name
         .split(RegExp(r'\s+'))
@@ -362,6 +363,18 @@ class _InterviewCard extends StatelessWidget {
               child: Divider(height: 1, color: AppColors.line2),
             ),
             _InterviewDetail(icon: LucideIcons.calendarDays, text: when),
+            if (item['credits_charged'] != null) ...[
+              const SizedBox(height: 8),
+              _InterviewDetail(
+                icon: LucideIcons.clock3,
+                text:
+                    '${_callDuration(item['duration_seconds'])} · ${item['credits_charged']} credits',
+              ),
+            ],
+            if (sourceLabel != null) ...[
+              const SizedBox(height: 10),
+              BrandChip(sourceLabel),
+            ],
             if ('${candidate['location_label'] ?? ''}'.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
@@ -451,6 +464,20 @@ class _InterviewCard extends StatelessWidget {
       ),
     );
   }
+
+  String? _sourceLabel(Object? source) {
+    switch ('$source'.toLowerCase()) {
+      case 'shortlist':
+        return 'After your shortlist';
+      default:
+        return null;
+    }
+  }
+}
+
+String _callDuration(Object? seconds) {
+  final value = (seconds as num?)?.toInt() ?? 0;
+  return '${value ~/ 60} min ${value % 60} s';
 }
 
 class _InterviewDetail extends StatelessWidget {

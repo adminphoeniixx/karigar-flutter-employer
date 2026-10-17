@@ -348,6 +348,15 @@ class EmployerApiService {
       client.post('/conversations/$id/read');
 
   Future<Json> plans() => client.get('/employer/plans');
+  Future<Json> aiCredits() => client.get(ApiConstants.aiCredits);
+  Future<Json> aiCreditsLedger({String filter = 'all'}) =>
+      client.get('${ApiConstants.aiCredits}/ledger', query: {'filter': filter});
+  Future<Json> aiCreditsCheckout(int packId, {String? email}) => client.post(
+    ApiConstants.aiCreditsCheckout(packId),
+    body: {'email': ?email},
+  );
+  Future<Json> aiCreditsCallback(Json payment) =>
+      client.post('${ApiConstants.aiCredits}/callback', body: payment);
   Future<Json> orders() => client.get(ApiConstants.orders);
   Future<Json> subscribe(int planId, {String? coupon, String? email}) async {
     final response = await client.post(

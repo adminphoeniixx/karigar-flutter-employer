@@ -63,8 +63,10 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final api = AppScope.of(context).api;
       if (action == 'shortlist') {
-        await api.shortlist(applicantId);
-        _message('Applicant shortlisted.');
+        final response = await api.shortlist(applicantId);
+        // The server decides whether an AI call is dialling, scheduled, or not
+        // possible. Keep that explanation intact instead of guessing locally.
+        _message('${response['message'] ?? 'Applicant shortlisted.'}');
       } else if (action == 'interview') {
         final date = await showDatePicker(
           context: context,

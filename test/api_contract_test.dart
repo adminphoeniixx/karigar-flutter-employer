@@ -117,5 +117,40 @@ void main() {
         expect(requested.path, '/api/v1/employer/screening-calls/79');
       },
     );
+
+    test(
+      'returns the shortlist call message and applicant call state',
+      () async {
+        late Uri requested;
+        final client = MockClient((request) async {
+          requested = request.url;
+          return http.Response(
+            jsonEncode({
+              'message':
+                  'Applicant shortlisted — AI call booked for 17 Oct, 10:00 AM.',
+              'applicant': {
+                'id': 412,
+                'screening_call': {
+                  'id': 88,
+                  'status': 'scheduled',
+                  'status_label': 'Scheduled',
+                },
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        });
+        final api = EmployerApiService(
+          ApiClient(client: client, baseUrl: 'https://example.com/api/v1'),
+        );
+
+        final response = await api.shortlist(412);
+
+        expect(requested.path, '/api/v1/employer/applicants/412/shortlist');
+        expect(response['message'], contains('AI call booked'));
+        expect((response['applicant'] as Map)['screening_call'], isA<Map>());
+      },
+    );
   });
 }

@@ -8,6 +8,7 @@ import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/jobs/job_manage_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/post_job_screen.dart';
 import 'package:employer_kariger_app/screens/jobs/ai_interviews_screen.dart';
+import 'package:employer_kariger_app/screens/jobs/ai_credits_screen.dart';
 
 class JobsScreen extends StatefulWidget {
   const JobsScreen({super.key});
@@ -96,6 +97,14 @@ class _JobsScreenState extends State<JobsScreen> {
             MaterialPageRoute(builder: (_) => const AiInterviewsScreen()),
           ),
           icon: const Icon(LucideIcons.botMessageSquare),
+        ),
+        IconButton(
+          tooltip: 'AI Credits',
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AiCreditsScreen()),
+          ),
+          icon: const Icon(LucideIcons.walletCards),
         ),
         const SizedBox(width: 8),
       ],

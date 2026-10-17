@@ -4,6 +4,7 @@ import '../../models/api_models.dart';
 import '../../core/api/api_exception.dart';
 import '../profile/plans_screen.dart';
 import '../profile/kyc_screen.dart';
+import 'ai_credits_screen.dart';
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:latlong2/latlong.dart';
@@ -45,6 +46,10 @@ class _PostJobScreenState extends State<PostJobScreen> {
   bool aiCallEnabled = true;
   bool aiShortlistAvailable = true;
   bool aiCallAvailable = true;
+  bool aiCreditsEnabled = true;
+  bool aiCreditsCanEnable = true;
+  int aiCreditsBalance = 0;
+  int aiCreditsMinForJob = 10;
   bool _referenceLoaded = false;
   List<String> categories = const [];
   List<String> skills = const [
@@ -227,9 +232,24 @@ class _PostJobScreenState extends State<PostJobScreen> {
         final options = await AppScope.of(context).api.jobFormOptions();
         final ai = options['ai'];
         if (mounted && ai is Map) {
+          final credits = ai['credits'];
           setState(() {
             aiShortlistAvailable = ai['shortlist_available'] != false;
             aiCallAvailable = ai['call_available'] != false;
+            if (credits is Map) {
+              aiCreditsEnabled = credits['enabled'] != false;
+              aiCreditsCanEnable = credits['can_enable'] != false;
+              aiCreditsBalance = (credits['balance'] as num?)?.toInt() ?? 0;
+              aiCreditsMinForJob =
+                  (credits['min_for_job'] as num?)?.toInt() ?? 10;
+              if (widget.job == null &&
+                  aiCreditsEnabled &&
+                  !aiCreditsCanEnable) {
+                aiCallEnabled = false;
+              } else if (widget.job == null && aiCreditsCanEnable) {
+                aiCallEnabled = true;
+              }
+            }
           });
         }
       } catch (_) {
@@ -461,6 +481,30 @@ class _PostJobScreenState extends State<PostJobScreen> {
           await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => const PlansScreen()),
+          );
+        }
+      } else if (exception.code == 'ai_credits_required') {
+        final recharge = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('AI call credits needed'),
+            content: Text(exception.message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Keep editing'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Recharge credits'),
+              ),
+            ],
+          ),
+        );
+        if (recharge == true && mounted) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const AiCreditsScreen()),
           );
         }
       } else if (exception.code == 'verification_required') {
@@ -802,6 +846,16 @@ class _PostJobScreenState extends State<PostJobScreen> {
                         callEnabled: aiCallEnabled,
                         shortlistAvailable: aiShortlistAvailable,
                         callAvailable: aiCallAvailable,
+                        creditsEnabled: aiCreditsEnabled,
+                        creditsCanEnable: aiCreditsCanEnable,
+                        creditsBalance: aiCreditsBalance,
+                        creditsMinForJob: aiCreditsMinForJob,
+                        onRecharge: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const AiCreditsScreen(),
+                          ),
+                        ),
                         onShortlistChanged: aiShortlistAvailable
                             ? (value) =>
                                   setState(() => aiShortlistEnabled = value)
@@ -1177,10 +1231,18 @@ class _AiHelpCard extends StatelessWidget {
     required this.callAvailable,
     required this.onShortlistChanged,
     required this.onCallChanged,
+    required this.creditsEnabled,
+    required this.creditsCanEnable,
+    required this.creditsBalance,
+    required this.creditsMinForJob,
+    required this.onRecharge,
   });
 
   final bool shortlistEnabled, callEnabled, shortlistAvailable, callAvailable;
   final ValueChanged<bool>? onShortlistChanged, onCallChanged;
+  final bool creditsEnabled, creditsCanEnable;
+  final int creditsBalance, creditsMinForJob;
+  final VoidCallback onRecharge;
 
   @override
   Widget build(BuildContext context) => Card(
@@ -1211,13 +1273,26 @@ class _AiHelpCard extends StatelessWidget {
             description:
                 'An AI agent calls each auto-shortlisted karigar to check they are still interested and asks a few first questions. You get the answers.',
             value: callEnabled,
-            onChanged: onCallChanged,
+            onChanged: !creditsEnabled || creditsCanEnable
+                ? onCallChanged
+                : null,
             note: !callAvailable
                 ? 'Switched off by the admin right now.'
                 : !shortlistEnabled
                 ? 'Needs AI shortlist on.'
+                : creditsEnabled && !creditsCanEnable
+                ? 'AI call credits: $creditsBalance · needs at least $creditsMinForJob to switch AI calls on.'
                 : null,
           ),
+          if (creditsEnabled && !creditsCanEnable)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: onRecharge,
+                icon: const Icon(LucideIcons.walletCards, size: 16),
+                label: const Text('Recharge credits'),
+              ),
+            ),
           const SizedBox(height: 8),
           const Text(
             'Your AI preferences are applied when you save or publish this job.',
