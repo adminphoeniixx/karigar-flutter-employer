@@ -68,7 +68,7 @@ class _JobsScreenState extends State<JobsScreen> {
           ? await AppScope.of(context).api.job(job.id)
           : null;
       if (!mounted) return;
-      final changed = await Navigator.push<bool>(
+      final result = await Navigator.push<Object?>(
         context,
         MaterialPageRoute(
           builder: (_) => draft == null
@@ -76,7 +76,10 @@ class _JobsScreenState extends State<JobsScreen> {
               : PostJobScreen(job: draft),
         ),
       );
-      if (changed == true && mounted) await controller.load();
+      // A closed job is already removed from the shared controller by the
+      // manage screen. Avoid immediately fetching the possibly stale active
+      // endpoint, which could otherwise put it back until an app restart.
+      if (result == true && mounted) await controller.load();
     } catch (exception) {
       if (mounted) {
         ScaffoldMessenger.of(

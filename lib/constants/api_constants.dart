@@ -2,7 +2,7 @@ class ApiConstants {
   const ApiConstants._();
 
   static const baseUrl =
-      'https://projects-karigar.rmsiry.easypanel.host/api/v1';
+      'https://superkarigar.com/api/v1';
 
   static const otpSend = '/auth/otp/send';
   static const otpVerify = '/auth/otp/verify';

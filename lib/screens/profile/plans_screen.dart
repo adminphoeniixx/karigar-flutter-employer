@@ -639,6 +639,21 @@ class _Plan extends StatefulWidget {
 class _PlanState extends State<_Plan> {
   bool showAllFeatures = false;
 
+  String _planPrice(dynamic value) {
+    final amount = asDouble(value).round();
+    final digits = amount.abs().toString();
+    if (digits.length <= 3) return '₹$amount';
+    final lastThree = digits.substring(digits.length - 3);
+    var remaining = digits.substring(0, digits.length - 3);
+    final groups = <String>[];
+    while (remaining.length > 2) {
+      groups.insert(0, remaining.substring(remaining.length - 2));
+      remaining = remaining.substring(0, remaining.length - 2);
+    }
+    if (remaining.isNotEmpty) groups.insert(0, remaining);
+    return '${amount.isNegative ? '−' : ''}₹${groups.join(',')},$lastThree';
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
@@ -649,6 +664,13 @@ class _PlanState extends State<_Plan> {
     final visibleFeatures = showAllFeatures
         ? featureLabels
         : featureLabels.take(3).toList();
+    final tagline = plan['tagline']?.toString().trim() ?? '';
+    final hasMrp = plan['mrp'] != null && asDouble(plan['mrp']) > 0;
+    final discount = plan['discount_percent'];
+    final hasDiscount = hasMrp && discount != null && asDouble(discount) > 0;
+    final jobLiveDays =
+        (plan['job_live_days'] as num?)?.toInt() ??
+        int.tryParse('${plan['job_live_days'] ?? ''}');
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -710,7 +732,7 @@ class _PlanState extends State<_Plan> {
                 ),
               ),
               Text(
-                '₹${plan['price'] ?? 0}',
+                _planPrice(plan['price']),
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -718,8 +740,47 @@ class _PlanState extends State<_Plan> {
               ),
             ],
           ),
+          if (tagline.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text(tagline, style: TextStyle(color: colors.onSurfaceVariant)),
+          ],
+          if (hasMrp || hasDiscount) ...[
+            const SizedBox(height: 7),
+            Row(
+              children: [
+                if (hasMrp)
+                  Text(
+                    'MRP ${_planPrice(plan['mrp'])}',
+                    style: TextStyle(
+                      color: colors.onSurfaceVariant,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                if (hasMrp && hasDiscount) const SizedBox(width: 8),
+                if (hasDiscount)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.green.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${percent(discount)}% OFF',
+                      style: const TextStyle(
+                        color: AppColors.green,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
           Text(
-            '${plan['interval_label'] ?? plan['interval'] ?? ''}',
+            '${_planPrice(plan['price'])} / ${plan['interval_label'] ?? plan['interval'] ?? ''}',
             style: TextStyle(color: colors.onSurfaceVariant),
           ),
           if (widget.gstPercent > 0 &&
@@ -728,6 +789,26 @@ class _PlanState extends State<_Plan> {
               '+ ${percent(widget.gstPercent)}% GST · ${money(plan['price_with_gst'])} total',
             ),
           const SizedBox(height: 12),
+          if (jobLiveDays != null && jobLiveDays > 0)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  const Icon(
+                    LucideIcons.clock3,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Each job stays live for $jobLiveDays day${jobLiveDays == 1 ? '' : 's'}',
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ...visibleFeatures.map(
             (feature) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),

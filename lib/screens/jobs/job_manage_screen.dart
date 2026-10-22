@@ -24,6 +24,8 @@ class JobManageScreen extends StatefulWidget {
   State<JobManageScreen> createState() => _JobManageScreenState();
 }
 
+enum JobManageResult { closed }
+
 class _OfferSentCard extends StatelessWidget {
   const _OfferSentCard({required this.offer});
   final Map<String, dynamic> offer;
@@ -511,13 +513,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
                   label: Text(
                     callAt == null
                         ? 'Choose call time (optional)'
-                        : MaterialLocalizations.of(
-                                context,
-                              ).formatMediumDate(callAt!) +
-                              ' · ' +
-                              MaterialLocalizations.of(context).formatTimeOfDay(
-                                TimeOfDay.fromDateTime(callAt!),
-                              ),
+                        : '${MaterialLocalizations.of(context).formatMediumDate(callAt!)} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(callAt!))}',
                   ),
                 ),
               const SizedBox(height: 10),
@@ -689,9 +685,11 @@ class _JobManageScreenState extends State<JobManageScreen> {
           _message('Share link copied.');
         }
       } else if (action == 'close') {
+        final jobsController = AppScope.of(context).jobs;
         await AppScope.of(context).api.closeJob(job.id);
+        jobsController.markClosed(job.id);
         _message('Job closed.');
-        if (mounted) Navigator.pop(context, true);
+        if (mounted) Navigator.pop(context, JobManageResult.closed);
       }
     } catch (exception) {
       _message('$exception');

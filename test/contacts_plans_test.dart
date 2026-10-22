@@ -59,6 +59,38 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+  testWidgets('job plan card shows pricing, plan length and job live length', (
+    tester,
+  ) async {
+    final api = service(
+      (_) async => jsonResponse({
+        'plans': [
+          {
+            'id': 3,
+            'name': '3 Months',
+            'tagline': 'Steady hiring through the quarter',
+            'price': 3649,
+            'mrp': 4194,
+            'discount_percent': 13,
+            'interval_label': '90 days',
+            'duration_days': 90,
+            'job_live_days': 15,
+            'purchasable': false,
+            'feature_list': ['6 job posts'],
+          },
+        ],
+      }),
+    );
+    await tester.pumpWidget(harness(api, const PlansScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Steady hiring through the quarter'), findsOneWidget);
+    expect(find.text('MRP ₹4,194'), findsOneWidget);
+    expect(find.text('13% OFF'), findsOneWidget);
+    expect(find.text('₹3,649 / 90 days'), findsOneWidget);
+    expect(find.text('Each job stays live for 15 days'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   test('unlock uses profile ID and preserves business error code', () async {
     final api = service((request) async {
       expect(request.method, 'POST');

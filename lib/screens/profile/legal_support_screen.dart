@@ -63,8 +63,9 @@ class LegalDocumentScreen extends StatelessWidget {
     body: FutureBuilder<Map<String, dynamic>>(
       future: AppScope.of(context).api.legalDocument(keyName),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final document = snapshot.data!['document'] as Map? ?? const {};
         final sections = document['sections'] as List? ?? const [];
         return ListView(
@@ -82,7 +83,7 @@ class LegalDocumentScreen extends StatelessWidget {
                 ...((section['blocks'] as List? ?? const [])
                     .whereType<Map>()
                     .map((block) {
-                      if (block['type'] == 'list')
+                      if (block['type'] == 'list') {
                         return Padding(
                           padding: const EdgeInsets.only(top: 8),
                           child: Column(
@@ -92,6 +93,7 @@ class LegalDocumentScreen extends StatelessWidget {
                                 .toList(),
                           ),
                         );
+                      }
                       return Padding(
                         padding: const EdgeInsets.only(top: 10),
                         child: Text(
@@ -119,8 +121,9 @@ class SupportScreen extends StatelessWidget {
     body: FutureBuilder<Map<String, dynamic>>(
       future: AppScope.of(context).api.support(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
         final data = snapshot.data!;
         final channels = data['channels'] as Map? ?? const {};
         final faqs = data['faqs'] as List? ?? const [];

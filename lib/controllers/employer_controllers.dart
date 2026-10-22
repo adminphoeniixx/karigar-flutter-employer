@@ -32,6 +32,14 @@ class JobsController extends BaseController {
     notifyListeners();
     return true;
   }
+
+  /// Removes a job that was closed while this list is open. The API can take a
+  /// moment to reflect a status change in its filtered results, so keeping the
+  /// local active list in sync prevents the closed job from lingering here.
+  void markClosed(int jobId) {
+    items = items.where((job) => job.id != jobId).toList();
+    notifyListeners();
+  }
 }
 
 class WorkersController extends BaseController {
