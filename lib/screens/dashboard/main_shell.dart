@@ -58,11 +58,11 @@ class _MainShellState extends State<MainShell> {
         onSelected: (i) async {
           if (i == 2) {
             final scope = AppScope.of(context);
-            final created = await Navigator.push<bool>(
+            final created = await Navigator.push<Object?>(
               context,
               MaterialPageRoute(builder: (_) => const PostJobScreen()),
             );
-            if (created == true && mounted) {
+            if (created != null && mounted) {
               await Future.wait([scope.jobs.load(), scope.dashboard.load()]);
             }
             return;

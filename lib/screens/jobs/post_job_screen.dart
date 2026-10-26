@@ -24,6 +24,9 @@ class PostJobScreen extends StatefulWidget {
   State<PostJobScreen> createState() => _PostJobScreenState();
 }
 
+/// Tells the jobs list to open Drafts while the server safety check is queued.
+enum JobPostResult { checking }
+
 class _PostJobScreenState extends State<PostJobScreen> {
   final selectedSkills = <String>{};
   String liveStatus = 'active';
@@ -398,6 +401,30 @@ class _PostJobScreenState extends State<PostJobScreen> {
         context,
       ).api.saveJob(values, id: widget.job?.id);
       if (!mounted) return;
+      if (response['code'] == 'job_checking') {
+        await showDialog<void>(
+          context: context,
+          builder: (context) => AlertDialog(
+            icon: const SizedBox(
+              width: 28,
+              height: 28,
+              child: CircularProgressIndicator(strokeWidth: 3),
+            ),
+            title: const Text('Checking your job'),
+            content: Text(
+              '${response['message'] ?? 'We are running a quick safety check. Your job will go live in a minute or two.'}',
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('View my jobs'),
+              ),
+            ],
+          ),
+        );
+        if (mounted) Navigator.pop(context, JobPostResult.checking);
+        return;
+      }
       if (response['code'] == 'job_under_review') {
         final rawJob = response['job'];
         final moderation = rawJob is Map && rawJob['moderation'] is Map
@@ -437,6 +464,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           canDraft &&
           exception.statusCode == 422 &&
           (exception.code == 'no_plan' ||
+              exception.code == 'subscription_required' ||
               exception.code == 'job_limit_reached' ||
               exception.message.contains('job posts') ||
               exception.message.contains('Subscribe to a plan'))) {
@@ -453,9 +481,14 @@ class _PostJobScreenState extends State<PostJobScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Text(
-                    "Choose a plan to continue",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+                  Text(
+                    exception.code == 'subscription_required'
+                        ? 'Renew your plan'
+                        : 'Choose a plan to continue',
+                    style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(exception.message),
@@ -467,7 +500,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
                   const SizedBox(height: 12),
                   FilledButton(
                     onPressed: () => Navigator.pop(context, 'plans'),
-                    child: const Text('See plans'),
+                    child: Text(
+                      exception.code == 'subscription_required'
+                          ? 'Renew plan'
+                          : 'See plans',
+                    ),
                   ),
                 ],
               ),

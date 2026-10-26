@@ -637,6 +637,12 @@ class _JobManageScreenState extends State<JobManageScreen> {
       '${value.day.toString().padLeft(2, '0')}';
 
   Future<void> _jobActions() async {
+    if (job.moderationStatus == 'checking') {
+      _message(
+        'This job is being checked right now. Please try again in a minute.',
+      );
+      return;
+    }
     final action = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
@@ -671,11 +677,11 @@ class _JobManageScreenState extends State<JobManageScreen> {
       if (action == 'edit') {
         final details = await AppScope.of(context).api.job(job.id);
         if (!mounted) return;
-        final changed = await Navigator.push<bool>(
+        final changed = await Navigator.push<Object?>(
           context,
           MaterialPageRoute(builder: (_) => PostJobScreen(job: details)),
         );
-        if (changed == true && mounted) Navigator.pop(context, true);
+        if (changed != null && mounted) Navigator.pop(context, changed);
       } else if (action == 'share') {
         final details = await AppScope.of(context).api.job(job.id);
         if (details.shareUrl.isEmpty) {
@@ -703,10 +709,11 @@ class _JobManageScreenState extends State<JobManageScreen> {
       appBar: AppBar(
         title: const Text('Manage Job'),
         actions: [
-          IconButton(
-            onPressed: job.id == 0 ? null : _jobActions,
-            icon: const Icon(LucideIcons.ellipsisVertical),
-          ),
+          if (job.moderationStatus != 'checking')
+            IconButton(
+              onPressed: job.id == 0 ? null : _jobActions,
+              icon: const Icon(LucideIcons.ellipsisVertical),
+            ),
         ],
       ),
       body: ListView(

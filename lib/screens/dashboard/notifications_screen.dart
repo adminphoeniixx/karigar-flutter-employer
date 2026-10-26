@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
+import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -67,6 +68,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } catch (_) {}
   }
 
+  Future<void> _open(Map<String, dynamic> item) async {
+    await _read(item);
+    if (!mounted || item['type']?.toString() != 'plan.reminder') return;
+    final data = item['data'] is Map
+        ? Map<String, dynamic>.from(item['data'] as Map)
+        : const <String, dynamic>{};
+    final planType =
+        data['plan_type']?.toString() ?? item['plan_type']?.toString();
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PlansScreen(focusDatabase: planType == 'database'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(
@@ -105,12 +122,14 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 }
                 final item = items[index];
                 return _Notification(
-                  _title('${item['type'] ?? ''}'),
+                  item['title']?.toString().trim().isNotEmpty == true
+                      ? item['title'].toString()
+                      : _title('${item['type'] ?? ''}'),
                   '${item['message'] ?? ''}',
                   '${item['created_ago'] ?? ''}',
                   item['read'] != true,
                   _icon('${item['type'] ?? ''}'),
-                  onTap: () => _read(item),
+                  onTap: () => _open(item),
                 );
               },
             ),
@@ -125,6 +144,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       .join(' ');
 
   IconData _icon(String type) {
+    if (type.contains('plan')) return LucideIcons.walletCards;
     if (type.contains('message')) return LucideIcons.messageSquare;
     if (type.contains('application')) return LucideIcons.userPlus;
     if (type.contains('shortlist')) return LucideIcons.star;

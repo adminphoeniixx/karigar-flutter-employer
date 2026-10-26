@@ -330,11 +330,11 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 _PostJobBanner(
                   onTap: () async {
-                    final created = await Navigator.push<bool>(
+                    final created = await Navigator.push<Object?>(
                       context,
                       MaterialPageRoute(builder: (_) => const PostJobScreen()),
                     );
-                    if (created == true && mounted) await controller.load();
+                    if (created != null && mounted) await controller.load();
                   },
                 ),
                 const SizedBox(height: 16),

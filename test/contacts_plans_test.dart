@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
+import 'package:employer_kariger_app/screens/dashboard/notifications_screen.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:employer_kariger_app/core/api/api_exception.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
@@ -89,6 +90,38 @@ void main() {
     expect(find.text('13% OFF'), findsOneWidget);
     expect(find.text('₹3,649 / 90 days'), findsOneWidget);
     expect(find.text('Each job stays live for 15 days'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('plan reminder opens database plans and uses the server title', (
+    tester,
+  ) async {
+    final api = service((request) async {
+      if (request.url.path.endsWith('/notifications')) {
+        return jsonResponse({
+          'notifications': {
+            'data': [
+              {
+                'id': 12,
+                'type': 'plan.reminder',
+                'title': 'Your plan ends on 26 Oct 2026',
+                'message': 'Database access will stop soon.',
+                'plan_type': 'database',
+                'read': false,
+              },
+            ],
+          },
+        });
+      }
+      if (request.url.path.endsWith('/read')) return jsonResponse({});
+      return jsonResponse({'plans': []});
+    });
+    await tester.pumpWidget(harness(api, const NotificationsScreen()));
+    await tester.pumpAndSettle();
+    expect(find.text('Your plan ends on 26 Oct 2026'), findsOneWidget);
+
+    await tester.tap(find.text('Your plan ends on 26 Oct 2026'));
+    await tester.pumpAndSettle();
+    expect(find.text('Plans & Karigar Database'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
   test('unlock uses profile ID and preserves business error code', () async {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -19,10 +21,37 @@ class JobsScreen extends StatefulWidget {
 
 class _JobsScreenState extends State<JobsScreen> {
   late final controller = AppScope.of(context).jobs;
+  Timer? _checkingRefresh;
+  bool _listeningToJobs = false;
+
+  @override
+  void dispose() {
+    if (_listeningToJobs) controller.removeListener(_syncCheckingRefresh);
+    _checkingRefresh?.cancel();
+    super.dispose();
+  }
+
+  void _syncCheckingRefresh() {
+    final hasCheckingJob = controller.items.any(
+      (job) => job.moderation?['status']?.toString() == 'checking',
+    );
+    if (hasCheckingJob && _checkingRefresh == null) {
+      _checkingRefresh = Timer.periodic(const Duration(seconds: 4), (_) {
+        if (mounted && !controller.loading) controller.load();
+      });
+    } else if (!hasCheckingJob) {
+      _checkingRefresh?.cancel();
+      _checkingRefresh = null;
+    }
+  }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_listeningToJobs) {
+      controller.addListener(_syncCheckingRefresh);
+      _listeningToJobs = true;
+    }
     if (controller.items.isEmpty && !controller.loading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && controller.items.isEmpty && !controller.loading) {
@@ -50,11 +79,15 @@ class _JobsScreenState extends State<JobsScreen> {
                   ? 'Under review'
                   : job.moderation?['status'] == 'rejected'
                   ? 'Not approved'
+                  : job.moderation?['status'] == 'checking'
+                  ? 'Checking…'
                   : job.status.isEmpty
                   ? ''
                   : '${job.status[0].toUpperCase()}${job.status.substring(1)}',
               id: job.id,
               moderationNote: job.moderation?['note']?.toString(),
+              moderationStatus: job.moderation?['status']?.toString(),
+              moderationMethod: job.moderation?['method']?.toString(),
             ),
           )
           .toList();
@@ -63,6 +96,16 @@ class _JobsScreenState extends State<JobsScreen> {
   );
 
   Future<void> _openJob(Job job) async {
+    if (job.moderationStatus == 'checking') {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'This job is being checked right now. Please try again in a minute.',
+          ),
+        ),
+      );
+      return;
+    }
     try {
       final draft = job.status.toLowerCase() == 'draft'
           ? await AppScope.of(context).api.job(job.id)
@@ -79,7 +122,11 @@ class _JobsScreenState extends State<JobsScreen> {
       // A closed job is already removed from the shared controller by the
       // manage screen. Avoid immediately fetching the possibly stale active
       // endpoint, which could otherwise put it back until an app restart.
-      if (result == true && mounted) await controller.load();
+      if (result == JobPostResult.checking && mounted) {
+        await controller.load(nextStatus: 'draft');
+      } else if (result == true && mounted) {
+        await controller.load();
+      }
     } catch (exception) {
       if (mounted) {
         ScaffoldMessenger.of(
@@ -131,13 +178,17 @@ class _JobsScreenState extends State<JobsScreen> {
                     onStatusChanged: (status) =>
                         controller.load(nextStatus: status),
                     onPostJob: () async {
-                      final created = await Navigator.push<bool>(
+                      final created = await Navigator.push<Object?>(
                         context,
                         MaterialPageRoute(
                           builder: (_) => const PostJobScreen(),
                         ),
                       );
-                      if (created == true && mounted) await controller.load();
+                      if (created == JobPostResult.checking && mounted) {
+                        await controller.load(nextStatus: 'draft');
+                      } else if (created == true && mounted) {
+                        await controller.load();
+                      }
                     },
                   ),
                 ),
@@ -347,6 +398,7 @@ class _JobListCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = job.status.toLowerCase();
+    final checking = job.moderationStatus == 'checking';
     final statusColor = switch (status) {
       'active' => AppColors.green,
       'draft' => AppColors.indigo,
@@ -394,14 +446,37 @@ class _JobListCard extends StatelessWidget {
                         color: statusBackground,
                         borderRadius: BorderRadius.circular(20),
                       ),
-                      child: Text(
-                        job.status,
-                        style: TextStyle(
-                          color: statusColor,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      child: checking
+                          ? const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: 12,
+                                  height: 12,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.indigo,
+                                  ),
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Checking…',
+                                  style: TextStyle(
+                                    color: AppColors.indigo,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              job.status,
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                     ),
                   ],
                 ),
@@ -453,6 +528,22 @@ class _JobListCard extends StatelessWidget {
                   child: Text(
                     job.moderationNote!,
                     style: const TextStyle(fontSize: 12, color: AppColors.rose),
+                  ),
+                ),
+              ],
+              if (job.moderationStatus == 'approved') ...[
+                const SizedBox(height: 11),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 17),
+                  child: Text(
+                    job.moderationMethod == 'phrases'
+                        ? 'Basic check'
+                        : 'AI checked ✓',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.green,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ],
