@@ -28,6 +28,7 @@ class _PlansScreenState extends State<PlansScreen> {
   String? error;
   Map<String, dynamic> unlocks = const {};
   List<Map<String, dynamic>> plans = const [];
+  List<Map<String, dynamic>> currentPlans = const [];
   Json? database;
   Json payment = {};
   Json? jobPosts;
@@ -101,7 +102,11 @@ class _PlansScreenState extends State<PlansScreen> {
             ? Json.from(response['job_posts'])
             : null;
         billingEmail = response['billing_email']?.toString();
-        plans = _maps(response['plans'])
+        currentPlans = _maps([
+          if (response['current'] is Map) response['current'],
+          if (response['current_database'] is Map) response['current_database'],
+        ]);
+        plans = _markCurrentPlans(_maps(response['plans']), currentPlans)
           ..sort((a, b) {
             if (!widget.focusDatabase) return 0;
             final aDatabase = a['type'] == 'database';
@@ -121,6 +126,29 @@ class _PlansScreenState extends State<PlansScreen> {
           .whereType<Map>()
           .map((item) => Map<String, dynamic>.from(item))
           .toList();
+
+  List<Map<String, dynamic>> _markCurrentPlans(
+    List<Map<String, dynamic>> catalog,
+    List<Map<String, dynamic>> current,
+  ) => catalog.map((plan) {
+    final matchingCurrent = current.where((activePlan) {
+      final activeName =
+          activePlan['plan']?.toString().trim() ??
+          activePlan['name']?.toString().trim() ??
+          '';
+      return (activeName.isNotEmpty &&
+              activeName == plan['name']?.toString()) ||
+          (activePlan['plan_id'] != null &&
+              activePlan['plan_id'].toString() == plan['id']?.toString());
+    }).firstOrNull;
+    if (matchingCurrent == null) return plan;
+    return {
+      ...plan,
+      'is_current': true,
+      'current_status': matchingCurrent['status'],
+      'current_ends_at': matchingCurrent['ends_at'],
+    };
+  }).toList();
 
   Future<void> _subscribe(Map<String, dynamic> plan) async {
     if (checkingOut || pendingSubscriptionId != null) {
@@ -469,7 +497,7 @@ class _PlansScreenState extends State<PlansScreen> {
                     padding: const EdgeInsets.only(top: 12, bottom: 12),
                     child: Text(_usageLabel(context)),
                   ),
-                _ActivePlanBanner(plans: plans),
+                _ActivePlanBanner(plans: plans, currentPlans: currentPlans),
                 const SizedBox(height: 26),
                 _PlanSection(
                   title: 'Job plans',
@@ -503,16 +531,23 @@ class _PlansScreenState extends State<PlansScreen> {
 }
 
 class _ActivePlanBanner extends StatelessWidget {
-  const _ActivePlanBanner({required this.plans});
+  const _ActivePlanBanner({required this.plans, required this.currentPlans});
   final List<Map<String, dynamic>> plans;
+  final List<Map<String, dynamic>> currentPlans;
 
   @override
   Widget build(BuildContext context) {
-    final current = plans
-        .where((plan) => plan['is_current'] == true)
-        .firstOrNull;
+    final current =
+        currentPlans.firstOrNull ??
+        plans.where((plan) => plan['is_current'] == true).firstOrNull;
     if (current == null) return const SizedBox.shrink();
     final colors = Theme.of(context).colorScheme;
+    final name = current['plan'] ?? current['name'] ?? '';
+    final endsAt = DateTime.tryParse(
+      '${current['ends_at'] ?? current['current_ends_at'] ?? ''}',
+    );
+    final status = current['status'] ?? current['current_status'];
+    final willNotRenew = status == 'cancelled' || status == 'completed';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -525,9 +560,24 @@ class _ActivePlanBanner extends StatelessWidget {
           Icon(LucideIcons.circleCheck, color: colors.primary),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              'Active plan: ${current['name'] ?? ''}',
-              style: const TextStyle(fontWeight: FontWeight.w700),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Current plan: $name',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                if (willNotRenew && endsAt != null) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    'Ends on ${MaterialLocalizations.of(context).formatMediumDate(endsAt.toLocal())}, will not renew',
+                    style: TextStyle(
+                      color: colors.onPrimaryContainer.withValues(alpha: .78),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
           Container(
@@ -536,7 +586,10 @@ class _ActivePlanBanner extends StatelessWidget {
               color: colors.primary.withValues(alpha: .14),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Text('Active', style: TextStyle(color: colors.primary)),
+            child: Text(
+              willNotRenew ? 'Ends soon' : 'Active',
+              style: TextStyle(color: colors.primary),
+            ),
           ),
         ],
       ),
@@ -639,6 +692,11 @@ class _Plan extends StatefulWidget {
 class _PlanState extends State<_Plan> {
   bool showAllFeatures = false;
 
+  String _recommendedBadge(Map<String, dynamic> plan) {
+    final badge = plan['badge']?.toString().trim() ?? '';
+    return badge.isEmpty ? 'Most popular' : badge;
+  }
+
   String _planPrice(dynamic value) {
     final amount = asDouble(value).round();
     final digits = amount.abs().toString();
@@ -702,16 +760,16 @@ class _PlanState extends State<_Plan> {
                 ),
               ),
             ),
-          if (plan['recommended'] == true && plan['is_current'] != true)
+          if (plan['recommended'] == true)
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: AppColors.brand50,
                 borderRadius: BorderRadius.circular(15),
               ),
-              child: const Text(
-                'RECOMMENDED',
-                style: TextStyle(
+              child: Text(
+                _recommendedBadge(plan),
+                style: const TextStyle(
                   fontSize: 10,
                   color: AppColors.brandDark,
                   fontWeight: FontWeight.w700,

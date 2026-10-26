@@ -92,6 +92,62 @@ void main() {
     expect(find.text('Each job stays live for 15 days'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('cancelled current plan remains visible through its end date', (
+    tester,
+  ) async {
+    final api = service(
+      (_) async => jsonResponse({
+        'current': {
+          'id': 41,
+          'plan': 'Basic',
+          'status': 'cancelled',
+          'ends_at': '2026-11-19T10:00:00+00:00',
+        },
+        'plans': [
+          {
+            'id': 7,
+            'name': 'Basic',
+            'price': 499,
+            'purchasable': true,
+            'recommended': true,
+            'badge': 'Best seller',
+            'feature_list': ['1 job post in 30 days', 'Priority support'],
+          },
+        ],
+      }),
+    );
+    await tester.pumpWidget(harness(api, const PlansScreen()));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Current plan: Basic'), findsOneWidget);
+    expect(find.textContaining('will not renew'), findsOneWidget);
+    expect(find.text('CURRENT PLAN'), findsOneWidget);
+    expect(find.text('Best seller'), findsOneWidget);
+    expect(find.text('1 job post in 30 days'), findsOneWidget);
+    expect(find.text('Priority support'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('recommended plan uses its admin-defined badge', (tester) async {
+    final api = service(
+      (_) async => jsonResponse({
+        'plans': [
+          {
+            'id': 7,
+            'name': 'Growth',
+            'price': 999,
+            'purchasable': false,
+            'recommended': true,
+            'badge': 'Best seller',
+            'feature_list': const [],
+          },
+        ],
+      }),
+    );
+    await tester.pumpWidget(harness(api, const PlansScreen()));
+    await tester.pumpAndSettle();
+    expect(find.text('Best seller'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
   testWidgets('plan reminder opens database plans and uses the server title', (
     tester,
   ) async {

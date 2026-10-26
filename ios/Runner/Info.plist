@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>FacebookAppID</key>
-    <string>2316068148934163</string>
+    <string>1418614670433521</string>
     <key>FacebookClientToken</key>
-    <string>1628db7652dbf9ec3f13057d20c530a6</string>
+    <string>d1412b94d994110550a1234b7c5b5641</string>
     <key>FacebookDisplayName</key>
     <string>Super Karigar Employer</string>
     <key>FacebookAutoLogAppEventsEnabled</key>
@@ -13,7 +13,7 @@
     <key>FacebookAdvertiserIDCollectionEnabled</key>
     <false/>
     <key>CFBundleURLTypes</key>
-    <array><dict><key>CFBundleURLSchemes</key><array><string>fb2316068148934163</string></array></dict></array>
+    <array><dict><key>CFBundleURLSchemes</key><array><string>fb1418614670433521</string></array></dict></array>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
