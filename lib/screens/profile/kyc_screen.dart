@@ -3,7 +3,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 import '../../core/api/api_exception.dart';
 import '../../core/app_scope.dart';
 import '../../core/theme.dart';
@@ -22,7 +22,7 @@ class _KycScreenState extends State<KycScreen> {
   Map<String, dynamic> kyc = const {};
   Map<String, dynamic> fieldErrors = const {};
   Map<String, dynamic> digilocker = const {};
-  String? type, error;
+  String? type, error, digilockerMessage;
   bool loading = true, submitting = false;
 
   @override
@@ -74,6 +74,10 @@ class _KycScreenState extends State<KycScreen> {
       address.text = '${business['registered_address'] ?? ''}';
       _syncDocuments();
     } on ApiException catch (e) {
+      if (e.code == 'verification_disabled') {
+        _closeWhenVerificationDisabled();
+        return;
+      }
       error = e.statusCode == 404
           ? 'Business verification is currently unavailable.'
           : e.message;
@@ -82,6 +86,16 @@ class _KycScreenState extends State<KycScreen> {
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  void _closeWhenVerificationDisabled() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Business verification is currently unavailable.'),
+      ),
+    );
+    Navigator.of(context).pop(true);
   }
 
   void _syncDocuments() {
@@ -142,9 +156,12 @@ class _KycScreenState extends State<KycScreen> {
         fields['${key}_missing'] = '1';
         fields['${key}_alt_type'] = form.alternate!;
         fields['${key}_reason'] = form.reason.text.trim();
-        if (form.number.text.trim().isNotEmpty)
+        if (form.number.text.trim().isNotEmpty) {
           fields['${key}_alt_number'] = form.number.text.trim();
-        if (form.file != null) files['${key}_alt_doc'] = form.file!;
+        }
+        if (form.file != null) {
+          files['${key}_alt_doc'] = form.file!;
+        }
       } else {
         if (form.number.text.trim().isEmpty) {
           _message('Enter ${docs[key]?['label'] ?? key} number.');
@@ -156,7 +173,9 @@ class _KycScreenState extends State<KycScreen> {
             .trim()
             .toUpperCase()
             .replaceAll(' ', '');
-        if (form.file != null) files['${key}_doc'] = form.file!;
+        if (form.file != null) {
+          files['${key}_doc'] = form.file!;
+        }
       }
     }
     setState(() => submitting = true);
@@ -175,6 +194,10 @@ class _KycScreenState extends State<KycScreen> {
       }
       Navigator.pop(context, true);
     } on ApiException catch (e) {
+      if (e.code == 'verification_disabled') {
+        _closeWhenVerificationDisabled();
+        return;
+      }
       if (mounted && e.errors != null) {
         setState(() => fieldErrors = e.errors!);
       }
@@ -195,25 +218,57 @@ class _KycScreenState extends State<KycScreen> {
       final response = await AppScope.of(context).api.startKycDigiLocker();
       final url = Uri.tryParse('${response['authorization_url'] ?? ''}');
       final reference = '${response['reference'] ?? ''}';
-      if (url == null || reference.isEmpty)
+      final returnUrlPrefix = '${response['return_url_prefix'] ?? ''}';
+      if (url == null || reference.isEmpty || returnUrlPrefix.isEmpty) {
         throw const ApiException('Unable to start DigiLocker verification.');
-      await launchUrl(url, mode: LaunchMode.inAppBrowserView);
+      }
       if (!mounted) return;
+      final navigator = Navigator.of(context);
+      final completed = await navigator.push<bool>(
+        MaterialPageRoute(
+          builder: (_) => _DigiLockerBrowser(
+            authorizationUrl: url,
+            returnUrlPrefix: returnUrlPrefix,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      if (completed != true) {
+        setState(
+          () => digilockerMessage =
+              'DigiLocker verification was not completed. You can try again or type your Aadhaar number.',
+        );
+        return;
+      }
       final status = await AppScope.of(
         context,
       ).api.kycDigiLockerStatus(reference);
       if (!mounted) return;
-      setState(() => digilocker = status);
+      setState(() {
+        digilocker = status;
+        digilockerMessage = status['status'] == 'verified'
+            ? null
+            : '${status['message'] ?? 'Complete verification in DigiLocker, then check again.'}';
+      });
       if (status['status'] == 'verified') {
         _message('Aadhaar verified with DigiLocker.');
-      } else {
-        _message(
-          '${status['message'] ?? 'Complete verification in DigiLocker, then check again.'}',
-        );
+      }
+    } on ApiException catch (e) {
+      if (e.code == 'verification_disabled') {
+        _closeWhenVerificationDisabled();
+      } else if (mounted) {
+        setState(() => digilockerMessage = e.message);
       }
     } catch (e) {
-      if (mounted) _message('$e');
+      if (mounted) setState(() => digilockerMessage = '$e');
     }
+  }
+
+  void _typeAadhaarNumber() {
+    final form = forms['aadhaar'];
+    if (form == null) return;
+    setState(() => form.missing = false);
+    FocusScope.of(context).requestFocus(form.numberFocus);
   }
 
   void _message(String text) =>
@@ -328,6 +383,33 @@ class _KycScreenState extends State<KycScreen> {
               if ((type == 'individual' || type == 'proprietorship') &&
                   forms.containsKey('aadhaar')) ...[
                 const SizedBox(height: 12),
+                if (digilockerMessage != null)
+                  Card(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    child: Padding(
+                      padding: const EdgeInsets.all(14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(digilockerMessage!),
+                          const SizedBox(height: 8),
+                          Wrap(
+                            spacing: 8,
+                            children: [
+                              TextButton(
+                                onPressed: _verifyDigiLocker,
+                                child: const Text('Try again'),
+                              ),
+                              TextButton(
+                                onPressed: _typeAadhaarNumber,
+                                child: const Text('Type Aadhaar number'),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 OutlinedButton.icon(
                   onPressed: digilocker['verified'] == true
                       ? null
@@ -355,12 +437,14 @@ class _KycScreenState extends State<KycScreen> {
 
 class _DocumentForm {
   final number = TextEditingController(), reason = TextEditingController();
+  final numberFocus = FocusNode();
   bool missing = false;
   String? alternate;
   File? file;
   void dispose() {
     number.dispose();
     reason.dispose();
+    numberFocus.dispose();
   }
 }
 
@@ -451,6 +535,7 @@ class _DocumentCard extends StatelessWidget {
             ] else
               TextField(
                 controller: form.number,
+                focusNode: form.numberFocus,
                 decoration: InputDecoration(
                   labelText: '$label number',
                   hintText: '${config['hint'] ?? ''}',
@@ -472,4 +557,67 @@ class _DocumentCard extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The callback must load in this view: it lets the server exchange the
+/// DigiLocker authorization code. Only the return URL marks the flow complete.
+class _DigiLockerBrowser extends StatefulWidget {
+  const _DigiLockerBrowser({
+    required this.authorizationUrl,
+    required this.returnUrlPrefix,
+  });
+
+  final Uri authorizationUrl;
+  final String returnUrlPrefix;
+
+  @override
+  State<_DigiLockerBrowser> createState() => _DigiLockerBrowserState();
+}
+
+class _DigiLockerBrowserState extends State<_DigiLockerBrowser> {
+  late final WebViewController _controller;
+  var _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: _checkForCompletion,
+          onNavigationRequest: (request) {
+            _checkForCompletion(request.url);
+            return NavigationDecision.navigate;
+          },
+          onPageFinished: (_) {
+            if (mounted) setState(() => _loading = false);
+          },
+        ),
+      )
+      ..loadRequest(widget.authorizationUrl);
+  }
+
+  void _checkForCompletion(String url) {
+    if (url.startsWith(widget.returnUrlPrefix) && mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Verify with DigiLocker'),
+      leading: IconButton(
+        icon: const Icon(Icons.close),
+        onPressed: () => Navigator.of(context).pop(false),
+      ),
+    ),
+    body: Stack(
+      children: [
+        WebViewWidget(controller: _controller),
+        if (_loading) const Center(child: CircularProgressIndicator()),
+      ],
+    ),
+  );
 }
