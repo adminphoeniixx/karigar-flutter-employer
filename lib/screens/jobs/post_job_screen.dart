@@ -402,25 +402,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
       ).api.saveJob(values, id: widget.job?.id);
       if (!mounted) return;
       if (response['code'] == 'job_checking') {
-        await showDialog<void>(
-          context: context,
-          builder: (context) => AlertDialog(
-            icon: const SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(strokeWidth: 3),
-            ),
-            title: const Text('Checking your job'),
-            content: Text(
-              '${response['message'] ?? 'We are running a quick safety check. Your job will go live in a minute or two.'}',
-            ),
-            actions: [
-              FilledButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('View my jobs'),
-              ),
-            ],
-          ),
+        await _showJobCheckingDialog(
+          response['message']?.toString() ??
+              'We are running a quick safety check. Your job will go live in a minute or two.',
         );
         if (mounted) Navigator.pop(context, JobPostResult.checking);
         return;
@@ -577,6 +561,53 @@ class _PostJobScreenState extends State<PostJobScreen> {
       if (mounted) setState(() => loading = false);
     }
   }
+
+  Future<void> _showJobCheckingDialog(String message) => showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (dialogContext) => Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 420),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(28, 30, 28, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Center(
+                // Keep both dimensions fixed so the spinner cannot be stretched
+                // by a dialog layout constraint on wider screens.
+                child: SizedBox.square(
+                  dimension: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 22),
+              const Text(
+                'Checking your job',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 14),
+              Text(message, textAlign: TextAlign.center),
+              const SizedBox(height: 24),
+              Align(
+                alignment: Alignment.center,
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: const Text('View my jobs'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
 
   Future<void> _suggestDescription() async {
     final title = titleController.text.trim();
