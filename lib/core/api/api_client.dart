@@ -273,7 +273,8 @@ class ApiClient {
     if (!kDebugMode) return;
     final buffer = StringBuffer()
       ..writeln('┌─ API REQUEST ─────────────────────────────')
-      ..writeln('│ $method $uri');
+      ..writeln('│ $method $uri')
+      ..writeln('│ Authorization: ${_tokenDebugState()}');
     if (body != null) {
       buffer.writeln('│ Body: ${_pretty(_redact(body))}');
     }
@@ -282,6 +283,12 @@ class ApiClient {
     }
     buffer.write('└──────────────────────────────────────────');
     debugPrint(buffer.toString());
+  }
+
+  String _tokenDebugState() {
+    final token = _token;
+    if (token == null || token.isEmpty) return 'Bearer token missing';
+    return 'Bearer token attached (length: ${token.length})';
   }
 
   void _logResponse(

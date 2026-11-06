@@ -5,6 +5,7 @@ import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
+import 'package:employer_kariger_app/widgets/searchable_option_sheet.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/dashboard/main_shell.dart';
 import 'package:employer_kariger_app/widgets/location_map.dart';
@@ -594,31 +595,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       );
       return;
     }
-    final value = await showModalBottomSheet<String>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-            ...values.map(
-              (item) => ListTile(
-                title: Text(item),
-                onTap: () => Navigator.pop(context, item),
-              ),
-            ),
-          ],
-        ),
-      ),
+    final value = await showSearchableOptionSheet(
+      context,
+      title: title,
+      values: values,
     );
     if (value != null) onSelected(value);
   }

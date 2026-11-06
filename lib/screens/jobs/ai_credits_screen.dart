@@ -27,7 +27,10 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
   String? _error, _pendingOrder;
   String _filter = 'all';
   Map<String, dynamic> _credits = const {};
+  Map<String, dynamic> _totals = const {}, _ledgerMeta = const {};
   List<Map<String, dynamic>> _packs = const [], _ledger = const [];
+  int _ledgerPage = 1;
+  bool _loadingMore = false;
   List<String> _rules = const [];
   String? _billingEmail;
 
@@ -83,7 +86,9 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
     try {
       final results = await Future.wait([
         AppScope.of(context).api.aiCredits(),
-        AppScope.of(context).api.aiCreditsLedger(filter: _filter),
+        AppScope.of(
+          context,
+        ).api.aiCreditsLedger(filter: _filter, page: _ledgerPage),
       ]);
       if (!mounted) return;
       final catalog = results[0];
@@ -92,19 +97,53 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
         _credits = catalog['credits'] is Map
             ? Map<String, dynamic>.from(catalog['credits'] as Map)
             : const {};
+        _totals = catalog['totals'] is Map
+            ? Map<String, dynamic>.from(catalog['totals'] as Map)
+            : const {};
         _packs = _maps(catalog['packs']);
         _rules = (catalog['rules'] as List? ?? const [])
             .map((rule) => '$rule')
             .where((rule) => rule.isNotEmpty)
             .toList();
         _billingEmail = catalog['billing_email']?.toString();
-        final rows = history['ledger'];
+        final rows = history['data'] ?? history['ledger'];
         _ledger = _maps(rows is Map ? rows['data'] : rows);
+        _ledgerMeta = history['meta'] is Map
+            ? Map<String, dynamic>.from(history['meta'] as Map)
+            : rows is Map && rows['meta'] is Map
+            ? Map<String, dynamic>.from(rows['meta'] as Map)
+            : const {};
       });
     } catch (e) {
       if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final current = (_ledgerMeta['current_page'] as num?)?.toInt() ?? 1;
+    final last = (_ledgerMeta['last_page'] as num?)?.toInt() ?? 1;
+    if (_loadingMore || current >= last) return;
+    setState(() => _loadingMore = true);
+    try {
+      final history = await AppScope.of(
+        context,
+      ).api.aiCreditsLedger(filter: _filter, page: current + 1);
+      if (!mounted) return;
+      final rows = history['data'] ?? history['ledger'];
+      setState(() {
+        _ledger.addAll(_maps(rows is Map ? rows['data'] : rows));
+        _ledgerMeta = history['meta'] is Map
+            ? Map<String, dynamic>.from(history['meta'] as Map)
+            : rows is Map && rows['meta'] is Map
+            ? Map<String, dynamic>.from(rows['meta'] as Map)
+            : _ledgerMeta;
+      });
+    } catch (error) {
+      _snack('$error');
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
     }
   }
 
@@ -251,6 +290,8 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
                 _BalanceCard(credits: _credits),
+                const SizedBox(height: 12),
+                _CreditTotals(totals: _totals),
                 const SizedBox(height: 20),
                 const SectionTitle('Recharge packs'),
                 ..._packs.map(
@@ -296,7 +337,10 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
                             label: tab.value,
                             selected: _filter == tab.key,
                             onTap: () {
-                              setState(() => _filter = tab.key);
+                              setState(() {
+                                _filter = tab.key;
+                                _ledgerPage = 1;
+                              });
                               _load();
                             },
                           ),
@@ -311,6 +355,21 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
                   )
                 else
                   ..._ledger.map(_LedgerRow.new),
+                if ((_ledgerMeta['current_page'] as num? ?? 1) <
+                    (_ledgerMeta['last_page'] as num? ?? 1))
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: OutlinedButton(
+                      onPressed: _loadingMore ? null : _loadMore,
+                      child: _loadingMore
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Load more history'),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -349,6 +408,59 @@ class _CreditHistoryTab extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _CreditTotals extends StatelessWidget {
+  const _CreditTotals({required this.totals});
+  final Map<String, dynamic> totals;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final entries = [
+      ('Added', '+${totals['added'] ?? 0}', LucideIcons.plus),
+      ('Spent', '${totals['spent'] ?? 0}', LucideIcons.minus),
+      ('Calls', '${totals['calls'] ?? 0}', LucideIcons.phoneCall),
+    ];
+    return Row(
+      children: entries
+          .map(
+            (entry) => Expanded(
+              child: Container(
+                margin: EdgeInsets.only(right: entry == entries.last ? 0 : 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: colors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: colors.outlineVariant),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(entry.$3, size: 16, color: colors.onSurfaceVariant),
+                    const SizedBox(height: 8),
+                    Text(
+                      entry.$2,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      entry.$1,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: colors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
 }
 
 class _BalanceCard extends StatelessWidget {
@@ -596,7 +708,11 @@ class _LedgerRow extends StatelessWidget {
     final amount = (row['credits'] as num?)?.toInt() ?? 0;
     final invoice = row['invoice'];
     final callId = (row['screening_call_id'] as num?)?.toInt();
-    final added = amount >= 0;
+    final added =
+        row['direction'] == 'credit' ||
+        (row['direction'] == null && amount >= 0);
+    final paid = row['amount_paid'];
+    final colors = Theme.of(context).colorScheme;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ListTile(
@@ -605,13 +721,13 @@ class _LedgerRow extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: added ? AppColors.greenBg : AppColors.roseBg,
+            color: added ? colors.tertiaryContainer : colors.errorContainer,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(
             added ? LucideIcons.plus : LucideIcons.phoneCall,
             size: 18,
-            color: added ? AppColors.green : AppColors.rose,
+            color: added ? colors.onTertiaryContainer : colors.onErrorContainer,
           ),
         ),
         title: Row(
@@ -634,7 +750,7 @@ class _LedgerRow extends StatelessWidget {
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text(
-            '${row['created_label'] ?? ''}\nBalance ${row['balance_after'] ?? ''}',
+            '${row['created_label'] ?? ''}\nBalance ${row['balance_after'] ?? ''}${paid is num ? ' · Paid ₹${paid.toStringAsFixed(2)}' : ''}',
           ),
         ),
         isThreeLine: true,
@@ -642,9 +758,9 @@ class _LedgerRow extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              '${amount >= 0 ? '+' : ''}$amount',
+              '${added ? '+' : '−'}${amount.abs()}',
               style: TextStyle(
-                color: added ? AppColors.green : AppColors.rose,
+                color: added ? colors.tertiary : colors.error,
                 fontWeight: FontWeight.w800,
               ),
             ),

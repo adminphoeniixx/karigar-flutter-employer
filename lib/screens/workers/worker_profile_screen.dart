@@ -149,6 +149,29 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   Widget build(BuildContext context) {
     final w = widget.worker;
     final details = profile;
+    // Once the full profile endpoint responds, it is the source of truth.
+    // Do not leak list-card fallback data into fields the API explicitly
+    // returns as empty or null.
+    final hasApiProfile = details != null;
+    final displayName = details?.name.trim().isNotEmpty == true
+        ? details!.name
+        : w.name;
+    final displaySkills = hasApiProfile ? details.skills : w.skills;
+    final displayTrade = displaySkills.firstOrNull ?? 'Karigar';
+    final displayExperience = hasApiProfile
+        ? details.experienceYears
+        : w.experience;
+    final displayWage = hasApiProfile ? details.expectedWage : w.wage;
+    final displayDistance = hasApiProfile
+        ? (details.distanceKm ?? 0)
+        : w.distance;
+    final initials = displayName
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .take(2)
+        .map((part) => part[0])
+        .join()
+        .toUpperCase();
     final languages = details?.languages ?? const <String>[];
     return Scaffold(
       appBar: AppBar(title: const Text('Karigar Profile')),
@@ -171,14 +194,20 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                           CircleAvatar(
                             radius: 28,
                             backgroundColor: AppColors.brand100,
-                            child: Text(
-                              w.initials,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.brandDark,
-                              ),
-                            ),
+                            backgroundImage:
+                                details?.avatarUrl?.trim().isNotEmpty == true
+                                ? NetworkImage(details!.avatarUrl!)
+                                : null,
+                            child: details?.avatarUrl?.trim().isNotEmpty == true
+                                ? null
+                                : Text(
+                                    initials.isEmpty ? 'K' : initials,
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.brandDark,
+                                    ),
+                                  ),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -189,7 +218,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   children: [
                                     Flexible(
                                       child: Text(
-                                        w.name,
+                                        displayName,
                                         overflow: TextOverflow.ellipsis,
                                         style: const TextStyle(
                                           color: Colors.white,
@@ -211,7 +240,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                   ],
                                 ),
                                 Text(
-                                  '${w.trade} · ${w.experience} yrs experience',
+                                  '$displayTrade · $displayExperience yrs experience',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13.5,
@@ -219,7 +248,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                 ),
                                 const SizedBox(height: 5),
                                 Text(
-                                  '${[details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ').isNotEmpty ? [details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ') : 'Location unavailable'}${w.distance > 0 ? ' · ${w.distance.toStringAsFixed(1)} km' : ''}',
+                                  '${[details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ').isNotEmpty ? [details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ') : 'Location unavailable'}${displayDistance > 0 ? ' · ${displayDistance.toStringAsFixed(1)} km' : ''}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13,
@@ -244,9 +273,9 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                 const SizedBox(width: 8),
                                 const BrandChip('● Available'),
                               ],
-                              if (w.wage > 0) ...[
+                              if (displayWage > 0) ...[
                                 const SizedBox(width: 8),
-                                BrandChip(monthlyWage(w.wage)),
+                                BrandChip(monthlyWage(displayWage)),
                               ],
                             ],
                           ),
@@ -386,11 +415,22 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         ),
                       ),
                       const SectionTitle('Skills'),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: w.skills.map(BrandChip.new).toList(),
-                      ),
+                      if (displaySkills.isEmpty)
+                        Text(
+                          'Not provided',
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
+                        )
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: displaySkills.map(BrandChip.new).toList(),
+                        ),
                       const SectionTitle('Work details'),
                       Card(
                         margin: EdgeInsets.zero,
@@ -404,8 +444,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                     child: _InfoTile(
                                       icon: LucideIcons.briefcaseBusiness,
                                       label: 'Experience',
-                                      value:
-                                          '${details?.experienceYears ?? w.experience} years',
+                                      value: '$displayExperience years',
                                     ),
                                   ),
                                   const SizedBox(width: 12),
@@ -413,11 +452,8 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                     child: _InfoTile(
                                       icon: LucideIcons.indianRupee,
                                       label: 'Expected wage',
-                                      value:
-                                          (details?.expectedWage ?? w.wage) > 0
-                                          ? monthlyWage(
-                                              details?.expectedWage ?? w.wage,
-                                            )
+                                      value: displayWage > 0
+                                          ? monthlyWage(displayWage)
                                           : 'Not disclosed',
                                     ),
                                   ),
@@ -465,8 +501,8 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                     child: _InfoTile(
                                       icon: LucideIcons.navigation,
                                       label: 'Distance',
-                                      value: w.distance > 0
-                                          ? '${w.distance.toStringAsFixed(1)} km away'
+                                      value: displayDistance > 0
+                                          ? '${displayDistance.toStringAsFixed(1)} km away'
                                           : 'Not available',
                                     ),
                                   ),

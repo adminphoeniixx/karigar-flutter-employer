@@ -94,21 +94,34 @@ class _ShortlistedScreenState extends State<ShortlistedScreen> {
                         return _ShortlistedWorkerCard(
                           applicant: applicant,
                           worker: worker,
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => WorkerProfileScreen(
-                                worker: worker,
-                                profileId: profile.id,
-                                workerUserId: profile.userId,
-                                jobId: (applicant.job?['id'] as num?)?.toInt(),
-                                phone: profile.phone,
-                                contactUnlocked: true,
-                                canMessage: true,
-                                alwaysShowContact: true,
+                          onTap: () {
+                            if (profile.id <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'This applicant has not completed a profile yet.',
+                                  ),
+                                ),
+                              );
+                              return;
+                            }
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => WorkerProfileScreen(
+                                  worker: worker,
+                                  profileId: profile.id,
+                                  workerUserId: profile.userId,
+                                  jobId: (applicant.job?['id'] as num?)
+                                      ?.toInt(),
+                                  phone: profile.phone,
+                                  contactUnlocked: true,
+                                  canMessage: true,
+                                  alwaysShowContact: true,
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         );
                       },
                     ),

@@ -202,6 +202,10 @@ class EmployerJob {
     this.address,
     this.perks = const [],
     this.contactMode = 'apply',
+    this.workMode = 'on_site',
+    this.workModeLabel = 'On-site',
+    this.interviewMode = 'on_site',
+    this.interviewModeLabel = 'Interview in person',
     this.contactPhone,
     this.contactName,
     this.contactDesignation,
@@ -250,6 +254,12 @@ class EmployerJob {
     address: json['address']?.toString(),
     perks: asStrings(json['perks']),
     contactMode: '${json['contact_mode'] ?? 'apply'}',
+    workMode: '${json['work_mode'] ?? 'on_site'}',
+    workModeLabel: '${json['work_mode_label'] ?? 'On-site'}',
+    interviewMode:
+        '${json['interview_mode'] ?? (json['work_mode'] == 'remote' ? 'remote' : 'on_site')}',
+    interviewModeLabel:
+        '${json['interview_mode_label'] ?? (json['work_mode'] == 'remote' ? 'Interview on phone / video' : 'Interview in person')}',
     contactPhone: json['contact_phone']?.toString(),
     contactName: json['contact_name']?.toString(),
     contactDesignation: json['contact_designation']?.toString(),
@@ -276,7 +286,14 @@ class EmployerJob {
   final double wageMin, wageMax;
   final double? workerFeeAmount, latitude, longitude;
   final String title, category, status, wageLabel, description, locationLabel;
-  final String city, state, wageType, shift, contactMode, createdAgo, shareUrl;
+  final String city,
+      state,
+      wageType,
+      shift,
+      contactMode,
+      workMode,
+      workModeLabel;
+  final String interviewMode, interviewModeLabel, createdAgo, shareUrl;
   final String? experienceLabel, shiftStart, shiftEnd, shiftHoursLabel, address;
   final String? contactPhone, contactName, contactDesignation;
   final List<String> skills, perks;
@@ -404,9 +421,15 @@ class Applicant {
         : null,
     job: json['job'] is Map ? Map<String, dynamic>.from(json['job']) : null,
     createdAgo: '${json['created_ago'] ?? ''}',
-    worker: WorkerProfile.fromJson(
-      Map<String, dynamic>.from(json['worker'] as Map? ?? {}),
-    ),
+    // Applicant payloads use `worker.id` for the auth user ID and expose the
+    // actual WorkerProfile primary key separately as `worker.profile_id`.
+    // WorkerProfile uses `id` for the profile endpoint, while `userId` is used
+    // for chat and invitations, so normalize the two IDs here.
+    worker: WorkerProfile.fromJson({
+      ...Map<String, dynamic>.from(json['worker'] as Map? ?? {}),
+      'id': (json['worker'] as Map?)?['profile_id'] ?? 0,
+      'user_id': (json['worker'] as Map?)?['id'] ?? 0,
+    }),
   );
   final int id;
   final String stage, status, statusLabel, createdAgo;

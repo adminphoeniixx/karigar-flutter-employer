@@ -61,6 +61,7 @@ class StatusPill extends StatelessWidget {
   final String text;
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     final positive = ['Active', 'Hired', 'Accepted', 'Verified'].contains(text);
     final shortlisted = text == 'Shortlisted';
     final rejected = text == 'Rejected' || text == 'Closed';
@@ -68,12 +69,12 @@ class StatusPill extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: positive
-            ? AppColors.greenBg
+            ? colors.tertiaryContainer
             : shortlisted
-            ? AppColors.indigoBg
+            ? colors.secondaryContainer
             : rejected
-            ? AppColors.roseBg
-            : AppColors.amberBg,
+            ? colors.errorContainer
+            : colors.primaryContainer,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(
@@ -82,12 +83,12 @@ class StatusPill extends StatelessWidget {
           fontSize: 11.5,
           fontWeight: FontWeight.w700,
           color: positive
-              ? AppColors.green
+              ? colors.onTertiaryContainer
               : shortlisted
-              ? AppColors.indigo
+              ? colors.onSecondaryContainer
               : rejected
-              ? AppColors.rose
-              : AppColors.amber,
+              ? colors.onErrorContainer
+              : colors.onPrimaryContainer,
         ),
       ),
     );
@@ -105,167 +106,172 @@ class WorkerCard extends StatelessWidget {
   final VoidCallback? onTap;
   final int maxSkills;
   @override
-  Widget build(BuildContext context) => Card(
-    child: InkWell(
-      borderRadius: BorderRadius.circular(16),
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final compact = constraints.maxWidth < 310;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      radius: 22,
-                      backgroundColor: AppColors.brand100,
-                      child: Text(
-                        worker.initials,
-                        style: const TextStyle(
-                          color: AppColors.brandDark,
-                          fontWeight: FontWeight.w700,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Card(
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final compact = constraints.maxWidth < 310;
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(
+                        radius: 22,
+                        backgroundColor: colors.primaryContainer,
+                        child: Text(
+                          worker.initials,
+                          style: TextStyle(
+                            color: colors.onPrimaryContainer,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  worker.name,
-                                  style: const TextStyle(
-                                    fontSize: 15.5,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 5),
-                              if (worker.verified)
-                                const Icon(
-                                  LucideIcons.badgeCheck,
-                                  size: 17,
-                                  color: AppColors.green,
-                                ),
-                            ],
-                          ),
-                          Text(
-                            [
-                              worker.trade,
-                              '${worker.experience} yrs exp',
-                              if (worker.rating > 0) '★ ${worker.rating}',
-                            ].join(' · '),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.muted,
-                            ),
-                          ),
-                          if (worker.distance > 0 || worker.wage > 0) ...[
-                            const SizedBox(height: 5),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Row(
                               children: [
-                                if (worker.distance > 0) ...[
-                                  const Icon(
-                                    LucideIcons.mapPin,
-                                    size: 13,
-                                    color: AppColors.muted,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${worker.distance.toStringAsFixed(1)} km away',
+                                Flexible(
+                                  child: Text(
+                                    worker.name,
                                     style: const TextStyle(
-                                      fontSize: 12,
+                                      fontSize: 15.5,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                if (worker.verified)
+                                  const Icon(
+                                    LucideIcons.badgeCheck,
+                                    size: 17,
+                                    color: AppColors.green,
+                                  ),
+                              ],
+                            ),
+                            Text(
+                              [
+                                worker.trade,
+                                '${worker.experience} yrs exp',
+                                if (worker.rating > 0) '★ ${worker.rating}',
+                              ].join(' · '),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.muted,
+                              ),
+                            ),
+                            if (worker.distance > 0 || worker.wage > 0) ...[
+                              const SizedBox(height: 5),
+                              Row(
+                                children: [
+                                  if (worker.distance > 0) ...[
+                                    const Icon(
+                                      LucideIcons.mapPin,
+                                      size: 13,
                                       color: AppColors.muted,
                                     ),
-                                  ),
-                                ],
-                                if (worker.distance > 0 && worker.wage > 0)
-                                  const Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                    ),
-                                    child: Text(
-                                      '·',
-                                      style: TextStyle(color: AppColors.muted),
-                                    ),
-                                  ),
-                                if (worker.wage > 0)
-                                  Flexible(
-                                    child: Text(
-                                      monthlyWage(worker.wage),
-                                      overflow: TextOverflow.ellipsis,
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      '${worker.distance.toStringAsFixed(1)} km away',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: AppColors.muted,
                                       ),
                                     ),
-                                  ),
-                              ],
-                            ),
+                                  ],
+                                  if (worker.distance > 0 && worker.wage > 0)
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                      ),
+                                      child: Text(
+                                        '·',
+                                        style: TextStyle(
+                                          color: AppColors.muted,
+                                        ),
+                                      ),
+                                    ),
+                                  if (worker.wage > 0)
+                                    Flexible(
+                                      child: Text(
+                                        monthlyWage(worker.wage),
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          color: AppColors.muted,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
+                      if (!compact) StatusPill(worker.status),
+                    ],
+                  ),
+                  if (compact) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: StatusPill(worker.status),
                     ),
-                    if (!compact) StatusPill(worker.status),
                   ],
-                ),
-                if (compact) ...[
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: StatusPill(worker.status),
-                  ),
-                ],
-                if (worker.skills.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  const Row(
-                    children: [
-                      Icon(
-                        LucideIcons.sparkles,
-                        size: 13,
-                        color: AppColors.muted,
-                      ),
-                      SizedBox(width: 5),
-                      Text(
-                        'Skills',
-                        style: TextStyle(
+                  if (worker.skills.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    const Row(
+                      children: [
+                        Icon(
+                          LucideIcons.sparkles,
+                          size: 13,
                           color: AppColors.muted,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 7),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      ...worker.skills
-                          .take(maxSkills)
-                          .map((s) => BrandChip(s, neutral: true)),
-                      if (worker.skills.length > maxSkills)
-                        BrandChip(
-                          '+${worker.skills.length - maxSkills} more',
-                          neutral: true,
+                        SizedBox(width: 5),
+                        Text(
+                          'Skills',
+                          style: TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const SizedBox(height: 7),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        ...worker.skills
+                            .take(maxSkills)
+                            .map((s) => BrandChip(s, neutral: true)),
+                        if (worker.skills.length > maxSkills)
+                          BrandChip(
+                            '+${worker.skills.length - maxSkills} more',
+                            neutral: true,
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
-              ],
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class LabeledField extends StatelessWidget {

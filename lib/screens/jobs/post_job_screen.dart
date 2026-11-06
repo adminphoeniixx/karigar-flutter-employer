@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/widgets/location_map.dart';
+import 'package:employer_kariger_app/widgets/searchable_option_sheet.dart';
 
 class PostJobScreen extends StatefulWidget {
   const PostJobScreen({super.key, this.job});
@@ -37,6 +38,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
   String shift = 'Day';
   String contact = 'Apply + Call';
   String wageType = 'monthly';
+  String workMode = 'on_site';
+  String interviewMode = 'on_site';
+  bool _interviewModeTouched = false;
   String aiLanguage = 'en';
   String? category;
   String? state;
@@ -73,6 +77,15 @@ class _PostJobScreenState extends State<PostJobScreen> {
   LatLng? selectedLocation;
   List<String> states = const [];
   List<String> cities = const [];
+  List<Map<String, String>> workModes = const [
+    {'value': 'on_site', 'label': 'On-site'},
+    {'value': 'remote', 'label': 'Work from home'},
+    {'value': 'both', 'label': 'On-site or from home'},
+  ];
+  List<Map<String, String>> interviewModes = const [
+    {'value': 'on_site', 'label': 'Interview in person'},
+    {'value': 'remote', 'label': 'Interview on phone / video'},
+  ];
   final titleController = TextEditingController();
   final openingsController = TextEditingController(text: '1');
   final experienceController = TextEditingController(text: '0');
@@ -132,6 +145,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
           'apply': 'Apply only',
         }[job.contactMode] ??
         'Apply only';
+    workMode = job.workMode;
+    interviewMode = job.interviewMode;
     liveStatus = job.status == 'closed' ? 'closed' : 'active';
     aiShortlistEnabled = job.aiShortlistEnabled;
     aiCallEnabled = job.aiCallEnabled;
@@ -234,7 +249,13 @@ class _PostJobScreenState extends State<PostJobScreen> {
       try {
         final options = await AppScope.of(context).api.jobFormOptions();
         final ai = options['ai'];
-        if (mounted && ai is Map) {
+        if (mounted) {
+          final parsedWorkModes = _modeOptions(options['work_modes']);
+          final parsedInterviewModes = _modeOptions(options['interview_modes']);
+          if (parsedWorkModes.isNotEmpty) workModes = parsedWorkModes;
+          if (parsedInterviewModes.isNotEmpty)
+            interviewModes = parsedInterviewModes;
+          if (ai is! Map) return;
           final credits = ai['credits'];
           setState(() {
             aiShortlistAvailable = ai['shortlist_available'] != false;
@@ -272,6 +293,18 @@ class _PostJobScreenState extends State<PostJobScreen> {
       })
       .where((item) => item.isNotEmpty)
       .toList();
+
+  List<Map<String, String>> _modeOptions(dynamic value) =>
+      (value as List? ?? const [])
+          .whereType<Map>()
+          .map(
+            (item) => {
+              'value': '${item['value'] ?? ''}',
+              'label': '${item['label'] ?? item['value'] ?? ''}',
+            },
+          )
+          .where((item) => item['value']!.isNotEmpty)
+          .toList();
 
   Future<void> _loadCities(
     String value, {
@@ -382,6 +415,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
               ).hasMatch(contactPhoneController.text.trim())
           ? 'apply'
           : contactMode,
+      'work_mode': workMode,
+      'interview_mode': interviewMode,
       if (contactMode != 'apply' &&
           RegExp(r'^[6-9]\d{9}$').hasMatch(contactPhoneController.text.trim()))
         'contact_phone': contactPhoneController.text.trim(),
@@ -978,6 +1013,24 @@ class _PostJobScreenState extends State<PostJobScreen> {
                         lines: 4,
                         controller: descriptionController,
                       ),
+                      const _SectionLabel('Work & interview'),
+                      _WorkInterviewCard(
+                        workMode: workMode,
+                        interviewMode: interviewMode,
+                        workModes: workModes,
+                        interviewModes: interviewModes,
+                        showAiNote: aiCallAvailable,
+                        onWorkModeChanged: (value) => setState(() {
+                          workMode = value;
+                          if (value == 'remote' && !_interviewModeTouched) {
+                            interviewMode = 'remote';
+                          }
+                        }),
+                        onInterviewModeChanged: (value) => setState(() {
+                          interviewMode = value;
+                          _interviewModeTouched = true;
+                        }),
+                      ),
                       const _SectionLabel('Location'),
                       Row(
                         children: [
@@ -1191,33 +1244,121 @@ class _PostJobScreenState extends State<PostJobScreen> {
       _message('Options are not available yet. Please try again.');
       return;
     }
-    final result = await showModalBottomSheet<String>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
+    final result = await showSearchableOptionSheet(
+      context,
+      title: title,
+      values: values,
+    );
+    if (result != null) onSelected(result);
+  }
+}
+
+class _WorkInterviewCard extends StatelessWidget {
+  const _WorkInterviewCard({
+    required this.workMode,
+    required this.interviewMode,
+    required this.workModes,
+    required this.interviewModes,
+    required this.showAiNote,
+    required this.onWorkModeChanged,
+    required this.onInterviewModeChanged,
+  });
+  final String workMode, interviewMode;
+  final List<Map<String, String>> workModes, interviewModes;
+  final bool showAiNote;
+  final ValueChanged<String> onWorkModeChanged, onInterviewModeChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    Widget options(
+      List<Map<String, String>> values,
+      String selected,
+      ValueChanged<String> onChanged,
+    ) => Column(
+      children: values.map((item) {
+        final value = item['value']!;
+        final active = selected == value;
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: InkWell(
+            onTap: () => onChanged(value),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+              decoration: BoxDecoration(
+                color: active
+                    ? colors.primaryContainer
+                    : colors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: active ? colors.primary : colors.outlineVariant,
                 ),
               ),
+              child: Row(
+                children: [
+                  Icon(
+                    active ? LucideIcons.circleDot : LucideIcons.circle,
+                    size: 18,
+                    color: active
+                        ? colors.onPrimaryContainer
+                        : colors.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      item['label']!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: active
+                            ? colors.onPrimaryContainer
+                            : colors.onSurface,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            ...values.map(
-              (item) => ListTile(
-                title: Text(item),
-                onTap: () => Navigator.pop(context, item),
+          ),
+        );
+      }).toList(),
+    );
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Where will the karigar work?',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          options(workModes, workMode, onWorkModeChanged),
+          const SizedBox(height: 16),
+          const Text(
+            'How will you take the interview?',
+            style: TextStyle(fontWeight: FontWeight.w700),
+          ),
+          options(interviewModes, interviewMode, onInterviewModeChanged),
+          if (showAiNote) ...[
+            const SizedBox(height: 12),
+            Text(
+              'The AI call asks whether the karigar can come to the location, or has the space and tools to work from home.',
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.35,
+                color: colors.onSurfaceVariant,
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
-    if (result != null) onSelected(result);
   }
 }
 

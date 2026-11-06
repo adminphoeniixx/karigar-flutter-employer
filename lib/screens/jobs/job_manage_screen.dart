@@ -118,6 +118,17 @@ class _JobSummaryCard extends StatelessWidget {
               ),
             ],
           ),
+          if (job.workModeLabel?.isNotEmpty == true ||
+              job.interviewModeLabel?.isNotEmpty == true) ...[
+            const SizedBox(height: 10),
+            Text(
+              [job.workModeLabel, job.interviewModeLabel]
+                  .whereType<String>()
+                  .where((value) => value.isNotEmpty)
+                  .join(' · '),
+              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+            ),
+          ],
         ],
       ),
     ),
@@ -381,10 +392,12 @@ class _JobManageScreenState extends State<JobManageScreen> {
       time.minute,
     );
     try {
-      await AppScope.of(context).api.scheduleInterview(
+      final api = AppScope.of(context).api;
+      final details = job.id == 0 ? null : await api.job(job.id);
+      await api.scheduleInterview(
         applicant.id,
         interviewAt: at.toIso8601String(),
-        mode: 'site',
+        mode: details?.interviewMode == 'remote' ? 'phone' : 'site',
       );
       await _load();
       _message('Interview invitation sent.');
@@ -820,21 +833,29 @@ class _JobManageScreenState extends State<JobManageScreen> {
                   children: [
                     WorkerCard(
                       worker: worker,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => WorkerProfileScreen(
-                            worker: worker,
-                            profileId: profile.id,
-                            workerUserId: profile.userId,
-                            jobId: job.id,
-                            phone: profile.phone,
-                            contactUnlocked: true,
-                            canMessage: true,
-                            alwaysShowContact: true,
+                      onTap: () {
+                        if (profile.id <= 0) {
+                          _message(
+                            'This applicant has not completed a profile yet.',
+                          );
+                          return;
+                        }
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => WorkerProfileScreen(
+                              worker: worker,
+                              profileId: profile.id,
+                              workerUserId: profile.userId,
+                              jobId: job.id,
+                              phone: profile.phone,
+                              contactUnlocked: true,
+                              canMessage: true,
+                              alwaysShowContact: true,
+                            ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                     Container(

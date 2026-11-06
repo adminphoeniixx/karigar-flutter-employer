@@ -1,9 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/screens/auth/registration_screen.dart';
 import 'package:employer_kariger_app/screens/dashboard/main_shell.dart';
@@ -18,6 +19,9 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   bool sent = false;
   bool loading = false;
+  static const _resendCooldown = 30;
+  int _resendSeconds = 0;
+  Timer? _resendTimer;
   final phoneController = TextEditingController();
   final otpControllers = List.generate(4, (_) => TextEditingController());
   final otpFocusNodes = List.generate(4, (_) => FocusNode());
@@ -30,11 +34,50 @@ class _OtpScreenState extends State<OtpScreen> {
     });
   }
 
+  void _startResendTimer() {
+    _resendTimer?.cancel();
+    setState(() => _resendSeconds = _resendCooldown);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendSeconds <= 1) {
+        timer.cancel();
+        setState(() => _resendSeconds = 0);
+      } else {
+        setState(() => _resendSeconds -= 1);
+      }
+    });
+  }
+
+  Future<void> _resendOtp() async {
+    if (loading || _resendSeconds > 0) return;
+    final phone = phoneController.text.replaceAll(RegExp(r'\D'), '');
+    if (phone.length != 10) return;
+    setState(() => loading = true);
+    final auth = AppScope.of(context).auth;
+    final success = await auth.sendOtp(phone);
+    if (!mounted) return;
+    setState(() => loading = false);
+    if (!success) {
+      _message(auth.error ?? 'Could not resend the OTP.');
+      return;
+    }
+    for (final controller in otpControllers) {
+      controller.clear();
+    }
+    _startResendTimer();
+    _focusFirstOtpField();
+    _message('A new OTP has been sent.');
+  }
+
   void _handleBack() {
     if (!sent) {
       Navigator.maybePop(context);
       return;
     }
+    _resendTimer?.cancel();
     FocusManager.instance.primaryFocus?.unfocus();
     for (final controller in otpControllers) {
       controller.clear();
@@ -44,6 +87,7 @@ class _OtpScreenState extends State<OtpScreen> {
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     phoneController.dispose();
     for (final controller in otpControllers) {
       controller.dispose();
@@ -69,7 +113,10 @@ class _OtpScreenState extends State<OtpScreen> {
         loading = false;
         if (success) sent = true;
       });
-      if (success) _focusFirstOtpField();
+      if (success) {
+        _startResendTimer();
+        _focusFirstOtpField();
+      }
       if (!success) _message(auth.error ?? 'Could not send the OTP.');
       return;
     }
@@ -165,13 +212,17 @@ class _OtpScreenState extends State<OtpScreen> {
                             width: 56,
                             height: 56,
                             decoration: BoxDecoration(
-                              color: AppColors.brand50,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
                               borderRadius: BorderRadius.circular(16),
                             ),
-                            child: const Icon(
+                            child: Icon(
                               LucideIcons.smartphone,
                               size: 28,
-                              color: AppColors.primary,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onPrimaryContainer,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -186,8 +237,10 @@ class _OtpScreenState extends State<OtpScreen> {
                           const SizedBox(height: 6),
                           Text(
                             "Employer · We'll send you a one-time code",
-                            style: const TextStyle(
-                              color: AppColors.muted,
+                            style: TextStyle(
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.onSurfaceVariant,
                               fontSize: 15,
                             ),
                           ),
@@ -203,6 +256,8 @@ class _OtpScreenState extends State<OtpScreen> {
                         controllers: otpControllers,
                         focusNodes: otpFocusNodes,
                         onChange: () => setState(() => sent = false),
+                        resendSeconds: _resendSeconds,
+                        onResend: _resendOtp,
                       ),
                     const SizedBox(height: 12),
                     FilledButton(
@@ -213,11 +268,11 @@ class _OtpScreenState extends State<OtpScreen> {
                     ),
                     if (sent) ...[
                       const SizedBox(height: 16),
-                      const Text(
+                      Text(
                         'By continuing you agree to our Terms & Privacy Policy.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: AppColors.muted,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                           fontSize: 11.5,
                         ),
                       ),
@@ -238,66 +293,69 @@ class _PhoneForm extends StatelessWidget {
   final TextEditingController controller;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      const Text(
-        'Mobile number',
-        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-      ),
-      const SizedBox(height: 7),
-      Container(
-        height: 58,
-        clipBehavior: Clip.antiAlias,
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          border: Border.all(color: AppColors.line),
-          borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Mobile number',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 64,
-              height: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              color: AppColors.line2,
-              alignment: Alignment.centerLeft,
-              child: const Text(
-                'IN\n+91',
-                style: TextStyle(
-                  height: 1.45,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+        const SizedBox(height: 7),
+        Container(
+          height: 58,
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerLow,
+            border: Border.all(color: colors.outlineVariant),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 64,
+                height: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                color: colors.surfaceContainerHighest,
+                alignment: Alignment.centerLeft,
+                child: const Text(
+                  'IN\n+91',
+                  style: TextStyle(
+                    height: 1.45,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                autofocus: true,
-                keyboardType: TextInputType.phone,
-                maxLength: 10,
-                decoration: InputDecoration(
-                  hintText: '98765 43210',
-                  counterText: '',
-                  filled: false,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 14),
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType: TextInputType.phone,
+                  maxLength: 10,
+                  decoration: InputDecoration(
+                    hintText: '98765 43210',
+                    counterText: '',
+                    filled: false,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: EdgeInsets.symmetric(horizontal: 14),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-      const SizedBox(height: 7),
-      const Text(
-        'Applicant alerts will be sent to this number.',
-        style: TextStyle(color: AppColors.muted, fontSize: 11.5),
-      ),
-    ],
-  );
+        const SizedBox(height: 7),
+        Text(
+          'Applicant alerts will be sent to this number.',
+          style: TextStyle(color: colors.onSurfaceVariant, fontSize: 11.5),
+        ),
+      ],
+    );
+  }
 }
 
 class _VerificationForm extends StatelessWidget {
@@ -306,11 +364,15 @@ class _VerificationForm extends StatelessWidget {
     required this.phone,
     required this.controllers,
     required this.focusNodes,
+    required this.resendSeconds,
+    required this.onResend,
   });
   final VoidCallback onChange;
   final String phone;
   final List<TextEditingController> controllers;
   final List<FocusNode> focusNodes;
+  final int resendSeconds;
+  final VoidCallback onResend;
 
   @override
   Widget build(BuildContext context) => Column(
@@ -328,8 +390,8 @@ class _VerificationForm extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              backgroundColor: AppColors.brand50,
-              foregroundColor: AppColors.brandDark,
+              backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+              foregroundColor: Theme.of(context).colorScheme.onPrimaryContainer,
             ),
             child: const Text('Change', style: TextStyle(fontSize: 12)),
           ),
@@ -396,11 +458,16 @@ class _VerificationForm extends StatelessWidget {
         ),
       ),
       const SizedBox(height: 12),
-      const Center(
-        child: Text(
-          'Resend in 30s',
-          style: TextStyle(color: AppColors.muted, fontSize: 12),
-        ),
+      Center(
+        child: resendSeconds > 0
+            ? Text(
+                'Resend in ${resendSeconds}s',
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  fontSize: 12,
+                ),
+              )
+            : TextButton(onPressed: onResend, child: const Text('Resend OTP')),
       ),
     ],
   );

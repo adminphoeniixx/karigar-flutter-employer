@@ -12,6 +12,8 @@ class Job {
     this.moderationNote,
     this.moderationStatus,
     this.moderationMethod,
+    this.workModeLabel,
+    this.interviewModeLabel,
   });
 
   final String title;
@@ -25,6 +27,7 @@ class Job {
   final int id;
   final String? moderationNote;
   final String? moderationStatus, moderationMethod;
+  final String? workModeLabel, interviewModeLabel;
 }
 
 class Worker {

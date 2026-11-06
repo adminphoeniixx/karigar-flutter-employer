@@ -88,6 +88,8 @@ class _JobsScreenState extends State<JobsScreen> {
               moderationNote: job.moderation?['note']?.toString(),
               moderationStatus: job.moderation?['status']?.toString(),
               moderationMethod: job.moderation?['method']?.toString(),
+              workModeLabel: job.workModeLabel,
+              interviewModeLabel: job.interviewModeLabel,
             ),
           )
           .toList();

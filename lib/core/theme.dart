@@ -207,6 +207,7 @@ abstract final class AppTheme {
           fontSize: 18,
           fontWeight: FontWeight.w700,
         ),
+        shape: const Border(bottom: BorderSide(color: Color(0xFF3B312B))),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,

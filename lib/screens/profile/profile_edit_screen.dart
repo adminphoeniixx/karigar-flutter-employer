@@ -228,7 +228,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           children: [
                             CircleAvatar(
                               radius: 44,
-                              backgroundColor: AppColors.brand50,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primaryContainer,
                               backgroundImage:
                                   AppScope.of(context).profile.profile?.logoUrl
                                           ?.trim()
@@ -246,10 +248,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                                           .isNotEmpty ==
                                       true
                                   ? null
-                                  : const Icon(
+                                  : Icon(
                                       LucideIcons.building2,
                                       size: 40,
-                                      color: AppColors.primary,
+                                      color: Theme.of(
+                                        context,
+                                      ).colorScheme.onPrimaryContainer,
                                     ),
                             ),
                             Positioned(
@@ -272,9 +276,11 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                           uploadingLogo
                               ? 'Uploading logo...'
                               : 'Tap to change logo',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.muted,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -374,9 +380,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                   'Tap anywhere on the map to set your exact location.',
-                  style: TextStyle(fontSize: 12, color: AppColors.muted),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 SizedBox(

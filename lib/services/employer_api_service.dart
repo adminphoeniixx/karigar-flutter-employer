@@ -38,7 +38,7 @@ class EmployerApiService {
           'phone': phone,
           'otp': otp,
           'role': 'employer',
-          'device_name': deviceName ?? 'Flutter app',
+          'device_name': deviceName ?? 'Super Karigar Employer',
         },
       );
 
@@ -349,8 +349,14 @@ class EmployerApiService {
 
   Future<Json> plans() => client.get('/employer/plans');
   Future<Json> aiCredits() => client.get(ApiConstants.aiCredits);
-  Future<Json> aiCreditsLedger({String filter = 'all'}) =>
-      client.get('${ApiConstants.aiCredits}/ledger', query: {'filter': filter});
+  Future<Json> aiCreditsLedger({
+    String filter = 'all',
+    int page = 1,
+    int perPage = 20,
+  }) => client.get(
+    '${ApiConstants.aiCredits}/ledger',
+    query: {'filter': filter, 'page': page, 'per_page': perPage},
+  );
   Future<Json> aiCreditsCheckout(int packId, {String? email}) => client.post(
     ApiConstants.aiCreditsCheckout(packId),
     body: {'email': ?email},

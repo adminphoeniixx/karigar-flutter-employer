@@ -516,6 +516,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     item.stats['hired'] as int? ?? 0,
                     item.status,
                     id: item.id,
+                    workModeLabel: item.workModeLabel,
+                    interviewModeLabel: item.interviewModeLabel,
                   );
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 12),

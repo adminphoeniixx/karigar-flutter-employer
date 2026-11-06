@@ -347,8 +347,8 @@ class _SectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
       child: Text(
         text.toUpperCase(),
-        style: const TextStyle(
-          color: AppColors.muted,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
           fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: .8,
@@ -375,10 +375,11 @@ class _SettingsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: AppColors.card,
+        color: colors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: onTap,
@@ -387,7 +388,7 @@ class _SettingsRow extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: 76),
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.line),
+              border: Border.all(color: colors.outlineVariant),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -396,10 +397,14 @@ class _SettingsRow extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: AppColors.brand50,
+                    color: colors.primaryContainer,
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: Icon(icon, color: AppColors.primary, size: 20),
+                  child: Icon(
+                    icon,
+                    color: colors.onPrimaryContainer,
+                    size: 20,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -419,7 +424,7 @@ class _SettingsRow extends StatelessWidget {
                         Text(
                           subtitle!,
                           style: TextStyle(
-                            color: AppColors.muted,
+                            color: colors.onSurfaceVariant,
                             fontSize: 11.5,
                           ),
                         ),
@@ -427,12 +432,11 @@ class _SettingsRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                trailing ??
-                    const Icon(
-                      LucideIcons.chevronRight,
-                      size: 18,
-                      color: AppColors.muted2,
-                    ),
+                trailing ?? Icon(
+                  LucideIcons.chevronRight,
+                  size: 18,
+                  color: colors.onSurfaceVariant,
+                ),
               ],
             ),
           ),

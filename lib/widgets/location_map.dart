@@ -160,7 +160,10 @@ class _LocationMapState extends State<LocationMap> {
               ? 'Tap the map to select a location'
               : 'Selected: ${_selectedLocation.latitude.toStringAsFixed(5)}, '
                     '${_selectedLocation.longitude.toStringAsFixed(5)}',
-          style: const TextStyle(fontSize: 11.5, color: AppColors.muted),
+          style: TextStyle(
+            fontSize: 11.5,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         ),
       ],
     );
@@ -176,7 +179,7 @@ class _MapButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.card,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
       elevation: 2,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
