@@ -821,7 +821,7 @@ class _VerifyCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Get the Verified badge',
+                'Complete KYC Verification',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
               ),
               SizedBox(height: 3),
@@ -840,7 +840,7 @@ class _VerifyCard extends StatelessWidget {
               minimumSize: const Size(64, 38),
               padding: const EdgeInsets.symmetric(horizontal: 14),
             ),
-            child: const Text('Verify'),
+            child: const Text('KYC'),
           ),
         ),
       ],

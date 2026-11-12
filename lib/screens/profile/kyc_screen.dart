@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart' hide Text;
+import 'package:flutter/material.dart' as material;
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -285,7 +286,7 @@ class _KycScreenState extends State<KycScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Business Verification')),
+    appBar: AppBar(title: const Text('KYC Verification')),
     body: loading
         ? const Center(child: CircularProgressIndicator())
         : error != null
@@ -319,7 +320,7 @@ class _KycScreenState extends State<KycScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: type,
+                initialValue: type,
                 decoration: const InputDecoration(labelText: 'Business type'),
                 items: types
                     .map(
@@ -426,9 +427,8 @@ class _KycScreenState extends State<KycScreen> {
               FilledButton.icon(
                 onPressed: submitting ? null : _submit,
                 icon: const Icon(LucideIcons.shieldCheck),
-                label: Text(
-                  submitting ? 'Submitting...' : 'Submit for verification',
-                ),
+                // This label is also spoken verbatim in the verification call.
+                label: material.Text(submitting ? 'Submitting...' : 'Submit'),
               ),
             ],
           ),
@@ -502,7 +502,7 @@ class _DocumentCard extends StatelessWidget {
             ),
             if (form.missing) ...[
               DropdownButtonFormField<String>(
-                value: form.alternate,
+                initialValue: form.alternate,
                 decoration: const InputDecoration(
                   labelText: 'Document you have',
                 ),

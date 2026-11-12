@@ -144,10 +144,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     if (verificationEnabled)
                       _ProfileRow(
                         icon: LucideIcons.shield,
-                        title: context.tr('Business Verification'),
+                        title: context.tr('KYC Verification'),
                         subtitle: profile?.verified == true
                             ? 'GST & PAN verified'
-                            : 'Submit GST & PAN details',
+                            : 'Complete your business verification',
                         verified: profile?.verified == true,
                         onTap: () => _open(const KycScreen(), refresh: true),
                       ),
