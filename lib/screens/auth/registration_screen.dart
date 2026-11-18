@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:employer_kariger_app/core/analytics/meta_analytics.dart';
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
@@ -9,6 +10,9 @@ import 'package:employer_kariger_app/widgets/searchable_option_sheet.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/dashboard/main_shell.dart';
 import 'package:employer_kariger_app/widgets/location_map.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -29,9 +33,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String? industry;
   String? state;
   String? city;
+  LatLng? selectedLocation;
   bool loading = false;
+  bool locating = false;
   bool referenceLoading = false;
   bool _loadedReference = false;
+  List<String> setupErrors = const [];
   List<String> industries = const [];
   List<String> states = const [];
   List<String> cities = const [];
@@ -92,15 +99,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               })
               .where((e) => e.isNotEmpty),
         );
-        final skills = List<String>.from(
-          (response['skills'] as List? ?? const [])
+        final categories = List<String>.from(
+          (response['job_categories'] as List? ?? const [])
               .map((e) {
                 if (e is Map) return '${e['name'] ?? e['label'] ?? ''}';
                 return '$e';
               })
               .where((e) => e.isNotEmpty),
         );
-        if (skills.isNotEmpty) availableTrades = skills;
+        if (categories.isNotEmpty) availableTrades = categories;
         final remoteHiringAs = List<String>.from(
           (response['hiring_as'] as List? ?? const []).map((e) => '$e'),
         );
@@ -144,12 +151,63 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
+  Future<void> _useCurrentLocation() async {
+    if (locating) return;
+    setState(() => locating = true);
+    try {
+      if (!await Geolocator.isLocationServiceEnabled()) {
+        _message('Turn on device location to use your current location.');
+        return;
+      }
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        _message('Location permission is needed to use your current location.');
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition();
+      final places = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      if (!mounted) return;
+      final place = places.isEmpty ? null : places.first;
+      final detectedState = place?.administrativeArea?.trim();
+      final detectedCity =
+          (place?.locality?.trim().isNotEmpty == true
+                  ? place!.locality
+                  : place?.subAdministrativeArea)
+              ?.trim();
+      if (detectedState == null || detectedState.isEmpty) {
+        _message('We could not detect your state. Select it manually.');
+        return;
+      }
+      await _loadCities(detectedState);
+      if (!mounted) return;
+      setState(() {
+        selectedLocation = LatLng(position.latitude, position.longitude);
+        if (detectedCity != null && detectedCity.isNotEmpty) {
+          city = detectedCity;
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        _message('Unable to detect your location. Please try again.');
+      }
+    } finally {
+      if (mounted) setState(() => locating = false);
+    }
+  }
+
   void _next() {
     if (!_validateStep()) return;
     if (step < 4) {
       setState(() => step++);
     } else {
-      _saveAndFinish();
+      _saveAndFinish(finish: true);
     }
   }
 
@@ -165,7 +223,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     String? error;
     if (step == 0 && nameController.text.trim().isEmpty) {
       error = 'Enter your full name.';
-    } else if (step == 1 && companyController.text.trim().isEmpty) {
+    } else if (step == 1 &&
+        hiringAs != 'individual' &&
+        companyController.text.trim().isEmpty) {
       error = 'Enter your business or company name.';
     } else if (step == 1 && industry == null) {
       error = 'Select an industry.';
@@ -178,8 +238,46 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     return error == null;
   }
 
-  Future<void> _saveAndFinish() async {
+  List<_SetupError> _missingFinishFields() {
+    final missing = <_SetupError>[];
+    if (nameController.text.trim().isEmpty) {
+      missing.add(const _SetupError(0, 'Enter your name.'));
+    }
+    if (hiringAs.trim().isEmpty) {
+      missing.add(const _SetupError(0, 'Choose who you are hiring as.'));
+    }
+    if (hiringAs != 'individual' && companyController.text.trim().isEmpty) {
+      missing.add(const _SetupError(1, 'Enter your business name.'));
+    }
+    if (industry == null || industry!.trim().isEmpty) {
+      missing.add(const _SetupError(1, 'Choose your industry.'));
+    }
+    if (selectedTrades.isEmpty) {
+      missing.add(
+        const _SetupError(3, 'Pick at least one kind of karigar you hire.'),
+      );
+    }
+    if (state == null || state!.trim().isEmpty) {
+      missing.add(const _SetupError(2, 'Choose your state.'));
+    }
+    if (city == null || city!.trim().isEmpty) {
+      missing.add(const _SetupError(2, 'Choose your city.'));
+    }
+    return missing;
+  }
+
+  Future<void> _saveAndFinish({required bool finish}) async {
     if (loading) return;
+    if (finish) {
+      final missing = _missingFinishFields();
+      if (missing.isNotEmpty) {
+        setState(() {
+          setupErrors = missing.map((item) => item.message).toList();
+          step = missing.first.step;
+        });
+        return;
+      }
+    }
     setState(() => loading = true);
     final success = await AppScope.of(context).profile.save({
       'name': nameController.text.trim(),
@@ -190,6 +288,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       'hiring_categories': selectedTrades.toList(),
       'state': state,
       'city': city,
+      if (selectedLocation != null) 'latitude': selectedLocation!.latitude,
+      if (selectedLocation != null) 'longitude': selectedLocation!.longitude,
+      if (finish) 'finish': true,
       if (addressController.text.trim().isNotEmpty)
         'address': addressController.text.trim(),
       if (gstinController.text.trim().isNotEmpty)
@@ -198,9 +299,21 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (!mounted) return;
     setState(() => loading = false);
     if (!success) {
-      _message(
-        AppScope.of(context).profile.error ?? 'Could not save the profile.',
+      final profile = AppScope.of(context).profile;
+      final errors = profile.validationErrors.values
+          .expand((value) => value is List ? value : [value])
+          .map((value) => '$value')
+          .where((value) => value.isNotEmpty)
+          .toList();
+      setState(
+        () => setupErrors = errors.isEmpty
+            ? [profile.error ?? 'Could not save the profile.']
+            : errors,
       );
+      if (errors.isNotEmpty) {
+        final missing = _missingFinishFields();
+        if (missing.isNotEmpty) setState(() => step = missing.first.step);
+      }
       return;
     }
     unawaited(MetaAnalytics.instance.registrationCompleted());
@@ -239,7 +352,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 icon: const Icon(LucideIcons.arrowLeft),
               ),
         leadingWidth: 44,
-        title: const Text('Set up your business'),
+        title: const Text('Set up your profile'),
         actions: [
           Center(
             child: Text(
@@ -262,6 +375,11 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ),
       body: Column(
         children: [
+          if (setupErrors.isNotEmpty)
+            _SetupErrorSummary(
+              errors: setupErrors,
+              onDismiss: () => setState(() => setupErrors = const []),
+            ),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 24, 16, 28),
@@ -278,13 +396,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     switch (step) {
       case 0:
         return _section(
-          title: 'Who are you hiring as?',
-          subtitle: 'Karigars will see this contact name on your jobs.',
+          title: 'Tell us about yourself',
+          subtitle: 'Karigars will see this contact name on your job posts.',
           children: [
             const _FieldLabel('Your full name'),
             _Input(hint: 'e.g. Anil Sharma', controller: nameController),
             const SizedBox(height: 16),
-            const _FieldLabel('You are hiring as'),
+            const _FieldLabel('I am hiring as'),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -305,12 +423,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           title: 'Tell us about your business',
           subtitle: 'This appears on your public employer profile.',
           children: [
-            const _FieldLabel('Business / Company name'),
-            _Input(
-              hint: 'e.g. Sri Sai Constructions',
-              controller: companyController,
-            ),
-            const SizedBox(height: 16),
+            if (hiringAs != 'individual') ...[
+              const _FieldLabel('Business / Company name'),
+              _Input(
+                hint: 'e.g. Sri Sai Constructions',
+                controller: companyController,
+              ),
+              const SizedBox(height: 16),
+            ],
             const _FieldLabel('Industry'),
             _SelectBox(
               hint: industry ?? 'Select industry',
@@ -342,29 +462,35 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           title: 'Where are you based?',
           subtitle: "We'll show your jobs to karigars near this location.",
           children: [
-            Container(
-              height: 46,
-              decoration: BoxDecoration(
-                color: AppColors.brand50,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    LucideIcons.locateFixed,
-                    size: 19,
-                    color: AppColors.primary,
-                  ),
-                  SizedBox(width: 9),
-                  Text(
-                    'Use my current location',
-                    style: TextStyle(
-                      color: AppColors.brandDark,
-                      fontWeight: FontWeight.w600,
+            InkWell(
+              onTap: locating ? null : _useCurrentLocation,
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                height: 46,
+                decoration: BoxDecoration(
+                  color: AppColors.brand50,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      LucideIcons.locateFixed,
+                      size: 19,
+                      color: AppColors.primary,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 9),
+                    Text(
+                      locating
+                          ? 'Detecting location...'
+                          : 'Use my current location',
+                      style: TextStyle(
+                        color: AppColors.brandDark,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 18),
@@ -394,7 +520,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             _Input(hint: 'Work address', controller: addressController),
             const SizedBox(height: 16),
             const _FieldLabel('Pin your work location'),
-            const SizedBox(height: 150, child: LocationMap()),
+            SizedBox(
+              height: 150,
+              child: LocationMap(
+                key: ValueKey(selectedLocation),
+                initialLocation:
+                    selectedLocation ?? const LatLng(13.0827, 80.2707),
+                hasSelection: selectedLocation != null,
+                onLocationChanged: (point) => selectedLocation = point,
+              ),
+            ),
           ],
         );
       case 3:
@@ -446,7 +581,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ),
           children: [
             const _FieldLabel('GST number (optional)'),
-            _Input(hint: '22ABCDE1234F1Z5', controller: gstinController),
+            _Input(
+              hint: '22ABCDE1234F1Z5',
+              controller: gstinController,
+              maxLength: 15,
+              capitalLetters: true,
+            ),
             const SizedBox(height: 16),
             const _FieldLabel('Business PAN'),
             const _Input(hint: 'Submit documents later from KYC screen'),
@@ -553,7 +693,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: loading ? null : _saveAndFinish,
+                  onPressed: loading
+                      ? null
+                      : () => _saveAndFinish(finish: false),
                   style: OutlinedButton.styleFrom(
                     minimumSize: const Size.fromHeight(44),
                     foregroundColor: AppColors.foreground,
@@ -569,7 +711,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               Expanded(
                 flex: 2,
                 child: FilledButton(
-                  onPressed: loading ? null : _saveAndFinish,
+                  onPressed: loading
+                      ? null
+                      : () => _saveAndFinish(finish: true),
                   child: Text(loading ? 'Saving...' : 'Finish setup'),
                 ),
               ),
@@ -604,6 +748,67 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   }
 }
 
+class _SetupError {
+  const _SetupError(this.step, this.message);
+  final int step;
+  final String message;
+}
+
+class _SetupErrorSummary extends StatelessWidget {
+  const _SetupErrorSummary({required this.errors, required this.onDismiss});
+  final List<String> errors;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: double.infinity,
+    margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+    padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+    decoration: BoxDecoration(
+      color: AppColors.amber.withValues(alpha: .12),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: AppColors.amber.withValues(alpha: .45)),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(top: 2),
+          child: Icon(
+            LucideIcons.circleAlert,
+            color: AppColors.amber,
+            size: 18,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Complete your profile',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 3),
+              ...errors.map(
+                (error) => Text(
+                  '• $error',
+                  style: const TextStyle(fontSize: 12, height: 1.35),
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          onPressed: onDismiss,
+          icon: const Icon(LucideIcons.x, size: 18),
+        ),
+      ],
+    ),
+  );
+}
+
 class _FieldLabel extends StatelessWidget {
   const _FieldLabel(this.text);
   final String text;
@@ -619,16 +824,27 @@ class _FieldLabel extends StatelessWidget {
 }
 
 class _Input extends StatelessWidget {
-  const _Input({required this.hint, this.controller});
+  const _Input({
+    required this.hint,
+    this.controller,
+    this.maxLength,
+    this.capitalLetters = false,
+  });
   final String hint;
   final TextEditingController? controller;
+  final int? maxLength;
+  final bool capitalLetters;
 
   @override
   Widget build(BuildContext context) => SizedBox(
     height: 46,
     child: TextField(
       controller: controller,
-      decoration: InputDecoration(hintText: hint),
+      maxLength: maxLength,
+      textCapitalization: capitalLetters
+          ? TextCapitalization.characters
+          : TextCapitalization.none,
+      decoration: InputDecoration(hintText: hint, counterText: ''),
     ),
   );
 }
@@ -718,7 +934,7 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     const radius = Radius.circular(14);
-    final path = Path()
+    final path = ui.Path()
       ..addRRect(RRect.fromRectAndRadius(Offset.zero & size, radius));
     final metric = path.computeMetrics().first;
     final paint = Paint()

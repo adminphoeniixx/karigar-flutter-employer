@@ -23,6 +23,8 @@ class _KycScreenState extends State<KycScreen> {
   Map<String, dynamic> kyc = const {};
   Map<String, dynamic> fieldErrors = const {};
   Map<String, dynamic> digilocker = const {};
+  bool photoRequired = true;
+  bool alternateNumberRequired = true;
   String? type, error, digilockerMessage;
   bool loading = true, submitting = false;
 
@@ -51,6 +53,17 @@ class _KycScreenState extends State<KycScreen> {
       final verification = ref['verification'] is Map
           ? Map<String, dynamic>.from(ref['verification'] as Map)
           : <String, dynamic>{};
+      final photoRules = verification['photo_required'] is Map
+          ? Map<String, dynamic>.from(verification['photo_required'] as Map)
+          : const <String, dynamic>{};
+      final alternateNumberRules =
+          verification['alternate_number_required'] is Map
+          ? Map<String, dynamic>.from(
+              verification['alternate_number_required'] as Map,
+            )
+          : const <String, dynamic>{};
+      photoRequired = photoRules['employer'] != false;
+      alternateNumberRequired = alternateNumberRules['employer'] != false;
       types = (verification['business_types'] as List? ?? const [])
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
@@ -144,25 +157,35 @@ class _KycScreenState extends State<KycScreen> {
       'registered_address': address.text.trim(),
     };
     final files = <String, File>{};
+    final savedDocuments = (kyc['documents'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item));
     for (final entry in forms.entries) {
       final key = entry.key, form = entry.value;
       if (key == 'aadhaar' && digilocker['verified'] == true) continue;
+      final saved = _first(
+        savedDocuments,
+        (document) => '${document['type']}' == key,
+      );
       if (form.missing) {
-        if (form.alternate == null || form.reason.text.trim().isEmpty) {
+        if (form.alternate == null) {
           _message(
             'Complete alternate details for ${docs[key]?['label'] ?? key}.',
           );
           return;
         }
+        if (alternateNumberRequired && form.number.text.trim().isEmpty) {
+          _message('Enter the number of the document you are sending instead.');
+          return;
+        }
+        if (form.file == null) {
+          _message('Upload a photo of the document you are sending instead.');
+          return;
+        }
         fields['${key}_missing'] = '1';
         fields['${key}_alt_type'] = form.alternate!;
-        fields['${key}_reason'] = form.reason.text.trim();
-        if (form.number.text.trim().isNotEmpty) {
-          fields['${key}_alt_number'] = form.number.text.trim();
-        }
-        if (form.file != null) {
-          files['${key}_alt_doc'] = form.file!;
-        }
+        fields['${key}_alt_number'] = form.number.text.trim();
+        files['${key}_alt_doc'] = form.file!;
       } else {
         if (form.number.text.trim().isEmpty) {
           _message('Enter ${docs[key]?['label'] ?? key} number.');
@@ -176,6 +199,9 @@ class _KycScreenState extends State<KycScreen> {
             .replaceAll(' ', '');
         if (form.file != null) {
           files['${key}_doc'] = form.file!;
+        } else if (_needsPhoto(key, saved)) {
+          _message('Upload a photo or PDF of ${docs[key]?['label'] ?? key}.');
+          return;
         }
       }
     }
@@ -206,6 +232,15 @@ class _KycScreenState extends State<KycScreen> {
     } finally {
       if (mounted) setState(() => submitting = false);
     }
+  }
+
+  bool _needsPhoto(String key, Map<String, dynamic>? saved) {
+    if (!photoRequired || saved?['has_file'] == true) return false;
+    if (key == 'aadhaar' && digilocker['verified'] == true) return false;
+    return !(key == 'pan' &&
+        (digilocker['pan_verified'] == true ||
+            (saved?['check'] is Map &&
+                (saved!['check'] as Map)['verified'] == true)));
   }
 
   String? _fieldError(String key) {
@@ -373,11 +408,18 @@ class _KycScreenState extends State<KycScreen> {
                   form: e.value,
                   pick: () => _pick(e.value),
                   changed: () => setState(() {}),
+                  photoRequired: _needsPhoto(e.key, saved),
+                  alternateNumberRequired: alternateNumberRequired,
                   check: saved?['check'] is Map
                       ? Map<String, dynamic>.from(saved!['check'] as Map)
                       : null,
                   errorText: _fieldError(
-                    '${docs[e.key]?['number_field'] ?? '${e.key}_number'}',
+                    e.value.missing
+                        ? '${e.key}_alt_number'
+                        : '${docs[e.key]?['number_field'] ?? '${e.key}_number'}',
+                  ),
+                  fileError: _fieldError(
+                    e.value.missing ? '${e.key}_alt_doc' : '${e.key}_doc',
                   ),
                 );
               }),
@@ -436,14 +478,13 @@ class _KycScreenState extends State<KycScreen> {
 }
 
 class _DocumentForm {
-  final number = TextEditingController(), reason = TextEditingController();
+  final number = TextEditingController();
   final numberFocus = FocusNode();
   bool missing = false;
   String? alternate;
   File? file;
   void dispose() {
     number.dispose();
-    reason.dispose();
     numberFocus.dispose();
   }
 }
@@ -455,15 +496,19 @@ class _DocumentCard extends StatelessWidget {
     required this.form,
     required this.pick,
     required this.changed,
+    required this.photoRequired,
+    required this.alternateNumberRequired,
     this.check,
     this.errorText,
+    this.fileError,
   });
   final String label;
   final Map<String, dynamic> config;
   final _DocumentForm form;
   final VoidCallback pick, changed;
+  final bool photoRequired, alternateNumberRequired;
   final Map<String, dynamic>? check;
-  final String? errorText;
+  final String? errorText, fileError;
   @override
   Widget build(BuildContext context) {
     final alternatives = (config['alternates'] as List? ?? const [])
@@ -521,15 +566,11 @@ class _DocumentCard extends StatelessWidget {
               ),
               TextField(
                 controller: form.number,
-                decoration: const InputDecoration(
-                  labelText: 'Document number (optional)',
-                ),
-              ),
-              TextField(
-                controller: form.reason,
-                maxLines: 2,
-                decoration: const InputDecoration(
-                  labelText: "Why don't you have it?",
+                decoration: InputDecoration(
+                  labelText: alternateNumberRequired
+                      ? 'Document number *'
+                      : 'Document number (optional)',
+                  errorText: errorText,
                 ),
               ),
             ] else
@@ -548,10 +589,25 @@ class _DocumentCard extends StatelessWidget {
               icon: const Icon(LucideIcons.upload, size: 18),
               label: Text(
                 form.file == null
-                    ? 'Upload photo or PDF (optional)'
+                    ? form.missing
+                          ? 'Upload alternate document photo *'
+                          : photoRequired
+                          ? 'Upload photo or PDF *'
+                          : 'Upload photo or PDF (on file)'
                     : form.file!.path.split(Platform.pathSeparator).last,
               ),
             ),
+            if (fileError != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  fileError!,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.error,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

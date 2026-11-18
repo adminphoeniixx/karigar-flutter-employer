@@ -199,6 +199,13 @@ class EmployerJob {
     this.shiftStart,
     this.shiftEnd,
     this.shiftHoursLabel,
+    this.gender,
+    this.genderLabel,
+    this.shiftTimings = const [],
+    this.workHours,
+    this.workHoursPeriod,
+    this.coreStart,
+    this.coreEnd,
     this.address,
     this.perks = const [],
     this.contactMode = 'apply',
@@ -251,6 +258,22 @@ class EmployerJob {
     shiftStart: json['shift_start']?.toString(),
     shiftEnd: json['shift_end']?.toString(),
     shiftHoursLabel: json['shift_hours_label']?.toString(),
+    gender: json['gender']?.toString(),
+    genderLabel: json['gender_label']?.toString(),
+    shiftTimings: (json['shift_timings'] as List? ?? const [])
+        .whereType<Map>()
+        .map(
+          (item) => Map<String, String>.fromEntries(
+            item.entries.map(
+              (entry) => MapEntry('${entry.key}', '${entry.value ?? ''}'),
+            ),
+          ),
+        )
+        .toList(),
+    workHours: json['work_hours'] == null ? null : asDouble(json['work_hours']),
+    workHoursPeriod: json['work_hours_period']?.toString(),
+    coreStart: json['core_start']?.toString(),
+    coreEnd: json['core_end']?.toString(),
     address: json['address']?.toString(),
     perks: asStrings(json['perks']),
     contactMode: '${json['contact_mode'] ?? 'apply'}',
@@ -295,6 +318,9 @@ class EmployerJob {
       workModeLabel;
   final String interviewMode, interviewModeLabel, createdAgo, shareUrl;
   final String? experienceLabel, shiftStart, shiftEnd, shiftHoursLabel, address;
+  final String? gender, genderLabel, workHoursPeriod, coreStart, coreEnd;
+  final double? workHours;
+  final List<Map<String, String>> shiftTimings;
   final String? contactPhone, contactName, contactDesignation;
   final List<String> skills, perks;
   final bool isDraft;
@@ -392,6 +418,7 @@ class Applicant {
     this.resume,
     this.ai,
     this.screeningCall,
+    this.interviewReminderCall,
     this.job,
     this.createdAgo = '',
   });
@@ -419,6 +446,9 @@ class Applicant {
     screeningCall: json['screening_call'] is Map
         ? Map<String, dynamic>.from(json['screening_call'])
         : null,
+    interviewReminderCall: json['interview_reminder_call'] is Map
+        ? Map<String, dynamic>.from(json['interview_reminder_call'])
+        : null,
     job: json['job'] is Map ? Map<String, dynamic>.from(json['job']) : null,
     createdAgo: '${json['created_ago'] ?? ''}',
     // Applicant payloads use `worker.id` for the auth user ID and expose the
@@ -437,7 +467,13 @@ class Applicant {
   final double? expectedWage;
   final bool shortlisted, contactUnlocked;
   final WorkerProfile worker;
-  final Json? offer, interview, resume, ai, screeningCall, job;
+  final Json? offer,
+      interview,
+      resume,
+      ai,
+      screeningCall,
+      interviewReminderCall,
+      job;
 }
 
 class DashboardData {

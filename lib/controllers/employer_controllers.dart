@@ -1,6 +1,7 @@
 import '../models/api_models.dart';
 import '../services/employer_api_service.dart';
 import 'base_controller.dart';
+import '../core/api/api_exception.dart';
 
 class DashboardController extends BaseController {
   DashboardController(this.api);
@@ -102,16 +103,31 @@ class ProfileController extends BaseController {
   ProfileController(this.api);
   final EmployerApiService api;
   EmployerProfile? profile;
+  Map<String, dynamic> validationErrors = const {};
   Future<void> load() async {
     profile = await run(api.profile);
     notifyListeners();
   }
 
   Future<bool> save(Json values) async {
-    final value = await run(() => api.updateProfile(values));
-    if (value == null) return false;
-    profile = value;
+    loading = true;
+    error = null;
+    validationErrors = const {};
     notifyListeners();
-    return true;
+    try {
+      profile = await api.updateProfile(values);
+      return true;
+    } on ApiException catch (exception) {
+      error = exception.message;
+      validationErrors = exception.errors ?? const {};
+      return false;
+    } catch (_) {
+      error = 'Something went wrong. Please try again.';
+      return false;
+    } finally {
+      loading = false;
+      hasLoaded = true;
+      notifyListeners();
+    }
   }
 }

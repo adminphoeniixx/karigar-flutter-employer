@@ -69,6 +69,14 @@ class EmployerApiService {
     (await client.get(ApiConstants.jobCategories))['job_categories'],
   );
   Future<Json> jobFormOptions() => client.get(ApiConstants.jobFormOptions);
+  Future<Json?> suggestJobCategory(String title) async {
+    final response = await client.get(
+      ApiConstants.suggestJobCategory,
+      query: {'title': title},
+    );
+    final suggestion = response['suggestion'];
+    return suggestion is Map ? Json.from(suggestion) : null;
+  }
 
   Future<DashboardData> dashboard() async =>
       DashboardData.fromJson(await client.get(ApiConstants.dashboard));
@@ -349,6 +357,9 @@ class EmployerApiService {
 
   Future<Json> plans() => client.get('/employer/plans');
   Future<Json> aiCredits() => client.get(ApiConstants.aiCredits);
+  Future<Json> aiCallSettings() => client.get(ApiConstants.aiCallSettings);
+  Future<Json> updateAiCallSettings(Json values) =>
+      client.put(ApiConstants.aiCallSettings, body: values);
   Future<Json> aiCreditsLedger({
     String filter = 'all',
     int page = 1,

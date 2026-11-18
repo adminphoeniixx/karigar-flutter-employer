@@ -18,6 +18,7 @@ class ApiConstants {
   static const profileLogo = '/employer/profile/logo';
   static const jobs = '/employer/jobs';
   static const suggestJobDescription = '/employer/jobs/suggest-description';
+  static const suggestJobCategory = '/employer/jobs/suggest-category';
   static const jobFormOptions = '/employer/jobs/form-options';
   static const applicants = '/employer/applicants';
   static const shortlisted = '/employer/shortlisted';
@@ -32,6 +33,7 @@ class ApiConstants {
   static const conversations = '/conversations';
   static const plans = '/employer/plans';
   static const aiCredits = '/employer/ai-credits';
+  static const aiCallSettings = '/employer/ai-call-settings';
   static const orders = '/employer/orders';
   static const plansCallback = '/employer/plans/callback';
   static const invoices = '/employer/invoices';

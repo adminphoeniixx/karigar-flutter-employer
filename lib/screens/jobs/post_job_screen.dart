@@ -30,12 +30,31 @@ enum JobPostResult { checking }
 
 class _PostJobScreenState extends State<PostJobScreen> {
   final selectedSkills = <String>{};
+  final _suggestedSkills = <String>{};
   String liveStatus = 'active';
   bool get editingDraft =>
       widget.job?.isDraft == true || widget.job?.status == 'draft';
   bool get canDraft => widget.job == null || editingDraft;
   final selectedPerks = <String>{};
   String shift = 'Day';
+  String? gender;
+  List<Map<String, String>> genderOptions = const [
+    {'value': 'male', 'label': 'Male'},
+    {'value': 'female', 'label': 'Female'},
+    {'value': 'both', 'label': 'Male & female'},
+  ];
+  Map<String, _ShiftDefault> shiftDefaults = const {
+    'day': _ShiftDefault('09:00', '18:00'),
+    'night': _ShiftDefault('21:00', '06:00'),
+  };
+  final rotationalTimings = <_ShiftTiming>[];
+  int maxShiftTimings = 6;
+  bool _shiftTimesTouched = false;
+  final workHoursController = TextEditingController();
+  String workHoursPeriod = 'day';
+  bool addCoreHours = false;
+  TimeOfDay? coreStartTime;
+  TimeOfDay? coreEndTime;
   String contact = 'Apply + Call';
   String wageType = 'monthly';
   String workMode = 'on_site';
@@ -58,6 +77,10 @@ class _PostJobScreenState extends State<PostJobScreen> {
   int aiCreditsBalance = 0;
   int aiCreditsMinForJob = 10;
   bool _referenceLoaded = false;
+  bool _useCustomTitle = false;
+  bool _categoryWasSuggested = false;
+  bool _skillsCameFromSuggestion = false;
+  List<_JobProfile> jobProfiles = const [];
   List<String> categories = const [];
   List<String> skills = const [
     'Pipe Fitting',
@@ -103,11 +126,13 @@ class _PostJobScreenState extends State<PostJobScreen> {
   final contactDesignationController = TextEditingController();
   final perkController = TextEditingController();
   Timer? _addressDebounce;
+  Timer? _titleDebounce;
 
   @override
   void initState() {
     super.initState();
     addressController.addListener(_addressChanged);
+    titleController.addListener(_titleChanged);
 
     final job = widget.job;
     if (job == null) return;
@@ -127,6 +152,19 @@ class _PostJobScreenState extends State<PostJobScreen> {
     shiftEndController.text = job.shiftEnd ?? '';
     shiftStartTime = _parseTime(job.shiftStart);
     shiftEndTime = _parseTime(job.shiftEnd);
+    gender = job.gender;
+    rotationalTimings.addAll(
+      job.shiftTimings.map(
+        (timing) => _ShiftTiming(timing['start'] ?? '', timing['end'] ?? ''),
+      ),
+    );
+    workHoursController.text = job.workHours == null
+        ? ''
+        : job.workHours!.toString().replaceFirst(RegExp(r'\.0$'), '');
+    workHoursPeriod = job.workHoursPeriod ?? 'day';
+    coreStartTime = _parseTime(job.coreStart);
+    coreEndTime = _parseTime(job.coreEnd);
+    addCoreHours = coreStartTime != null || coreEndTime != null;
     contactNameController.text = job.contactName ?? '';
     contactDesignationController.text = job.contactDesignation ?? '';
     category = job.category.isEmpty ? null : job.category;
@@ -150,6 +188,17 @@ class _PostJobScreenState extends State<PostJobScreen> {
     liveStatus = job.status == 'closed' ? 'closed' : 'active';
     aiShortlistEnabled = job.aiShortlistEnabled;
     aiCallEnabled = job.aiCallEnabled;
+  }
+
+  void _titleChanged() {
+    if (!_useCustomTitle) return;
+    _titleDebounce?.cancel();
+    final title = titleController.text.trim();
+    if (title.length < 2) return;
+    _titleDebounce = Timer(
+      const Duration(milliseconds: 500),
+      () => _suggestFromTitle(title),
+    );
   }
 
   TimeOfDay? _parseTime(String? value) {
@@ -182,6 +231,63 @@ class _PostJobScreenState extends State<PostJobScreen> {
         shiftEndTime = selected;
         shiftEndController.text = value;
       }
+      _shiftTimesTouched = true;
+    });
+  }
+
+  Future<TimeOfDay?> _chooseTime(TimeOfDay? initial) => showTimePicker(
+    context: context,
+    initialTime: initial ?? const TimeOfDay(hour: 9, minute: 0),
+  );
+
+  String _formatTime(TimeOfDay value) =>
+      '${value.hour.toString().padLeft(2, '0')}:${value.minute.toString().padLeft(2, '0')}';
+
+  Future<void> _pickRotationalTime(int index, {required bool start}) async {
+    final timing = rotationalTimings[index];
+    final selected = await _chooseTime(
+      _parseTime(start ? timing.start : timing.end),
+    );
+    if (selected == null || !mounted) return;
+    setState(() {
+      if (start) {
+        timing.start = _formatTime(selected);
+      } else {
+        timing.end = _formatTime(selected);
+      }
+    });
+  }
+
+  Future<void> _pickCoreTime({required bool start}) async {
+    final selected = await _chooseTime(start ? coreStartTime : coreEndTime);
+    if (selected == null || !mounted) return;
+    setState(() {
+      if (start) {
+        coreStartTime = selected;
+      } else {
+        coreEndTime = selected;
+      }
+    });
+  }
+
+  void _changeShift(String value) {
+    final previous = shift.toLowerCase();
+    final next = value.toLowerCase();
+    setState(() {
+      shift = value;
+      if (next == 'rotational' && rotationalTimings.isEmpty) {
+        rotationalTimings.add(_ShiftTiming('', ''));
+      }
+      if ((next == 'day' || next == 'night') &&
+          (!_shiftTimesTouched || (previous != 'day' && previous != 'night'))) {
+        final defaults = shiftDefaults[next];
+        if (defaults != null) {
+          shiftStartController.text = defaults.start;
+          shiftEndController.text = defaults.end;
+          shiftStartTime = _parseTime(defaults.start);
+          shiftEndTime = _parseTime(defaults.end);
+        }
+      }
     });
   }
 
@@ -211,6 +317,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
     } catch (_) {
       // Keep the current pin when geocoding cannot resolve a landmark.
     }
+    if (shift == 'Rotational' && rotationalTimings.isEmpty) {
+      rotationalTimings.add(_ShiftTiming('', ''));
+    }
   }
 
   @override
@@ -234,6 +343,19 @@ class _PostJobScreenState extends State<PostJobScreen> {
         categorySkills = rawCategorySkills.map(
           (key, value) => MapEntry('$key', _names(value)),
         );
+        final referenceDefaults = _shiftDefaults(response['shift_defaults']);
+        if (referenceDefaults.isNotEmpty) shiftDefaults = referenceDefaults;
+        if (widget.job == null &&
+            shiftStartTime == null &&
+            shiftEndTime == null) {
+          final defaults = shiftDefaults['day'];
+          if (defaults != null) {
+            shiftStartController.text = defaults.start;
+            shiftEndController.text = defaults.end;
+            shiftStartTime = _parseTime(defaults.start);
+            shiftEndTime = _parseTime(defaults.end);
+          }
+        }
         final apiPerks = _names(response['perks']);
         states = _names(response['states']);
         if (city != null) cities = [city!];
@@ -248,13 +370,42 @@ class _PostJobScreenState extends State<PostJobScreen> {
       if (state != null) unawaited(_loadCities(state!, keepSelectedCity: true));
       try {
         final options = await AppScope.of(context).api.jobFormOptions();
+        final profiles = (options['job_profiles'] as List? ?? const [])
+            .whereType<Map>()
+            .map(
+              (item) => _JobProfile(
+                title: '${item['title'] ?? ''}',
+                category: '${item['category'] ?? ''}',
+              ),
+            )
+            .where((profile) => profile.title.isNotEmpty)
+            .toList();
         final ai = options['ai'];
         if (mounted) {
           final parsedWorkModes = _modeOptions(options['work_modes']);
           final parsedInterviewModes = _modeOptions(options['interview_modes']);
           if (parsedWorkModes.isNotEmpty) workModes = parsedWorkModes;
-          if (parsedInterviewModes.isNotEmpty)
+          if (parsedInterviewModes.isNotEmpty) {
             interviewModes = parsedInterviewModes;
+          }
+          final parsedGenders = _modeOptions(options['genders']);
+          final optionDefaults = _shiftDefaults(options['shift_defaults']);
+          final maxTimings = (options['max_shift_timings'] as num?)?.toInt();
+          final currentTitle = titleController.text.trim();
+          setState(() {
+            if (parsedGenders.isNotEmpty) genderOptions = parsedGenders;
+            if (optionDefaults.isNotEmpty) shiftDefaults = optionDefaults;
+            if (maxTimings != null && maxTimings > 0) {
+              maxShiftTimings = maxTimings;
+            }
+            jobProfiles = profiles;
+            if (currentTitle.isNotEmpty) {
+              _useCustomTitle = !profiles.any(
+                (profile) =>
+                    profile.title.toLowerCase() == currentTitle.toLowerCase(),
+              );
+            }
+          });
           if (ai is! Map) return;
           final credits = ai['credits'];
           setState(() {
@@ -286,6 +437,65 @@ class _PostJobScreenState extends State<PostJobScreen> {
     }
   }
 
+  Future<void> _suggestFromTitle(String title) async {
+    try {
+      final suggestion = await AppScope.of(
+        context,
+      ).api.suggestJobCategory(title);
+      if (!mounted || title != titleController.text.trim()) return;
+      if (suggestion == null) return;
+      final suggestedCategory = '${suggestion['category'] ?? ''}'.trim();
+      final suggestedSkills = _names(suggestion['skills']).take(3).toSet();
+      setState(() {
+        if (suggestedCategory.isNotEmpty &&
+            (category == null || _categoryWasSuggested)) {
+          category = suggestedCategory;
+          _categoryWasSuggested = true;
+          skills = {
+            ...(categorySkills[suggestedCategory] ?? skills),
+            ...selectedSkills,
+          }.toList();
+        }
+        if (suggestedSkills.isNotEmpty &&
+            (selectedSkills.isEmpty || _skillsCameFromSuggestion)) {
+          selectedSkills
+            ..clear()
+            ..addAll(suggestedSkills);
+          _suggestedSkills
+            ..clear()
+            ..addAll(suggestedSkills);
+          _skillsCameFromSuggestion = true;
+        }
+      });
+    } catch (_) {
+      // Suggestions are optional; posting stays available when the endpoint is offline.
+    }
+  }
+
+  Future<void> _chooseJobProfile() async {
+    if (jobProfiles.isEmpty) {
+      _message('Job profiles are not available yet. Please try again.');
+      return;
+    }
+    final picked = await showModalBottomSheet<_JobProfile?>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (context) => _JobProfileSheet(profiles: jobProfiles),
+    );
+    if (picked == null || !mounted) return;
+    if (picked.isOther) {
+      setState(() => _useCustomTitle = true);
+      return;
+    }
+    _titleDebounce?.cancel();
+    setState(() {
+      _useCustomTitle = false;
+      titleController.text = picked.title;
+    });
+    unawaited(_suggestFromTitle(picked.title));
+  }
+
   List<String> _names(dynamic value) => (value as List? ?? const [])
       .map((item) {
         if (item is Map) return '${item['name'] ?? item['label'] ?? ''}';
@@ -305,6 +515,21 @@ class _PostJobScreenState extends State<PostJobScreen> {
           )
           .where((item) => item['value']!.isNotEmpty)
           .toList();
+
+  Map<String, _ShiftDefault> _shiftDefaults(dynamic value) {
+    if (value is! Map) return const {};
+    final defaults = <String, _ShiftDefault>{};
+    for (final entry in value.entries) {
+      if (entry.value is! Map) continue;
+      final item = entry.value as Map;
+      final start = '${item['start'] ?? ''}';
+      final end = '${item['end'] ?? ''}';
+      if (start.isNotEmpty && end.isNotEmpty) {
+        defaults['${entry.key}'.toLowerCase()] = _ShiftDefault(start, end);
+      }
+    }
+    return defaults;
+  }
 
   Future<void> _loadCities(
     String value, {
@@ -335,6 +560,8 @@ class _PostJobScreenState extends State<PostJobScreen> {
     final experienceMax = int.tryParse(experienceMaxController.text);
     final wageMin = num.tryParse(wageMinController.text);
     final wageMax = num.tryParse(wageMaxController.text);
+    final workHours = num.tryParse(workHoursController.text);
+    final shiftValue = shift.toLowerCase();
     final contactMode = {
       'Apply + Call': 'both',
       'Apply only': 'apply',
@@ -369,10 +596,47 @@ class _PostJobScreenState extends State<PostJobScreen> {
       return;
     }
     if (!draft &&
+        (shiftValue == 'day' || shiftValue == 'night') &&
         ((shiftStartController.text.trim().isEmpty) !=
             (shiftEndController.text.trim().isEmpty))) {
       _message('Enter both shift start and end times, or leave both blank.');
       return;
+    }
+    if (!draft && shiftValue == 'rotational') {
+      for (var index = 0; index < rotationalTimings.length; index++) {
+        final timing = rotationalTimings[index];
+        if (timing.start.isEmpty ||
+            timing.end.isEmpty ||
+            timing.start == timing.end) {
+          _message('Shift ${index + 1} needs different start and end times.');
+          return;
+        }
+      }
+    }
+    if (!draft && shiftValue == 'flexible') {
+      final maximum = workHoursPeriod == 'week' ? 168 : 24;
+      if (workHours == null || workHours <= 0 || workHours > maximum) {
+        _message(
+          'Enter working hours between 1 and $maximum per $workHoursPeriod.',
+        );
+        return;
+      }
+      if (addCoreHours && (coreStartTime == null || coreEndTime == null)) {
+        _message('Enter both core working hours.');
+        return;
+      }
+      if (addCoreHours) {
+        final startMinutes = coreStartTime!.hour * 60 + coreStartTime!.minute;
+        final endMinutes = coreEndTime!.hour * 60 + coreEndTime!.minute;
+        final coreHours = (endMinutes - startMinutes) / 60;
+        final dailyHours = workHoursPeriod == 'week'
+            ? workHours / 6
+            : workHours;
+        if (coreHours <= 0 || coreHours > dailyHours) {
+          _message('Core hours must fit within the working hours in one day.');
+          return;
+        }
+      }
     }
     if (!draft &&
         contactMode != 'apply' &&
@@ -384,6 +648,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
       'title': title,
       if (description.isNotEmpty) 'description': description,
       'category': ?category,
+      'gender': ?gender,
       if (!draft || selectedSkills.isNotEmpty)
         'skills': selectedSkills.toList(),
       if (wageMin != null && wageMin >= 0) 'wage_min': wageMin,
@@ -402,11 +667,26 @@ class _PostJobScreenState extends State<PostJobScreen> {
             : 0,
       if (experienceMax != null && experienceMax >= 0)
         'experience_max': experienceMax,
-      if (!draft) 'shift': shift.toLowerCase(),
-      if (shiftStartController.text.trim().isNotEmpty)
+      if (!draft) 'shift': shiftValue,
+      if ((shiftValue == 'day' || shiftValue == 'night') &&
+          shiftStartController.text.trim().isNotEmpty)
         'shift_start': shiftStartController.text.trim(),
-      if (shiftEndController.text.trim().isNotEmpty)
+      if ((shiftValue == 'day' || shiftValue == 'night') &&
+          shiftEndController.text.trim().isNotEmpty)
         'shift_end': shiftEndController.text.trim(),
+      if (shiftValue == 'rotational')
+        'shift_timings': rotationalTimings
+            .where((timing) => timing.start.isNotEmpty || timing.end.isNotEmpty)
+            .map((timing) => {'start': timing.start, 'end': timing.end})
+            .toList(),
+      if (shiftValue == 'flexible' && workHours != null)
+        'work_hours': workHours,
+      if (shiftValue == 'flexible' && workHours != null)
+        'work_hours_period': workHoursPeriod,
+      if (shiftValue == 'flexible' && addCoreHours && coreStartTime != null)
+        'core_start': _formatTime(coreStartTime!),
+      if (shiftValue == 'flexible' && addCoreHours && coreEndTime != null)
+        'core_end': _formatTime(coreEndTime!),
       if (!draft || selectedPerks.isNotEmpty) 'perks': selectedPerks.toList(),
       'contact_mode':
           draft &&
@@ -713,7 +993,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
   @override
   void dispose() {
     _addressDebounce?.cancel();
+    _titleDebounce?.cancel();
     addressController.removeListener(_addressChanged);
+    titleController.removeListener(_titleChanged);
     titleController.dispose();
     openingsController.dispose();
     experienceController.dispose();
@@ -725,6 +1007,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
     addressController.dispose();
     shiftStartController.dispose();
     shiftEndController.dispose();
+    workHoursController.dispose();
     contactNameController.dispose();
     contactDesignationController.dispose();
     perkController.dispose();
@@ -768,10 +1051,30 @@ class _PostJobScreenState extends State<PostJobScreen> {
                         const SizedBox(height: 14),
                       ],
                       const _Label('Job title'),
-                      _Input(
-                        hint: 'e.g. Plumber for apartment project',
-                        controller: titleController,
-                      ),
+                      _useCustomTitle
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _Input(
+                                  hint: 'Type the job title',
+                                  controller: titleController,
+                                ),
+                                TextButton.icon(
+                                  onPressed: () => setState(() {
+                                    _useCustomTitle = false;
+                                    titleController.clear();
+                                  }),
+                                  icon: const Icon(LucideIcons.list, size: 16),
+                                  label: const Text('Choose from job profiles'),
+                                ),
+                              ],
+                            )
+                          : _Select(
+                              titleController.text.trim().isEmpty
+                                  ? 'Select job profile'
+                                  : titleController.text.trim(),
+                              onTap: _chooseJobProfile,
+                            ),
                       const SizedBox(height: 14),
                       const _Label('Category'),
                       _Select(
@@ -781,6 +1084,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           categories,
                           (value) => setState(() {
                             category = value;
+                            _categoryWasSuggested = false;
                             skills = {
                               ...(categorySkills[value] ?? skills),
                               ...selectedSkills,
@@ -788,9 +1092,68 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           }),
                         ),
                       ),
+                      if (_categoryWasSuggested) ...[
+                        const SizedBox(height: 6),
+                        const _Hint('Suggested from the job title.'),
+                      ],
+                      const SizedBox(height: 14),
+                      const _Label('Who can apply'),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _Choice(
+                            text: 'Not specified',
+                            selected: gender == null,
+                            onTap: () => setState(() => gender = null),
+                          ),
+                          ...genderOptions.map(
+                            (option) => _Choice(
+                              text: option['label']!,
+                              selected: gender == option['value'],
+                              onTap: () =>
+                                  setState(() => gender = option['value']),
+                            ),
+                          ),
+                        ],
+                      ),
                       const SizedBox(height: 14),
                       const _Label('Skills required'),
-                      _chips(skills, selectedSkills, multi: true),
+                      if (selectedSkills.isNotEmpty)
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: selectedSkills
+                              .map(
+                                (skill) => InputChip(
+                                  label: Text(skill),
+                                  onDeleted: () => setState(() {
+                                    selectedSkills.remove(skill);
+                                    _suggestedSkills.remove(skill);
+                                    _skillsCameFromSuggestion = false;
+                                  }),
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      if (selectedSkills.isNotEmpty) const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: skills
+                            .where((skill) => !selectedSkills.contains(skill))
+                            .map(
+                              (skill) => _Choice(
+                                text: skill,
+                                selected: false,
+                                onTap: () => setState(() {
+                                  selectedSkills.add(skill);
+                                  _skillsCameFromSuggestion = false;
+                                }),
+                              ),
+                            )
+                            .toList(),
+                      ),
                       const SizedBox(height: 8),
                       _Input(
                         hint: 'Add a skill',
@@ -801,6 +1164,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                             setState(() {
                               skills = {...skills, skill}.toList();
                               selectedSkills.add(skill);
+                              _skillsCameFromSuggestion = false;
                               perkController.clear();
                             });
                           }
@@ -901,30 +1265,53 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       _singleChips(
                         ['Day', 'Night', 'Rotational', 'Flexible'],
                         shift,
-                        (value) {
-                          setState(() => shift = value);
-                        },
+                        _changeShift,
                       ),
                       const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _TimeInput(
-                              label: 'Start time',
-                              value: shiftStartTime,
-                              onTap: () => _pickTime(start: true),
+                      if (shift == 'Day' || shift == 'Night')
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _TimeInput(
+                                label: 'Start time',
+                                value: shiftStartTime,
+                                onTap: () => _pickTime(start: true),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _TimeInput(
-                              label: 'End time',
-                              value: shiftEndTime,
-                              onTap: () => _pickTime(start: false),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: _TimeInput(
+                                label: 'End time',
+                                value: shiftEndTime,
+                                onTap: () => _pickTime(start: false),
+                              ),
                             ),
+                          ],
+                        )
+                      else if (shift == 'Rotational')
+                        _RotationalShiftEditor(
+                          timings: rotationalTimings,
+                          maxTimings: maxShiftTimings,
+                          onPick: _pickRotationalTime,
+                          onAdd: () => setState(
+                            () => rotationalTimings.add(_ShiftTiming('', '')),
                           ),
-                        ],
-                      ),
+                          onRemove: (index) =>
+                              setState(() => rotationalTimings.removeAt(index)),
+                        )
+                      else
+                        _FlexibleShiftEditor(
+                          hoursController: workHoursController,
+                          period: workHoursPeriod,
+                          addCoreHours: addCoreHours,
+                          coreStart: coreStartTime,
+                          coreEnd: coreEndTime,
+                          onPeriodChanged: (value) =>
+                              setState(() => workHoursPeriod = value),
+                          onCoreChanged: (value) =>
+                              setState(() => addCoreHours = value),
+                          onPickCore: _pickCoreTime,
+                        ),
                       const SizedBox(height: 14),
                       const _Label('Perks & benefits'),
                       _chips(perks, selectedPerks, multi: true),
@@ -1250,6 +1637,261 @@ class _PostJobScreenState extends State<PostJobScreen> {
       values: values,
     );
     if (result != null) onSelected(result);
+  }
+}
+
+class _ShiftDefault {
+  const _ShiftDefault(this.start, this.end);
+  final String start, end;
+}
+
+class _ShiftTiming {
+  _ShiftTiming(this.start, this.end);
+  String start, end;
+}
+
+class _RotationalShiftEditor extends StatelessWidget {
+  const _RotationalShiftEditor({
+    required this.timings,
+    required this.maxTimings,
+    required this.onPick,
+    required this.onAdd,
+    required this.onRemove,
+  });
+  final List<_ShiftTiming> timings;
+  final int maxTimings;
+  final Future<void> Function(int, {required bool start}) onPick;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onRemove;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    children: [
+      ...timings.indexed.map(
+        (entry) => Padding(
+          padding: const EdgeInsets.only(bottom: 10),
+          child: Row(
+            children: [
+              SizedBox(width: 54, child: Text('Shift ${entry.$1 + 1}')),
+              Expanded(
+                child: _TimeInput(
+                  label: 'Start',
+                  value: _parse(entry.$2.start),
+                  onTap: () => onPick(entry.$1, start: true),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _TimeInput(
+                  label: 'End',
+                  value: _parse(entry.$2.end),
+                  onTap: () => onPick(entry.$1, start: false),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Remove shift timing',
+                onPressed: timings.length > 1 ? () => onRemove(entry.$1) : null,
+                icon: const Icon(LucideIcons.x),
+              ),
+            ],
+          ),
+        ),
+      ),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: timings.length < maxTimings ? onAdd : null,
+          icon: const Icon(LucideIcons.plus, size: 17),
+          label: const Text('Add Shift Timing'),
+        ),
+      ),
+    ],
+  );
+
+  TimeOfDay? _parse(String value) {
+    final pieces = value.split(':');
+    if (pieces.length != 2) return null;
+    final hour = int.tryParse(pieces[0]);
+    final minute = int.tryParse(pieces[1]);
+    if (hour == null || minute == null) return null;
+    return TimeOfDay(hour: hour, minute: minute);
+  }
+}
+
+class _FlexibleShiftEditor extends StatelessWidget {
+  const _FlexibleShiftEditor({
+    required this.hoursController,
+    required this.period,
+    required this.addCoreHours,
+    required this.coreStart,
+    required this.coreEnd,
+    required this.onPeriodChanged,
+    required this.onCoreChanged,
+    required this.onPickCore,
+  });
+  final TextEditingController hoursController;
+  final String period;
+  final bool addCoreHours;
+  final TimeOfDay? coreStart, coreEnd;
+  final ValueChanged<String> onPeriodChanged;
+  final ValueChanged<bool> onCoreChanged;
+  final Future<void> Function({required bool start}) onPickCore;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Row(
+        children: [
+          Expanded(
+            child: _Input(
+              hint: '8',
+              suffix: 'hours',
+              controller: hoursController,
+              number: true,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(child: _singlePeriod(context)),
+        ],
+      ),
+      const SizedBox(height: 8),
+      SwitchListTile.adaptive(
+        contentPadding: EdgeInsets.zero,
+        value: addCoreHours,
+        onChanged: onCoreChanged,
+        title: const Text('Add Core Working Hours'),
+        subtitle: const Text(
+          'Time window when employee must be online/available',
+          style: TextStyle(fontSize: 12),
+        ),
+      ),
+      if (addCoreHours) ...[
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            Expanded(
+              child: _TimeInput(
+                label: 'Core start',
+                value: coreStart,
+                onTap: () => onPickCore(start: true),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _TimeInput(
+                label: 'Core end',
+                value: coreEnd,
+                onTap: () => onPickCore(start: false),
+              ),
+            ),
+          ],
+        ),
+      ],
+    ],
+  );
+
+  Widget _singlePeriod(BuildContext context) => DropdownButtonFormField<String>(
+    initialValue: period,
+    decoration: const InputDecoration(labelText: 'Period'),
+    items: const [
+      DropdownMenuItem(value: 'day', child: Text('Per day')),
+      DropdownMenuItem(value: 'week', child: Text('Per week')),
+    ],
+    onChanged: (value) {
+      if (value != null) onPeriodChanged(value);
+    },
+  );
+}
+
+class _JobProfile {
+  const _JobProfile({required this.title, required this.category})
+    : isOther = false;
+
+  const _JobProfile.other()
+    : title = 'Other (type your own)',
+      category = '',
+      isOther = true;
+
+  final String title;
+  final String category;
+  final bool isOther;
+}
+
+class _JobProfileSheet extends StatefulWidget {
+  const _JobProfileSheet({required this.profiles});
+  final List<_JobProfile> profiles;
+
+  @override
+  State<_JobProfileSheet> createState() => _JobProfileSheetState();
+}
+
+class _JobProfileSheetState extends State<_JobProfileSheet> {
+  String query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = query.trim().toLowerCase();
+    final visible = widget.profiles
+        .where(
+          (profile) =>
+              profile.title.toLowerCase().contains(normalized) ||
+              profile.category.toLowerCase().contains(normalized),
+        )
+        .toList();
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SizedBox(
+        height: MediaQuery.sizeOf(context).height * .72,
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Select job profile',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    autofocus: true,
+                    onChanged: (value) => setState(() => query = value),
+                    decoration: const InputDecoration(
+                      hintText: 'Search job profiles',
+                      prefixIcon: Icon(Icons.search),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                children: [
+                  ...visible.map(
+                    (profile) => ListTile(
+                      title: Text(profile.title),
+                      subtitle: profile.category.isEmpty
+                          ? null
+                          : Text(profile.category),
+                      onTap: () => Navigator.pop(context, profile),
+                    ),
+                  ),
+                  const Divider(height: 1),
+                  ListTile(
+                    leading: const Icon(LucideIcons.pencil),
+                    title: const Text('Other (type your own)'),
+                    onTap: () =>
+                        Navigator.pop(context, const _JobProfile.other()),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

@@ -10,6 +10,7 @@ import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 import 'package:employer_kariger_app/widgets/location_map.dart';
+import 'package:employer_kariger_app/widgets/searchable_option_sheet.dart';
 
 class ProfileEditScreen extends StatefulWidget {
   const ProfileEditScreen({super.key});
@@ -33,6 +34,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   bool saving = false;
   bool uploadingLogo = false;
   bool _loaded = false;
+  List<String> hiringCategories = const [];
+  final selectedHiringCategories = <String>{};
 
   @override
   void didChangeDependencies() {
@@ -62,9 +65,32 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       aboutController.text = profile.about ?? '';
       stateController.text = profile.state ?? '';
       cityController.text = profile.city ?? '';
+      selectedHiringCategories
+        ..clear()
+        ..addAll(profile.hiringCategories);
       if (profile.latitude != null && profile.longitude != null) {
         _siteLocation = LatLng(profile.latitude!, profile.longitude!);
       }
+    }
+    try {
+      final reference = await AppScope.of(context).api.reference();
+      if (!mounted) return;
+      final categories = (reference['job_categories'] as List? ?? const [])
+          .map(
+            (item) => item is Map
+                ? '${item['name'] ?? item['label'] ?? ''}'
+                : '$item',
+          )
+          .where((item) => item.isNotEmpty)
+          .toList();
+      setState(
+        () => hiringCategories = {
+          ...categories,
+          ...selectedHiringCategories,
+        }.toList(),
+      );
+    } catch (_) {
+      // Keep the saved categories visible if reference data is temporarily unavailable.
     }
     setState(() => loading = false);
   }
@@ -104,6 +130,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       'name': nameController.text.trim(),
       'phone': phoneController.text.replaceAll(RegExp(r'\D'), ''),
       'industry': industryController.text.trim(),
+      'hiring_categories': selectedHiringCategories.toList(),
       'about': aboutController.text.trim(),
       'state': stateController.text.trim(),
       'city': cityController.text.trim(),
@@ -329,14 +356,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
-                const Wrap(
+                Wrap(
                   spacing: 7,
                   runSpacing: 7,
                   children: [
-                    BrandChip('Plumbing ×'),
-                    BrandChip('Electrical ×'),
-                    BrandChip('Masonry ×'),
-                    BrandChip('+ Add trade', neutral: true),
+                    ...selectedHiringCategories.map(
+                      (category) => InputChip(
+                        label: Text(category),
+                        onDeleted: () => setState(
+                          () => selectedHiringCategories.remove(category),
+                        ),
+                      ),
+                    ),
+                    ActionChip(
+                      avatar: const Icon(LucideIcons.plus, size: 16),
+                      label: const Text('Add category'),
+                      onPressed: _chooseHiringCategory,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
@@ -398,5 +434,20 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
               ],
             ),
     );
+  }
+
+  Future<void> _chooseHiringCategory() async {
+    final options = hiringCategories
+        .where((category) => !selectedHiringCategories.contains(category))
+        .toList();
+    if (options.isEmpty) return;
+    final category = await showSearchableOptionSheet(
+      context,
+      title: 'Usually hiring for',
+      values: options,
+    );
+    if (category != null && mounted) {
+      setState(() => selectedHiringCategories.add(category));
+    }
   }
 }

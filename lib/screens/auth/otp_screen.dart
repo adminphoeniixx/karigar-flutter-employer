@@ -19,6 +19,7 @@ class OtpScreen extends StatefulWidget {
 class _OtpScreenState extends State<OtpScreen> {
   bool sent = false;
   bool loading = false;
+  String? formError;
   static const _resendCooldown = 30;
   int _resendSeconds = 0;
   Timer? _resendTimer;
@@ -169,9 +170,7 @@ class _OtpScreenState extends State<OtpScreen> {
     );
   }
 
-  void _message(String value) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(value)));
+  void _message(String value) => setState(() => formError = value);
 
   @override
   Widget build(BuildContext context) => PopScope(
@@ -203,6 +202,13 @@ class _OtpScreenState extends State<OtpScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    if (formError != null) ...[
+                      _AuthErrorBanner(
+                        message: formError!,
+                        onDismiss: () => setState(() => formError = null),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 4),
                       child: Column(
@@ -236,7 +242,7 @@ class _OtpScreenState extends State<OtpScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            "Employer · We'll send you a one-time code",
+                            "We'll send a verification code to this number",
                             style: TextStyle(
                               color: Theme.of(
                                 context,
@@ -288,6 +294,38 @@ class _OtpScreenState extends State<OtpScreen> {
   );
 }
 
+class _AuthErrorBanner extends StatelessWidget {
+  const _AuthErrorBanner({required this.message, required this.onDismiss});
+  final String message;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.fromLTRB(12, 10, 6, 10),
+    decoration: BoxDecoration(
+      color: Theme.of(context).colorScheme.errorContainer,
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          LucideIcons.circleAlert,
+          color: Theme.of(context).colorScheme.error,
+          size: 18,
+        ),
+        const SizedBox(width: 8),
+        Expanded(child: Text(message, style: const TextStyle(fontSize: 13))),
+        IconButton(
+          onPressed: onDismiss,
+          visualDensity: VisualDensity.compact,
+          icon: const Icon(LucideIcons.x, size: 17),
+        ),
+      ],
+    ),
+  );
+}
+
 class _PhoneForm extends StatelessWidget {
   const _PhoneForm({required this.controller});
   final TextEditingController controller;
@@ -320,12 +358,8 @@ class _PhoneForm extends StatelessWidget {
                 color: colors.surfaceContainerHighest,
                 alignment: Alignment.centerLeft,
                 child: const Text(
-                  'IN\n+91',
-                  style: TextStyle(
-                    height: 1.45,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  '🇮🇳 +91',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                 ),
               ),
               Expanded(
@@ -335,7 +369,7 @@ class _PhoneForm extends StatelessWidget {
                   keyboardType: TextInputType.phone,
                   maxLength: 10,
                   decoration: InputDecoration(
-                    hintText: '98765 43210',
+                    hintText: 'Enter the 10 digit mobile',
                     counterText: '',
                     filled: false,
                     border: InputBorder.none,

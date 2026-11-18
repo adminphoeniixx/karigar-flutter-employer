@@ -18,6 +18,8 @@
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Use your location to set your business address.</string>
 	<key>CFBundleDisplayName</key>
 	<string>Super Karigar Employer</string>
 	<key>CFBundleExecutable</key>

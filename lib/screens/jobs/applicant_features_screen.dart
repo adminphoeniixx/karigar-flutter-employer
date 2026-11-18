@@ -296,6 +296,44 @@ class ApplicantScreeningCallPanel extends StatelessWidget {
   }
 }
 
+/// A morning-of-interview AI check-in is separate from screening, but uses the
+/// same compact treatment so employers can act on it without opening a call.
+class InterviewReminderCallPanel extends StatelessWidget {
+  const InterviewReminderCallPanel({super.key, required this.call, required this.workerName});
+  final Map<String, dynamic>? call;
+  final String workerName;
+
+  @override
+  Widget build(BuildContext context) {
+    final item = call;
+    if (item == null) return const SizedBox.shrink();
+    final outcome = '${item['outcome_label'] ?? item['status_label'] ?? item['status'] ?? 'Pending'}'.trim();
+    final summary = '${item['summary'] ?? ''}'.trim();
+    final proposed = '${item['proposed_interview_label'] ?? ''}'.trim();
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xfff0f7ff),
+        border: Border.all(color: const Color(0xffb8d9f5)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(LucideIcons.calendarCheck, size: 16, color: AppColors.brandDark),
+          const SizedBox(width: 7),
+          const Expanded(child: Text('Interview reminder call', style: TextStyle(fontWeight: FontWeight.w700))),
+          _CallOutcomeChip(label: outcome),
+        ]),
+        if (summary.isNotEmpty) ...[const SizedBox(height: 8), Text(summary, style: const TextStyle(fontSize: 12.5, height: 1.35))],
+        if (proposed.isNotEmpty) ...[const SizedBox(height: 7), Text('Requested: $proposed', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))],
+        if (item['called_label'] != null) ...[const SizedBox(height: 7), Text('${item['called_label']} · ${item['credits_charged'] ?? 0} credits', style: const TextStyle(fontSize: 12, color: AppColors.muted))],
+      ]),
+    );
+  }
+}
+
 String _duration(Object? seconds) {
   final value = (seconds as num?)?.toInt() ?? 0;
   return '${value ~/ 60} min ${value % 60} s';

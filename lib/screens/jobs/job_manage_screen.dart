@@ -885,6 +885,13 @@ class _JobManageScreenState extends State<JobManageScreen> {
                               workerName: profile.name,
                             ),
 
+                          if (applicant.interview != null &&
+                              applicant.interviewReminderCall != null)
+                            InterviewReminderCallPanel(
+                              call: applicant.interviewReminderCall,
+                              workerName: profile.name,
+                            ),
+
                           if (applicant.resume != null)
                             SizedBox(
                               width: double.infinity,

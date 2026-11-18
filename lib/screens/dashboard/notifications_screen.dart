@@ -5,6 +5,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
+import 'package:employer_kariger_app/core/data.dart';
+import 'package:employer_kariger_app/models/api_models.dart';
+import 'package:employer_kariger_app/screens/jobs/job_manage_screen.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -70,7 +73,34 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _open(Map<String, dynamic> item) async {
     await _read(item);
-    if (!mounted || item['type']?.toString() != 'plan.reminder') return;
+    if (!mounted) return;
+    if (item['type']?.toString() == 'application.interview_reminder') {
+      final data = item['data'] is Map
+          ? Map<String, dynamic>.from(item['data'] as Map)
+          : const <String, dynamic>{};
+      final url = '${item['url'] ?? data['url'] ?? ''}';
+      final match = RegExp(r'/employer/jobs/(\\d+)/applicants').firstMatch(url);
+      final jobId = int.tryParse(match?.group(1) ?? '${data['job_id'] ?? ''}');
+      if (jobId != null) {
+        final jobs = await AppScope.of(context).api.jobs();
+        if (!mounted) return;
+        EmployerJob? job;
+        for (final candidate in jobs) {
+          if (candidate.id == jobId) {
+            job = candidate;
+            break;
+          }
+        }
+        if (job != null) {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => JobManageScreen(job: _job(job!))),
+          );
+        }
+      }
+      return;
+    }
+    if (item['type']?.toString() != 'plan.reminder') return;
     final data = item['data'] is Map
         ? Map<String, dynamic>.from(item['data'] as Map)
         : const <String, dynamic>{};
@@ -83,6 +113,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       ),
     );
   }
+
+  Job _job(EmployerJob job) => Job(
+    job.title,
+    job.category,
+    job.wageLabel,
+    job.vacancies,
+    job.stats['applicants'] as int? ?? 0,
+    job.stats['shortlisted'] as int? ?? 0,
+    job.stats['hired'] as int? ?? 0,
+    job.status,
+    id: job.id,
+    workModeLabel: job.workModeLabel,
+    interviewModeLabel: job.interviewModeLabel,
+  );
 
   @override
   Widget build(BuildContext context) => Scaffold(

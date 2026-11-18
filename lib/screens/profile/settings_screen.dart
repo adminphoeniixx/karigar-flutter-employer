@@ -9,6 +9,7 @@ import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/auth/onboarding_screen.dart';
 import 'package:employer_kariger_app/screens/profile/account_management_screen.dart';
 import 'package:employer_kariger_app/screens/profile/legal_support_screen.dart';
+import 'package:employer_kariger_app/screens/profile/ai_call_settings_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -190,6 +191,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
                 _SectionHeader(context.tr('Account & Security')),
+                _SettingsRow(
+                  icon: LucideIcons.phoneCall,
+                  title: 'AI call settings',
+                  subtitle: 'Choose when applicants receive AI calls',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AiCallSettingsScreen()),
+                  ),
+                ),
                 _SettingsRow(
                   icon: LucideIcons.lockKeyhole,
                   title: context.tr('Login & security'),

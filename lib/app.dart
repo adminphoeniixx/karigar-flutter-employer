@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 
 import 'controllers/auth_controller.dart';
@@ -39,6 +40,7 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
   DateTime? maintenanceUntil;
   String? updateMessage;
   String? updateUrl;
+  String? updateVersion;
   bool forceUpdate = false;
 
   @override
@@ -94,6 +96,7 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
             update['message']?.toString() ??
             'A newer version of Super Karigar is available.';
         updateUrl = update['store_url']?.toString();
+        updateVersion = update['latest_version']?.toString();
         forceUpdate = update['force_update'] == true;
       }
     } catch (_) {}
@@ -178,11 +181,13 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
             ? _OptionalUpdatePrompt(
                 message: updateMessage,
                 storeUrl: updateUrl,
+                version: updateVersion,
                 child: const MainShell(),
               )
             : _OptionalUpdatePrompt(
                 message: updateMessage,
                 storeUrl: updateUrl,
+                version: updateVersion,
                 child: const OnboardingScreen(),
               ),
       ),
@@ -195,9 +200,10 @@ class _OptionalUpdatePrompt extends StatefulWidget {
     required this.child,
     this.message,
     this.storeUrl,
+    this.version,
   });
   final Widget child;
-  final String? message, storeUrl;
+  final String? message, storeUrl, version;
   @override
   State<_OptionalUpdatePrompt> createState() => _OptionalUpdatePromptState();
 }
@@ -207,15 +213,32 @@ class _OptionalUpdatePromptState extends State<_OptionalUpdatePrompt> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (shown || widget.message == null) return;
+    if (shown || widget.message == null || widget.version == null) return;
     shown = true;
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => showDialog<void>(
+    _showIfNeeded();
+  }
+
+  Future<void> _showIfNeeded() async {
+    final version = widget.version!;
+    final preferences = await SharedPreferences.getInstance();
+    if (!mounted ||
+        preferences.getString('dismissed_update_version') == version) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      showDialog<void>(
         context: context,
-        builder: (context) =>
-            _UpdateDialog(message: widget.message!, storeUrl: widget.storeUrl),
-      ),
-    );
+        builder: (context) => _UpdateDialog(
+          message: widget.message!,
+          storeUrl: widget.storeUrl,
+          onLater: () async {
+            await preferences.setString('dismissed_update_version', version);
+            if (context.mounted) Navigator.pop(context);
+          },
+        ),
+      );
+    });
   }
 
   @override
@@ -223,9 +246,14 @@ class _OptionalUpdatePromptState extends State<_OptionalUpdatePrompt> {
 }
 
 class _UpdateDialog extends StatelessWidget {
-  const _UpdateDialog({required this.message, this.storeUrl});
+  const _UpdateDialog({
+    required this.message,
+    this.storeUrl,
+    required this.onLater,
+  });
   final String message;
   final String? storeUrl;
+  final Future<void> Function() onLater;
   Future<void> _open(BuildContext context) async {
     final url = Uri.tryParse(storeUrl ?? '');
     if (url == null || url.scheme.isEmpty) {
@@ -251,14 +279,12 @@ class _UpdateDialog extends StatelessWidget {
     title: const Text('New version available'),
     content: Text(message),
     actions: [
-      TextButton(
-        onPressed: () => Navigator.pop(context),
-        child: const Text('Later'),
-      ),
-      FilledButton(
-        onPressed: () => _open(context),
-        child: const Text('Update'),
-      ),
+      TextButton(onPressed: onLater, child: const Text('Later')),
+      if (storeUrl?.trim().isNotEmpty == true)
+        FilledButton(
+          onPressed: () => _open(context),
+          child: const Text('Update'),
+        ),
     ],
   );
 }
