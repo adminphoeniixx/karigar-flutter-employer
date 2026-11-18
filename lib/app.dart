@@ -221,10 +221,11 @@ class _OptionalUpdatePromptState extends State<_OptionalUpdatePrompt> {
   Future<void> _showIfNeeded() async {
     final version = widget.version!;
     final preferences = await SharedPreferences.getInstance();
-    if (!mounted ||
-        preferences.getString('dismissed_update_version') == version) {
+    if (!mounted || preferences.getString('shown_update_version') == version) {
       return;
     }
+    await preferences.setString('shown_update_version', version);
+    if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       showDialog<void>(

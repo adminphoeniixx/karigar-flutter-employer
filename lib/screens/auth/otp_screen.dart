@@ -352,14 +352,20 @@ class _PhoneForm extends StatelessWidget {
           child: Row(
             children: [
               Container(
-                width: 64,
+                width: 72,
                 height: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 color: colors.surfaceContainerHighest,
                 alignment: Alignment.centerLeft,
-                child: const Text(
-                  '🇮🇳 +91',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                child: const FittedBox(
+                  alignment: Alignment.centerLeft,
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    '🇮🇳 +91',
+                    maxLines: 1,
+                    softWrap: false,
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
               Expanded(

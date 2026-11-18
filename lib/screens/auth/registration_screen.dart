@@ -324,9 +324,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  void _message(String value) => ScaffoldMessenger.of(
-    context,
-  ).showSnackBar(SnackBar(content: Text(value)));
+  void _message(String value) => setState(() => setupErrors = [value]);
 
   @override
   void dispose() {

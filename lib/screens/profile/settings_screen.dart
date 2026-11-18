@@ -25,8 +25,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<String> languageCodes = const ['en', 'hi', 'ta', 'te', 'bn', 'mr'];
   bool loaded = false;
   bool loading = true;
-  // Do not let a slower preferences request undo a choice made on this page.
-  bool _themeChangedLocally = false;
 
   @override
   void didChangeDependencies() {
@@ -49,17 +47,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final preferences = response['preferences'];
       final reference = results.last;
       if (!mounted) return;
-      if (!_themeChangedLocally) {
-        await AppScope.of(context).appTheme.setServerValue(
-          preferences is Map ? preferences['theme']?.toString() : null,
-        );
-      }
-      if (!mounted) return;
       setState(() {
         if (preferences is Map) {
-          if (!_themeChangedLocally) {
-            darkTheme = AppScope.of(context).appTheme.isDark;
-          }
+          // Theme is controlled by the local, explicit toggle.  Never let a
+          // stale server preference switch the whole app merely by opening
+          // Settings.
+          darkTheme = AppScope.of(context).appTheme.isDark;
           applicantAlerts = preferences['applicant_alerts'] != false;
           messageAlerts = preferences['message_alerts'] != false;
         }
@@ -94,7 +87,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _changeDarkTheme(bool value) async {
     final oldValue = darkTheme;
     final theme = AppScope.of(context).appTheme;
-    _themeChangedLocally = true;
     setState(() => darkTheme = value);
     try {
       await theme.setDark(value);
@@ -197,7 +189,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Choose when applicants receive AI calls',
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => const AiCallSettingsScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const AiCallSettingsScreen(),
+                    ),
                   ),
                 ),
                 _SettingsRow(
@@ -410,11 +404,7 @@ class _SettingsRow extends StatelessWidget {
                     color: colors.primaryContainer,
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: Icon(
-                    icon,
-                    color: colors.onPrimaryContainer,
-                    size: 20,
-                  ),
+                  child: Icon(icon, color: colors.onPrimaryContainer, size: 20),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -442,11 +432,12 @@ class _SettingsRow extends StatelessWidget {
                     ],
                   ),
                 ),
-                trailing ?? Icon(
-                  LucideIcons.chevronRight,
-                  size: 18,
-                  color: colors.onSurfaceVariant,
-                ),
+                trailing ??
+                    Icon(
+                      LucideIcons.chevronRight,
+                      size: 18,
+                      color: colors.onSurfaceVariant,
+                    ),
               ],
             ),
           ),

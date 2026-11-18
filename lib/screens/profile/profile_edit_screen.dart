@@ -345,6 +345,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   'GSTIN (optional)',
                   hint: 'Business GSTIN',
                   controller: gstinController,
+                  maxLength: 15,
                 ),
                 LabeledField(
                   'Industry',

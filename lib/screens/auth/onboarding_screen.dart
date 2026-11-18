@@ -53,7 +53,7 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       const Text(
-                        'Hire skilled\nkarigars, fast.',
+                        'Hire skilled\nkarigars, fast',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 32,
@@ -64,7 +64,7 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Post a job free and reach thousands of verified, work-ready karigars near you. No middlemen.',
+                        'Post a job for free and reach thousands of verified, work-ready karigars near you. No middlemen.',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 15.5,
@@ -74,11 +74,11 @@ class OnboardingScreen extends StatelessWidget {
                       const Spacer(),
                       const _Feature(
                         LucideIcons.phoneCall,
-                        'AI-powered calls & interviews',
+                        'AI screening calls',
                       ),
                       const _Feature(
                         LucideIcons.calendarClock,
-                        'AI-assisted interview scheduling',
+                        'Smart AI interview scheduling',
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
@@ -102,9 +102,7 @@ class OnboardingScreen extends StatelessWidget {
                         child: Text.rich(
                           TextSpan(
                             children: [
-                              TextSpan(
-                                text: 'For employers · Looking for work? ',
-                              ),
+                              TextSpan(text: 'Looking for work? '),
                               TextSpan(
                                 text: 'Karigar app',
                                 style: TextStyle(fontWeight: FontWeight.w700),

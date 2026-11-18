@@ -142,7 +142,7 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 1500));
 
-    expect(find.text('Hire skilled\nworkers, fast.'), findsOneWidget);
+    expect(find.text('Hire skilled\nkarigars, fast'), findsOneWidget);
     expect(find.text('Get Started'), findsOneWidget);
   });
 
