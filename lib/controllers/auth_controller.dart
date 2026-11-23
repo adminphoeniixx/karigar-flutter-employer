@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../models/api_models.dart';
 import '../services/employer_api_service.dart';
 import 'base_controller.dart';
@@ -14,7 +16,10 @@ class AuthController extends BaseController {
 
   Future<Json?> verifyOtp(String phone, String otp) => run(() async {
     final response = await api.verifyOtp(phone, otp);
-    await api.client.setToken(response['token']?.toString());
+    final token = response['token']?.toString();
+    debugPrint('OTP verify response: $response');
+    debugPrint('Bearer token: Bearer $token');
+    await api.client.setToken(token);
     user = response['user'] is Map
         ? Map<String, dynamic>.from(response['user'])
         : null;

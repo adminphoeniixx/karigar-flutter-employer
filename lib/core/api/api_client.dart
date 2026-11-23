@@ -46,6 +46,12 @@ class ApiClient {
 
   Future<void> setToken(String? token) async {
     _token = token;
+    // Development-only diagnostic requested for verifying the exact auth header.
+    // Do not leave this enabled in a production build.
+    // ignore: avoid_print
+    print(
+      'Bearer token: ${token == null || token.isEmpty ? '(cleared)' : 'Bearer $token'}',
+    );
     try {
       final preferences = await SharedPreferences.getInstance();
       if (token == null || token.isEmpty) {
@@ -288,7 +294,7 @@ class ApiClient {
   String _tokenDebugState() {
     final token = _token;
     if (token == null || token.isEmpty) return 'Bearer token missing';
-    return 'Bearer token attached (length: ${token.length})';
+    return 'Bearer $token';
   }
 
   void _logResponse(
@@ -310,6 +316,7 @@ class ApiClient {
         '│ Status: ${response.statusCode}'
         '${elapsed == null ? '' : ' · ${elapsed.inMilliseconds} ms'}',
       );
+    buffer.writeln('│ Authorization: ${_tokenDebugState()}');
     if (decodeError != null) {
       buffer.writeln('│ Decode error: $decodeError');
     }

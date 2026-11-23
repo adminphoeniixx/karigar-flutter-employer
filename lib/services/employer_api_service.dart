@@ -66,6 +66,21 @@ class EmployerApiService {
   Future<List<String>> cities(String state) async => asStrings(
     (await client.get(ApiConstants.cities, query: {'state': state}))['cities'],
   );
+
+  /// Search is intentionally separate from state-bound cities: step 2 can
+  /// target karigars from any Indian city.
+  Future<List<Json>> searchCities(String query) async {
+    if (query.trim().isEmpty) return const [];
+    final response = await client.get(
+      ApiConstants.citiesSearch,
+      query: {'q': query.trim()},
+    );
+    return (response['cities'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Json.from(item))
+        .toList();
+  }
+
   Future<List<String>> jobCategories() async => asStrings(
     (await client.get(ApiConstants.jobCategories))['job_categories'],
   );

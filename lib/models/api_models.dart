@@ -240,6 +240,9 @@ class EmployerJob {
     this.education,
     this.english,
     this.reach = 'city',
+    this.reachKm,
+    this.reachCity,
+    this.reachState,
     this.relocationAllowed = false,
     this.languages = const [],
     this.assets = const [],
@@ -336,6 +339,9 @@ class EmployerJob {
     education: json['education']?.toString(),
     english: json['english']?.toString(),
     reach: '${json['reach'] ?? 'city'}',
+    reachKm: json['reach_km'] == null ? null : asInt(json['reach_km']),
+    reachCity: json['reach_city']?.toString(),
+    reachState: json['reach_state']?.toString(),
     relocationAllowed: json['relocation_allowed'] == true,
     languages: asStrings(json['languages']),
     assets: asStrings(json['assets']),
@@ -381,6 +387,8 @@ class EmployerJob {
   final Json stats, boost;
   final Json? moderation;
   final String jobType, reach, hiringUrgency;
+  final int? reachKm;
+  final String? reachCity, reachState;
   final String? education, english, incentiveType, otherRequirements;
   final List<String> languages, assets, workDays, interviewDays;
   final int? ageMin, ageMax;

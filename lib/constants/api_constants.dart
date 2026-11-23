@@ -12,6 +12,7 @@ class ApiConstants {
   static const locale = '/locale';
   static const reference = '/reference';
   static const cities = '/reference/cities';
+  static const citiesSearch = '/reference/cities/search';
   static const jobCategories = '/reference/job-categories';
   static const dashboard = '/employer/dashboard';
   static const profile = '/employer/profile';
