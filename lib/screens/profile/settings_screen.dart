@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/app_language.dart';
 import 'package:employer_kariger_app/core/app_strings.dart';
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/auth/onboarding_screen.dart';
 import 'package:employer_kariger_app/screens/profile/account_management_screen.dart';
@@ -232,6 +233,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     MaterialPageRoute(builder: (_) => const SupportScreen()),
                   ),
                 ),
+                _SettingsRow(
+                  icon: LucideIcons.trash2,
+                  title: 'Delete account',
+                  subtitle: 'Permanently remove your account and data',
+                  danger: true,
+                  onTap: _showDeleteAccountSheet,
+                ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
                   child: OutlinedButton.icon(
@@ -339,6 +347,283 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
   }
+
+  Future<void> _showDeleteAccountSheet() async {
+    final api = AppScope.of(context).api;
+    Map<String, dynamic>? details;
+    String? loadError;
+    var acknowledged = false;
+    var deleting = false;
+    var loadingDetails = false;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          Future<void> load() async {
+            if (loadingDetails) return;
+            loadingDetails = true;
+            try {
+              final response = await api.accountDeletion();
+              if (!sheetContext.mounted) return;
+              setSheetState(() => details = response);
+            } catch (error) {
+              if (!sheetContext.mounted) return;
+              setSheetState(() => loadError = readableMessage('$error'));
+            } finally {
+              loadingDetails = false;
+            }
+          }
+
+          if (details == null && loadError == null) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => load());
+          }
+
+          final canDelete = details?['can_delete'] == true;
+          final warnings = (details?['warnings'] as List? ?? const [])
+              .whereType<Object>()
+              .map((warning) => '$warning')
+              .toList();
+          final blockedMessage = readableMessage(
+            details?['blocked_message']?.toString(),
+            fallback: 'This account cannot be deleted.',
+          );
+          final colors = Theme.of(sheetContext).colorScheme;
+
+          return SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                20,
+                10,
+                20,
+                20 + MediaQuery.viewInsetsOf(sheetContext).bottom,
+              ),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.sizeOf(sheetContext).height * .82,
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: colors.outlineVariant,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'Delete your account?',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      if (details == null && loadError == null)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 28),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (loadError != null)
+                        _DeleteNotice(message: loadError!, isError: true)
+                      else ...[
+                        if (!canDelete)
+                          _DeleteNotice(message: blockedMessage, isError: true)
+                        else ...[
+                          ...warnings.map(
+                            (warning) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 3),
+                                    child: Icon(
+                                      LucideIcons.alertTriangle,
+                                      size: 16,
+                                      color: colors.error,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      warning,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: colors.onSurfaceVariant,
+                                        height: 1.35,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          CheckboxListTile(
+                            value: acknowledged,
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            title: const Text(
+                              'I understand this cannot be undone',
+                              style: TextStyle(fontSize: 13.5),
+                            ),
+                            onChanged: deleting
+                                ? null
+                                : (value) => setSheetState(
+                                    () => acknowledged = value ?? false,
+                                  ),
+                          ),
+                        ],
+                      ],
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: deleting
+                                  ? null
+                                  : () => Navigator.pop(sheetContext),
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          if (canDelete) ...[
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: FilledButton(
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: colors.error,
+                                  foregroundColor: colors.onError,
+                                ),
+                                onPressed: acknowledged && !deleting
+                                    ? () async {
+                                        setSheetState(() => deleting = true);
+                                        try {
+                                          final response = await api
+                                              .deleteAccount();
+                                          if (!sheetContext.mounted) return;
+                                          await _completeAccountDeletion(
+                                            response['message']?.toString(),
+                                          );
+                                        } on ApiException catch (error) {
+                                          if (sheetContext.mounted) {
+                                            setSheetState(
+                                              () => deleting = false,
+                                            );
+                                            ScaffoldMessenger.of(
+                                              sheetContext,
+                                            ).showSnackBar(
+                                              SnackBar(
+                                                content: Text(error.message),
+                                              ),
+                                            );
+                                          }
+                                        } catch (_) {
+                                          if (sheetContext.mounted) {
+                                            setSheetState(
+                                              () => deleting = false,
+                                            );
+                                            ScaffoldMessenger.of(
+                                              sheetContext,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Could not delete the account. Please try again.',
+                                                ),
+                                              ),
+                                            );
+                                          }
+                                        }
+                                      }
+                                    : null,
+                                child: deleting
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Colors.white,
+                                        ),
+                                      )
+                                    : const Text('Delete account'),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _completeAccountDeletion(String? message) async {
+    final scope = AppScope.of(context);
+    await scope.api.client.setToken(null);
+    scope.auth.clearSession();
+    scope.dashboard.clear();
+    scope.jobs.clear();
+    scope.workers.clear();
+    scope.profile.clear();
+    if (!mounted) return;
+    Navigator.pop(context);
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+      (_) => false,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          readableMessage(message, fallback: 'Your account has been deleted.'),
+        ),
+      ),
+    );
+  }
+}
+
+class _DeleteNotice extends StatelessWidget {
+  const _DeleteNotice({required this.message, required this.isError});
+  final String message;
+  final bool isError;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isError ? colors.errorContainer : colors.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(
+        message,
+        style: TextStyle(
+          fontSize: 13,
+          height: 1.35,
+          color: isError ? colors.onErrorContainer : colors.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
 }
 
 class _SectionHeader extends StatelessWidget {
@@ -369,6 +654,7 @@ class _SettingsRow extends StatelessWidget {
     this.subtitle,
     this.trailing,
     this.onTap,
+    this.danger = false,
   });
 
   final IconData icon;
@@ -376,10 +662,15 @@ class _SettingsRow extends StatelessWidget {
   final String? subtitle;
   final Widget? trailing;
   final VoidCallback? onTap;
+  final bool danger;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
+    final accent = danger ? colors.error : colors.onPrimaryContainer;
+    final iconBackground = danger
+        ? colors.errorContainer
+        : colors.primaryContainer;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
@@ -401,10 +692,10 @@ class _SettingsRow extends StatelessWidget {
                   width: 42,
                   height: 42,
                   decoration: BoxDecoration(
-                    color: colors.primaryContainer,
+                    color: iconBackground,
                     borderRadius: BorderRadius.circular(13),
                   ),
-                  child: Icon(icon, color: colors.onPrimaryContainer, size: 20),
+                  child: Icon(icon, color: accent, size: 20),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -414,9 +705,10 @@ class _SettingsRow extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w600,
+                          color: danger ? colors.error : null,
                         ),
                       ),
                       if (subtitle != null) ...[

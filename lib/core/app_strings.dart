@@ -49,6 +49,17 @@ class AppStrings {
     'View matched karigars': 'मिलान वाले कारीगर देखें',
     'Matched karigars': 'मिलान वाले कारीगर',
     'Business Verification': 'बिज़नेस सत्यापन',
+    'Pick from the list, or add your own title.':
+        'सूची से चुनें, या अपना टाइटल जोड़ें।',
+    'Other (not in the list)': 'अन्य (सूची में नहीं)',
+    'Suggested from the job title. Change it if it is wrong.':
+        'जॉब टाइटल से सुझाया गया। गलत हो तो बदल दें।',
+    'Pick the closest craft, so the right karigars get this job.':
+        'सबसे मिलता-जुलता काम चुनें, ताकि जॉब सही कारीगरों तक पहुँचे।',
+    'Karigars find this job only by searching. If a craft comes close, pick that instead.':
+        'यह जॉब कारीगरों को सिर्फ़ खोजने पर मिलेगी। कोई मिलता-जुलता काम हो तो वही चुनें।',
+    'Pick a category, or Other if none fits.':
+        'कैटेगरी चुनें, या कोई न मिले तो "अन्य"।',
     'Business verification required': 'बिज़नेस सत्यापन आवश्यक है',
     'Verify business': 'बिज़नेस सत्यापित करें',
     'Submit your details for review.': 'समीक्षा के लिए अपनी जानकारी भेजें।',

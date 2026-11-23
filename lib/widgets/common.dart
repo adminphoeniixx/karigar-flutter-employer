@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../core/data.dart';
 import '../core/theme.dart';
@@ -283,6 +284,10 @@ class LabeledField extends StatelessWidget {
     this.keyboardType,
     this.controller,
     this.maxLength,
+    this.errorText,
+    this.focusNode,
+    this.inputFormatters,
+    this.textCapitalization = TextCapitalization.none,
   });
   final String label;
   final String? hint;
@@ -290,6 +295,10 @@ class LabeledField extends StatelessWidget {
   final TextInputType? keyboardType;
   final TextEditingController? controller;
   final int? maxLength;
+  final String? errorText;
+  final FocusNode? focusNode;
+  final List<TextInputFormatter>? inputFormatters;
+  final TextCapitalization textCapitalization;
   @override
   Widget build(BuildContext context) => Padding(
     padding: const EdgeInsets.only(bottom: 14),
@@ -303,12 +312,16 @@ class LabeledField extends StatelessWidget {
         const SizedBox(height: 7),
         TextField(
           controller: controller,
+          focusNode: focusNode,
           maxLines: lines,
           maxLength: maxLength,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
+          textCapitalization: textCapitalization,
           decoration: InputDecoration(
             hintText: hint,
             counterText: maxLength == null ? null : '',
+            errorText: errorText,
           ),
         ),
       ],

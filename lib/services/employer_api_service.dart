@@ -44,6 +44,7 @@ class EmployerApiService {
 
   Future<Json> me() => client.get(ApiConstants.me);
   Future<Json> logout() => client.post(ApiConstants.logout);
+  Future<Json> accountDeletion() => client.get(ApiConstants.accountDeletion);
   Future<Json> deleteAccount() =>
       client.delete(ApiConstants.account, body: {'confirm': true});
   Future<Json> setLocale(String locale) =>

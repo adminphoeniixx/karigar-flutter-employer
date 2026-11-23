@@ -172,6 +172,12 @@ class _PlansScreenState extends State<PlansScreen> {
         context,
       ).api.subscribe(planId, email: email.isEmpty ? null : email);
       if (!mounted) return;
+      // The server quote is ready. Do not leave a loading spinner behind the
+      // confirmation dialog; loading resumes only after the user confirms.
+      setState(() {
+        checkingOut = false;
+        checkoutPlanId = null;
+      });
       if (!await _confirmCheckout(response) || !mounted) {
         return;
       }
@@ -185,6 +191,10 @@ class _PlansScreenState extends State<PlansScreen> {
         );
       }
       pendingSubscriptionId = subscriptionId;
+      setState(() {
+        checkingOut = true;
+        checkoutPlanId = planId;
+      });
       unawaited(
         AppScope.of(context).api.analytics.checkoutStarted(subscriptionId),
       );
@@ -266,7 +276,10 @@ class _PlansScreenState extends State<PlansScreen> {
         ],
       ),
     );
-    controller.dispose();
+    // Navigator.pop completes before the dialog's TextField has finished its
+    // exit-frame rebuild. Dispose after that frame so TextField never receives
+    // an already-disposed controller during the route transition.
+    WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
     return result;
   }
 

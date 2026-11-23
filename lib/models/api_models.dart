@@ -29,6 +29,9 @@ class EmployerProfile {
     required this.companyName,
     this.hiringAs,
     this.industry,
+    this.industryOther,
+    this.hiringFrequency,
+    this.hiringFrequencyLabel,
     this.companySize,
     this.hiringCategories = const [],
     this.gstin,
@@ -51,6 +54,9 @@ class EmployerProfile {
     companyName: '${json['company_name'] ?? ''}',
     hiringAs: json['hiring_as']?.toString(),
     industry: json['industry']?.toString(),
+    industryOther: json['industry_other']?.toString(),
+    hiringFrequency: json['hiring_frequency']?.toString(),
+    hiringFrequencyLabel: json['hiring_frequency_label']?.toString(),
     companySize: json['company_size']?.toString(),
     hiringCategories: asStrings(json['hiring_categories']),
     gstin: json['gstin']?.toString(),
@@ -72,6 +78,9 @@ class EmployerProfile {
   final String companyName;
   final String? hiringAs,
       industry,
+      industryOther,
+      hiringFrequency,
+      hiringFrequencyLabel,
       companySize,
       gstin,
       email,
@@ -227,6 +236,26 @@ class EmployerJob {
     this.boost = const {},
     this.stats = const {},
     this.moderation,
+    this.jobType = 'full_time',
+    this.education,
+    this.english,
+    this.reach = 'city',
+    this.relocationAllowed = false,
+    this.languages = const [],
+    this.assets = const [],
+    this.ageMin,
+    this.ageMax,
+    this.incentiveMax,
+    this.incentiveType,
+    this.otherRequirements,
+    this.workDays = const [],
+    this.interviewDays = const [],
+    this.interviewStart,
+    this.interviewEnd,
+    this.interviewAddress,
+    this.workerFeePurpose,
+    this.hiringUrgency = 'can_wait',
+    this.titleLocked = false,
   });
   factory EmployerJob.fromJson(Json json) => EmployerJob(
     id: asInt(json['id']),
@@ -303,6 +332,28 @@ class EmployerJob {
     moderation: json['moderation'] is Map
         ? Map<String, dynamic>.from(json['moderation'])
         : null,
+    jobType: '${json['job_type'] ?? 'full_time'}',
+    education: json['education']?.toString(),
+    english: json['english']?.toString(),
+    reach: '${json['reach'] ?? 'city'}',
+    relocationAllowed: json['relocation_allowed'] == true,
+    languages: asStrings(json['languages']),
+    assets: asStrings(json['assets']),
+    ageMin: json['age_min'] == null ? null : asInt(json['age_min']),
+    ageMax: json['age_max'] == null ? null : asInt(json['age_max']),
+    incentiveMax: json['incentive_max'] == null
+        ? null
+        : asDouble(json['incentive_max']),
+    incentiveType: json['incentive_type']?.toString(),
+    otherRequirements: json['other_requirements']?.toString(),
+    workDays: asStrings(json['work_days']),
+    interviewDays: asStrings(json['interview_days']),
+    interviewStart: json['interview_start']?.toString(),
+    interviewEnd: json['interview_end']?.toString(),
+    interviewAddress: json['interview_address']?.toString(),
+    workerFeePurpose: json['worker_fee_purpose']?.toString(),
+    hiringUrgency: '${json['hiring_urgency'] ?? 'can_wait'}',
+    titleLocked: json['title_locked'] == true,
   );
   final int id, vacancies, experienceMin;
   final int? experienceMax;
@@ -329,6 +380,16 @@ class EmployerJob {
   final bool aiShortlistEnabled, aiCallEnabled;
   final Json stats, boost;
   final Json? moderation;
+  final String jobType, reach, hiringUrgency;
+  final String? education, english, incentiveType, otherRequirements;
+  final List<String> languages, assets, workDays, interviewDays;
+  final int? ageMin, ageMax;
+  final double? incentiveMax;
+  final bool relocationAllowed, titleLocked;
+  final String? interviewStart,
+      interviewEnd,
+      interviewAddress,
+      workerFeePurpose;
 }
 
 class WorkerProfile {

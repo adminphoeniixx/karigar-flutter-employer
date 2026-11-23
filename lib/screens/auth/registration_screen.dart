@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:employer_kariger_app/core/analytics/meta_analytics.dart';
 import 'package:flutter/material.dart' hide Text;
+import 'package:flutter/services.dart';
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -9,6 +10,7 @@ import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/widgets/searchable_option_sheet.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/dashboard/main_shell.dart';
+import 'package:employer_kariger_app/screens/profile/kyc_screen.dart';
 import 'package:employer_kariger_app/widgets/location_map.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
@@ -29,20 +31,38 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final nameController = TextEditingController();
   final companyController = TextEditingController();
   final addressController = TextEditingController();
+  final areaController = TextEditingController();
   final gstinController = TextEditingController();
+  final panController = TextEditingController();
+  final gstinFocusNode = FocusNode();
+  final industryOtherController = TextEditingController();
+  final otherSkillController = TextEditingController();
   String? industry;
+  String? hiringFrequency;
   String? state;
   String? city;
   LatLng? selectedLocation;
   bool loading = false;
+  bool finishingVerification = false;
   bool locating = false;
   bool referenceLoading = false;
   bool _loadedReference = false;
   List<String> setupErrors = const [];
+  Timer? _setupErrorTimer;
+  String? gstinError;
   List<String> industries = const [];
   List<String> states = const [];
   List<String> cities = const [];
   List<String> availableTrades = trades;
+  Map<String, List<String>> hiringSkills = const {};
+  List<Map<String, dynamic>> individualWorkTypes = const [];
+  // This remains dynamic so hot reload can retain the previous List<String>
+  // state while newer API responses provide key/label objects.
+  List<dynamic> hiringFrequencies = const [
+    {'value': 'one_time', 'label': 'One-time work'},
+    {'value': 'occasional', 'label': 'Occasional'},
+    {'value': 'regular', 'label': 'Regular / Monthly'},
+  ];
   List<String> hiringAsOptions = const ['business', 'contractor', 'individual'];
   List<String> companySizes = const [
     '1\u201310',
@@ -108,6 +128,39 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               .where((e) => e.isNotEmpty),
         );
         if (categories.isNotEmpty) availableTrades = categories;
+        individualWorkTypes =
+            (response['individual_work_types'] as List? ?? const [])
+                .whereType<Map>()
+                .map((item) => Map<String, dynamic>.from(item))
+                .toList();
+        final rawSkills = response['hiring_skills'] as Map? ?? const {};
+        hiringSkills = rawSkills.map(
+          (key, value) => MapEntry(
+            '$key',
+            List<String>.from(
+              (value as List? ?? const []).map((item) => '$item'),
+            ),
+          ),
+        );
+        final frequencies =
+            (response['hiring_frequencies'] as List? ?? const [])
+                .map((item) {
+                  if (item is Map) {
+                    final value =
+                        '${item['key'] ?? item['value'] ?? item['id'] ?? ''}';
+                    final label = '${item['label'] ?? item['name'] ?? value}';
+                    return value.isEmpty
+                        ? null
+                        : {'value': value, 'label': label};
+                  }
+                  final value = '$item';
+                  return value.isEmpty
+                      ? null
+                      : {'value': value, 'label': _frequencyLabel(value)};
+                })
+                .whereType<Map<String, String>>()
+                .toList();
+        if (frequencies.isNotEmpty) hiringFrequencies = frequencies;
         final remoteHiringAs = List<String>.from(
           (response['hiring_as'] as List? ?? const []).map((e) => '$e'),
         );
@@ -134,6 +187,66 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     }
   }
 
+  void _selectIndustry(String value) {
+    setState(() {
+      industry = value;
+      if (value != 'Other') industryOtherController.clear();
+      availableTrades = _skillsForIndustry(value);
+      selectedTrades.clear();
+    });
+    _refreshSetupErrors();
+  }
+
+  List<String> _skillsForIndustry(String value) {
+    final mapped = hiringSkills[value];
+    if (mapped != null) return mapped;
+    final workType = individualWorkTypes
+        .cast<Map<String, dynamic>?>()
+        .firstWhere(
+          (item) => '${item?['name'] ?? item?['label'] ?? ''}' == value,
+          orElse: () => null,
+        );
+    return workType == null
+        ? const []
+        : (workType['skills'] as List? ?? const [])
+              .map((skill) => '$skill')
+              .where((skill) => skill.isNotEmpty)
+              .toList();
+  }
+
+  String _frequencyLabel(String value) => switch (value) {
+    'one_time' => 'One-time work',
+    'occasional' => 'Occasional',
+    'regular' => 'Regular / Monthly',
+    _ => value,
+  };
+
+  Map<String, String>? _frequencyOption(dynamic item) {
+    if (item is Map) {
+      final value = '${item['value'] ?? item['key'] ?? item['id'] ?? ''}';
+      if (value.isEmpty) return null;
+      return {
+        'value': value,
+        'label': '${item['label'] ?? item['name'] ?? value}',
+      };
+    }
+    final value = '$item';
+    // A running hot-reloaded screen may still hold values that the previous
+    // implementation converted from an API object into this Dart map string.
+    final legacy = RegExp(
+      r'^\{\s*(?:key|value)\s*:\s*([^,}]+),\s*label\s*:\s*([^}]+)\s*\}$',
+    ).firstMatch(value);
+    if (legacy != null) {
+      return {
+        'value': legacy.group(1)!.trim(),
+        'label': legacy.group(2)!.trim(),
+      };
+    }
+    return value.isEmpty
+        ? null
+        : {'value': value, 'label': _frequencyLabel(value)};
+  }
+
   Future<void> _loadCities(String selectedState) async {
     setState(() {
       state = selectedState;
@@ -143,7 +256,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     });
     try {
       final result = await AppScope.of(context).api.cities(selectedState);
-      if (mounted) setState(() => cities = result);
+      if (mounted) {
+        setState(() => cities = result);
+        _refreshSetupErrors();
+      }
     } catch (_) {
       _message('Could not load cities. Please try again.');
     } finally {
@@ -192,13 +308,71 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         if (detectedCity != null && detectedCity.isNotEmpty) {
           city = detectedCity;
         }
+        final area = place?.subLocality?.trim() ?? place?.thoroughfare?.trim();
+        if (area != null && area.isNotEmpty) areaController.text = area;
       });
+      _refreshSetupErrors();
     } catch (_) {
       if (mounted) {
         _message('Unable to detect your location. Please try again.');
       }
     } finally {
       if (mounted) setState(() => locating = false);
+    }
+  }
+
+  Future<void> _pinFromEnteredLocation() async {
+    final query = [
+      areaController.text.trim(),
+      ?city,
+      ?state,
+      'India',
+    ].whereType<String>().where((part) => part.isNotEmpty).join(', ');
+    if (query.isEmpty) return;
+    try {
+      final places = await locationFromAddress(query);
+      if (!mounted || places.isEmpty) return;
+      setState(
+        () => selectedLocation = LatLng(
+          places.first.latitude,
+          places.first.longitude,
+        ),
+      );
+    } catch (_) {
+      // Typing a location must remain possible when device geocoding is offline.
+    }
+  }
+
+  Future<void> _syncLocationFromMap(LatLng point) async {
+    setState(() => selectedLocation = point);
+    try {
+      final places = await placemarkFromCoordinates(
+        point.latitude,
+        point.longitude,
+      );
+      if (!mounted || places.isEmpty) return;
+      final place = places.first;
+      final detectedState = place.administrativeArea?.trim();
+      final detectedCity =
+          (place.locality?.trim().isNotEmpty == true
+                  ? place.locality
+                  : place.subAdministrativeArea)
+              ?.trim();
+      if (detectedState != null &&
+          detectedState.isNotEmpty &&
+          state != detectedState) {
+        await _loadCities(detectedState);
+      }
+      if (!mounted) return;
+      setState(() {
+        if (detectedCity != null && detectedCity.isNotEmpty)
+          city = detectedCity;
+        final area = place.subLocality?.trim() ?? place.thoroughfare?.trim();
+        if (area != null && area.isNotEmpty) areaController.text = area;
+      });
+      _refreshSetupErrors();
+    } catch (_) {
+      // Coordinates remain selected even if reverse geocoding is unavailable.
     }
   }
 
@@ -229,8 +403,14 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       error = 'Enter your business or company name.';
     } else if (step == 1 && industry == null) {
       error = 'Select an industry.';
+    } else if (step == 1 &&
+        hiringAs == 'individual' &&
+        hiringFrequency == null) {
+      error = 'Choose how often you hire.';
     } else if (step == 2 && (state == null || city == null)) {
       error = 'Select your state and city.';
+    } else if (step == 2 && areaController.text.trim().isEmpty) {
+      error = 'Enter your area or locality.';
     } else if (step == 3 && selectedTrades.isEmpty) {
       error = 'Select at least one karigar category.';
     }
@@ -252,6 +432,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (industry == null || industry!.trim().isEmpty) {
       missing.add(const _SetupError(1, 'Choose your industry.'));
     }
+    if (hiringAs == 'individual' && hiringFrequency == null) {
+      missing.add(const _SetupError(1, 'Choose how often you hire.'));
+    }
     if (selectedTrades.isEmpty) {
       missing.add(
         const _SetupError(3, 'Pick at least one kind of karigar you hire.'),
@@ -263,27 +446,105 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (city == null || city!.trim().isEmpty) {
       missing.add(const _SetupError(2, 'Choose your city.'));
     }
+    if (areaController.text.trim().isEmpty) {
+      missing.add(const _SetupError(2, 'Enter your area or locality.'));
+    }
     return missing;
   }
 
-  Future<void> _saveAndFinish({required bool finish}) async {
+  void _showSetupErrors(List<String> errors) {
+    _setupErrorTimer?.cancel();
+    setState(() => setupErrors = errors);
+    if (errors.isNotEmpty) {
+      _setupErrorTimer = Timer(const Duration(seconds: 6), () {
+        if (mounted) setState(() => setupErrors = const []);
+      });
+    }
+  }
+
+  void _refreshSetupErrors() {
+    if (setupErrors.isEmpty) return;
+    final missing = _missingFinishFields().map((item) => item.message).toList();
+    _showSetupErrors(missing);
+  }
+
+  String _normalizedTaxId(String value) =>
+      value.toUpperCase().replaceAll(RegExp(r'[\s.\-]'), '');
+
+  String? _gstinProblem() {
+    final gst = _normalizedTaxId(gstinController.text);
+    if (gst.isEmpty) return 'Enter your GST number to verify your business.';
+    if (gst.length != 15) {
+      return 'A GST number has 15 characters, like 22ABCDE1234F1ZA.';
+    }
+    if (!RegExp(
+      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$',
+    ).hasMatch(gst)) {
+      return 'Enter the GST number in the format 22ABCDE1234F1ZA.';
+    }
+    final stateCode = int.parse(gst.substring(0, 2));
+    if (!((stateCode >= 1 &&
+            stateCode <= 38 &&
+            stateCode != 25 &&
+            stateCode != 28) ||
+        stateCode == 97)) {
+      return 'A GST number starts with a state code (01–38). Check the first two digits.';
+    }
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    var sum = 0;
+    for (var index = 0; index < 14; index++) {
+      final value = chars.indexOf(gst[index]) * (index.isEven ? 1 : 2);
+      sum += value ~/ 36 + value % 36;
+    }
+    if (gst[14] != chars[(36 - sum % 36) % 36]) {
+      return 'This GST number is not valid. Check it for a typing mistake.';
+    }
+    final pan = _normalizedTaxId(panController.text);
+    if (pan.length == 10 && gst.substring(2, 12) != pan) {
+      return 'This GSTIN does not belong to the PAN given above.';
+    }
+    return null;
+  }
+
+  Future<void> _saveAndFinish({
+    required bool finish,
+    bool openKyc = false,
+  }) async {
     if (loading) return;
     if (finish) {
-      final missing = _missingFinishFields();
-      if (missing.isNotEmpty) {
+      final gstError = _gstinProblem();
+      if (gstError != null) {
         setState(() {
-          setupErrors = missing.map((item) => item.message).toList();
-          step = missing.first.step;
+          gstinError = gstError;
+          step = 4;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) gstinFocusNode.requestFocus();
         });
         return;
       }
+      if (gstinError != null) setState(() => gstinError = null);
+      final missing = _missingFinishFields();
+      if (missing.isNotEmpty) {
+        setState(() => step = missing.first.step);
+        _showSetupErrors(missing.map((item) => item.message).toList());
+        return;
+      }
     }
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+      finishingVerification = finish;
+    });
     final success = await AppScope.of(context).profile.save({
       'name': nameController.text.trim(),
       'company_name': companyController.text.trim(),
       'hiring_as': hiringAs,
       'industry': industry,
+      if (hiringAs == 'individual' &&
+          industry == 'Other' &&
+          industryOtherController.text.trim().isNotEmpty)
+        'industry_other': industryOtherController.text.trim(),
+      if (hiringAs == 'individual') 'hiring_frequency': hiringFrequency,
       'company_size': companySize,
       'hiring_categories': selectedTrades.toList(),
       'state': state,
@@ -291,22 +552,39 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       if (selectedLocation != null) 'latitude': selectedLocation!.latitude,
       if (selectedLocation != null) 'longitude': selectedLocation!.longitude,
       if (finish) 'finish': true,
-      if (addressController.text.trim().isNotEmpty)
-        'address': addressController.text.trim(),
-      if (gstinController.text.trim().isNotEmpty)
-        'gstin': gstinController.text.trim().toUpperCase(),
+      'address': [
+        'Area: ${areaController.text.trim()}',
+        if (addressController.text.trim().isNotEmpty)
+          addressController.text.trim(),
+      ].join(', '),
+      if (finish && gstinController.text.trim().isNotEmpty)
+        'gstin': _normalizedTaxId(gstinController.text),
     });
     if (!mounted) return;
-    setState(() => loading = false);
+    setState(() {
+      loading = false;
+      finishingVerification = false;
+    });
     if (!success) {
       final profile = AppScope.of(context).profile;
+      final gstErrors = profile.validationErrors['gstin'];
+      if (gstErrors is List && gstErrors.isNotEmpty) {
+        setState(() {
+          gstinError = '${gstErrors.first}';
+          step = 4;
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) gstinFocusNode.requestFocus();
+        });
+        return;
+      }
       final errors = profile.validationErrors.values
           .expand((value) => value is List ? value : [value])
           .map((value) => '$value')
           .where((value) => value.isNotEmpty)
           .toList();
-      setState(
-        () => setupErrors = errors.isEmpty
+      _showSetupErrors(
+        errors.isEmpty
             ? [profile.error ?? 'Could not save the profile.']
             : errors,
       );
@@ -317,6 +595,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
     unawaited(MetaAnalytics.instance.registrationCompleted());
+    if (openKyc) {
+      await Navigator.of(
+        context,
+      ).push(MaterialPageRoute(builder: (_) => const KycScreen()));
+    }
+    if (!mounted) return;
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const MainShell()),
@@ -324,14 +608,20 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     );
   }
 
-  void _message(String value) => setState(() => setupErrors = [value]);
+  void _message(String value) => _showSetupErrors([value]);
 
   @override
   void dispose() {
+    _setupErrorTimer?.cancel();
     nameController.dispose();
     companyController.dispose();
     addressController.dispose();
+    areaController.dispose();
     gstinController.dispose();
+    panController.dispose();
+    gstinFocusNode.dispose();
+    industryOtherController.dispose();
+    otherSkillController.dispose();
     super.dispose();
   }
 
@@ -376,7 +666,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           if (setupErrors.isNotEmpty)
             _SetupErrorSummary(
               errors: setupErrors,
-              onDismiss: () => setState(() => setupErrors = const []),
+              onDismiss: () => _showSetupErrors(const []),
             ),
           Expanded(
             child: ListView(
@@ -409,7 +699,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     (item) => _SelectChip(
                       text: _hiringAsLabel(item),
                       selected: hiringAs == item,
-                      onTap: () => setState(() => hiringAs = item),
+                      onTap: () {
+                        setState(() => hiringAs = item);
+                        _refreshSetupErrors();
+                      },
                     ),
                   )
                   .toList(),
@@ -417,6 +710,73 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           ],
         );
       case 1:
+        if (hiringAs == 'individual') {
+          return _section(
+            title: 'Tell us about your work',
+            subtitle: 'This helps us show you the right workers.',
+            children: [
+              const _FieldLabel('Type of work'),
+              ...individualWorkTypes.map((item) {
+                final name = '${item['name'] ?? item['label'] ?? ''}';
+                final skills = (item['skills'] as List? ?? const []).join(', ');
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _SelectChip(
+                    text: skills.isEmpty ? name : '$name ($skills)',
+                    selected: industry == name,
+                    onTap: () => _selectIndustry(name),
+                  ),
+                );
+              }),
+              if (individualWorkTypes.isEmpty)
+                ...[
+                  'Home Repair & Maintenance',
+                  'Construction & Renovation',
+                  'Household & Domestic Help',
+                  'Event & Personal Work',
+                  'Other',
+                ].map(
+                  (name) => Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: _SelectChip(
+                      text: name,
+                      selected: industry == name,
+                      onTap: () => _selectIndustry(name),
+                    ),
+                  ),
+                ),
+              if (industry == 'Other') ...[
+                const SizedBox(height: 8),
+                const _FieldLabel('Specify work type (optional)'),
+                _Input(
+                  hint: 'e.g. Pest control',
+                  controller: industryOtherController,
+                  maxLength: 100,
+                ),
+              ],
+              const SizedBox(height: 16),
+              const _FieldLabel('How often do you hire?'),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: hiringFrequencies
+                    .map(_frequencyOption)
+                    .whereType<Map<String, String>>()
+                    .map(
+                      (item) => _SelectChip(
+                        text: item['label']!,
+                        selected: hiringFrequency == item['value'],
+                        onTap: () {
+                          setState(() => hiringFrequency = item['value']);
+                          _refreshSetupErrors();
+                        },
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          );
+        }
         return _section(
           title: 'Tell us about your business',
           subtitle: 'This appears on your public employer profile.',
@@ -435,7 +795,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               onTap: () => _choose(
                 title: 'Select industry',
                 values: industries,
-                onSelected: (value) => setState(() => industry = value),
+                onSelected: _selectIndustry,
               ),
             ),
             const SizedBox(height: 16),
@@ -448,7 +808,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     (item) => _SelectChip(
                       text: item,
                       selected: companySize == item,
-                      onTap: () => setState(() => companySize = item),
+                      onTap: () {
+                        setState(() => companySize = item);
+                        _refreshSetupErrors();
+                      },
                     ),
                   )
                   .toList(),
@@ -510,11 +873,23 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   : () => _choose(
                       title: 'Select city',
                       values: cities,
-                      onSelected: (value) => setState(() => city = value),
+                      onSelected: (value) {
+                        setState(() => city = value);
+                        _refreshSetupErrors();
+                        unawaited(_pinFromEnteredLocation());
+                      },
                     ),
             ),
             const SizedBox(height: 16),
-            const _FieldLabel('Address (optional)'),
+            const _FieldLabel('Area / locality'),
+            _Input(
+              hint: 'e.g. Sector 45, Andheri West',
+              controller: areaController,
+              onChanged: (_) => _refreshSetupErrors(),
+              onSubmitted: (_) => _pinFromEnteredLocation(),
+            ),
+            const SizedBox(height: 16),
+            const _FieldLabel('Address / landmark (optional)'),
             _Input(hint: 'Work address', controller: addressController),
             const SizedBox(height: 16),
             const _FieldLabel('Pin your work location'),
@@ -525,7 +900,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                 initialLocation:
                     selectedLocation ?? const LatLng(13.0827, 80.2707),
                 hasSelection: selectedLocation != null,
-                onLocationChanged: (point) => selectedLocation = point,
+                onLocationChanged: (point) =>
+                    unawaited(_syncLocationFromMap(point)),
               ),
             ),
           ],
@@ -534,7 +910,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         return _section(
           title: 'What kind of karigars do you hire?',
           subtitle:
-              "Pick the trades you usually need. We'll suggest matching karigars. Choose all that apply.",
+              'Select the skills you usually hire for. You can choose multiple.',
           children: [
             Wrap(
               spacing: 8,
@@ -544,21 +920,103 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     (item) => _SelectChip(
                       text: item,
                       selected: selectedTrades.contains(item),
-                      onTap: () => setState(() {
-                        selectedTrades.contains(item)
-                            ? selectedTrades.remove(item)
-                            : selectedTrades.add(item);
-                      }),
+                      onTap: () {
+                        setState(() {
+                          selectedTrades.contains(item)
+                              ? selectedTrades.remove(item)
+                              : selectedTrades.add(item);
+                        });
+                        _refreshSetupErrors();
+                      },
                     ),
                   )
                   .toList(),
             ),
+            if (availableTrades.isEmpty) ...[
+              const SizedBox(height: 10),
+              const Text(
+                'No suggested skills are available for this work type. Add the skills you need below.',
+                style: TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+            ],
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              onPressed: () async {
+                final value = await showDialog<String>(
+                  context: context,
+                  builder: (context) {
+                    final controller = TextEditingController();
+                    return AlertDialog(
+                      title: const Text('Add a skill'),
+                      content: TextField(
+                        controller: controller,
+                        maxLength: 100,
+                        decoration: const InputDecoration(
+                          hintText: 'e.g. Water tank cleaning',
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          onPressed: () =>
+                              Navigator.pop(context, controller.text.trim()),
+                          child: const Text('Add'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+                if (value != null && value.isNotEmpty)
+                  setState(() {
+                    availableTrades = [...availableTrades, value];
+                    selectedTrades.add(value);
+                  });
+              },
+              icon: const Icon(LucideIcons.plus, size: 17),
+              label: const Text('Other'),
+            ),
           ],
         );
       default:
+        if (hiringAs == 'individual') {
+          return _section(
+            title: 'Verify your identity',
+            titleTrailing: const _OptionalPill(),
+            subtitle:
+                'Add personal and residence proof to build trust with workers. You can also do this later.',
+            children: [
+              _VerificationOption(
+                icon: LucideIcons.idCard,
+                title: 'Personal proof',
+                subtitle: 'Aadhaar or another identity document',
+              ),
+              const SizedBox(height: 10),
+              _VerificationOption(
+                icon: LucideIcons.house,
+                title: 'Residence proof',
+                subtitle: 'A document showing your current address',
+              ),
+              const SizedBox(height: 14),
+              OutlinedButton.icon(
+                onPressed: loading
+                    ? null
+                    : () => _saveAndFinish(finish: true, openKyc: true),
+                icon: const Icon(LucideIcons.upload, size: 17),
+                label: const Text('Add proofs now'),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Proof requirements are loaded securely from the verification API.',
+                style: TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+            ],
+          );
+        }
         return _section(
           title: 'Verify your business',
-          titleTrailing: const _OptionalPill(),
           subtitle:
               'Add GST / PAN to get a Verified Employer badge — verified employers get 3x more applications and rank higher. You can skip and do this later.',
           subtitleWidget: const Text.rich(
@@ -578,16 +1036,29 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
             style: TextStyle(color: AppColors.muted, fontSize: 14, height: 1.5),
           ),
           children: [
-            const _FieldLabel('GST number (optional)'),
+            const _FieldLabel('GST number'),
             _Input(
-              hint: '22ABCDE1234F1Z5',
+              hint: '22ABCDE1234F1ZA',
               controller: gstinController,
-              maxLength: 15,
+              focusNode: gstinFocusNode,
+              inputFormatters: [_TaxIdFormatter(maxLength: 15)],
               capitalLetters: true,
+              errorText: gstinError,
+              onChanged: (_) {
+                // Once an invalid GSTIN is corrected, remove its old error
+                // without making the employer submit the form again.
+                if (gstinError == null) return;
+                setState(() => gstinError = _gstinProblem());
+              },
             ),
             const SizedBox(height: 16),
             const _FieldLabel('Business PAN'),
-            const _Input(hint: 'Submit documents later from KYC screen'),
+            _Input(
+              hint: 'ABCDE1234F (optional)',
+              controller: panController,
+              inputFormatters: [_TaxIdFormatter(maxLength: 10)],
+              capitalLetters: true,
+            ),
             const SizedBox(height: 16),
             CustomPaint(
               painter: _DashedBorderPainter(),
@@ -712,7 +1183,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                   onPressed: loading
                       ? null
                       : () => _saveAndFinish(finish: true),
-                  child: Text(loading ? 'Saving...' : 'Finish setup'),
+                  child: Text(
+                    finishingVerification ? 'Verifying...' : 'Verify & Finish',
+                  ),
                 ),
               ),
             ],
@@ -827,24 +1300,65 @@ class _Input extends StatelessWidget {
     this.controller,
     this.maxLength,
     this.capitalLetters = false,
+    this.onSubmitted,
+    this.onChanged,
+    this.focusNode,
+    this.inputFormatters,
+    this.errorText,
   });
   final String hint;
   final TextEditingController? controller;
   final int? maxLength;
   final bool capitalLetters;
+  final ValueChanged<String>? onSubmitted;
+  final ValueChanged<String>? onChanged;
+  final FocusNode? focusNode;
+  final List<TextInputFormatter>? inputFormatters;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) => SizedBox(
-    height: 46,
+    height: errorText == null ? 46 : 70,
     child: TextField(
       controller: controller,
+      focusNode: focusNode,
       maxLength: maxLength,
+      inputFormatters: inputFormatters,
       textCapitalization: capitalLetters
           ? TextCapitalization.characters
           : TextCapitalization.none,
-      decoration: InputDecoration(hintText: hint, counterText: ''),
+      onSubmitted: onSubmitted,
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        hintText: hint,
+        counterText: '',
+        errorText: errorText,
+      ),
     ),
   );
+}
+
+class _TaxIdFormatter extends TextInputFormatter {
+  const _TaxIdFormatter({required this.maxLength});
+  final int maxLength;
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.toUpperCase().replaceAll(
+      RegExp(r'[^A-Z0-9]'),
+      '',
+    );
+    final limited = text.length > maxLength
+        ? text.substring(0, maxLength)
+        : text;
+    return TextEditingValue(
+      text: limited,
+      selection: TextSelection.collapsed(offset: limited.length),
+    );
+  }
 }
 
 class _SelectBox extends StatelessWidget {
@@ -922,6 +1436,46 @@ class _OptionalPill extends StatelessWidget {
     child: const Text(
       'Optional',
       style: TextStyle(fontSize: 11, color: AppColors.muted),
+    ),
+  );
+}
+
+class _VerificationOption extends StatelessWidget {
+  const _VerificationOption({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title, subtitle;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(13),
+    decoration: BoxDecoration(
+      color: AppColors.card,
+      border: Border.all(color: AppColors.line),
+      borderRadius: BorderRadius.circular(12),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 20),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: const TextStyle(fontSize: 12, color: AppColors.muted),
+              ),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }

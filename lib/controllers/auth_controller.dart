@@ -35,8 +35,13 @@ class AuthController extends BaseController {
   Future<void> logout() async {
     await run(api.logout);
     await api.client.setToken(null);
-    user = null;
+    clearSession();
+  }
 
+  /// Clears local authentication after the server has already deleted the
+  /// account. This deliberately does not call the logout endpoint.
+  void clearSession() {
+    user = null;
     notifyListeners();
   }
 }

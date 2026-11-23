@@ -1,14 +1,14 @@
 class ApiConstants {
   const ApiConstants._();
 
-  static const baseUrl =
-      'https://superkarigar.com/api/v1';
+  static const baseUrl = 'https://superkarigar.com/api/v1';
 
   static const otpSend = '/auth/otp/send';
   static const otpVerify = '/auth/otp/verify';
   static const me = '/auth/me';
   static const logout = '/auth/logout';
   static const account = '/account';
+  static const accountDeletion = '/account/deletion';
   static const locale = '/locale';
   static const reference = '/reference';
   static const cities = '/reference/cities';

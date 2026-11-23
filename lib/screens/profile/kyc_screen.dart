@@ -70,7 +70,11 @@ class _KycScreenState extends State<KycScreen> {
       final business = response['business'] is Map
           ? Map<String, dynamic>.from(response['business'] as Map)
           : const {};
-      type = business['business_type']?.toString();
+      type =
+          business['business_type']?.toString() ??
+          (AppScope.of(context).profile.profile?.hiringAs == 'individual'
+              ? 'individual'
+              : null);
       legalName.text = '${business['legal_name'] ?? ''}';
       address.text = '${business['registered_address'] ?? ''}';
       _syncDocuments();
@@ -153,16 +157,24 @@ class _KycScreenState extends State<KycScreen> {
         savedDocuments,
         (document) => '${document['type']}' == key,
       );
-      if (form.number.text.trim().isEmpty) {
+      if (key == 'address_proof') {
+        if (form.proofType == null) {
+          _message('Choose the proof you are sending for residence proof.');
+          return;
+        }
+        fields['address_proof_type'] = form.proofType!;
+      } else if (form.number.text.trim().isEmpty) {
         _message('Enter ${docs[key]?['label'] ?? key} number.');
         return;
       }
-      fields['${docs[key]?['number_field'] ?? '${key}_number'}'] = form
-          .number
-          .text
-          .trim()
-          .toUpperCase()
-          .replaceAll(' ', '');
+      if (key != 'address_proof') {
+        fields['${docs[key]?['number_field'] ?? '${key}_number'}'] = form
+            .number
+            .text
+            .trim()
+            .toUpperCase()
+            .replaceAll(' ', '');
+      }
       if (form.file != null) {
         files['${key}_doc'] = form.file!;
       } else if (_needsPhoto(key, saved)) {
@@ -335,7 +347,7 @@ class _KycScreenState extends State<KycScreen> {
                 controller: legalName,
                 decoration: InputDecoration(
                   labelText: type == 'individual'
-                      ? 'Full name (as on PAN)'
+                      ? 'Full name (as on Aadhaar)'
                       : 'Legal name',
                 ),
               ),
@@ -364,7 +376,7 @@ class _KycScreenState extends State<KycScreen> {
                 );
                 return _DocumentCard(
                   label: '${docs[e.key]?['label'] ?? e.key}',
-                  config: docs[e.key] ?? const {},
+                  config: {...?docs[e.key], 'key': e.key},
                   form: e.value,
                   pick: () => _pick(e.value),
                   photoRequired: _needsPhoto(e.key, saved),
@@ -435,6 +447,7 @@ class _DocumentForm {
   final number = TextEditingController();
   final numberFocus = FocusNode();
   File? file;
+  String? proofType;
   void dispose() {
     number.dispose();
     numberFocus.dispose();
@@ -484,15 +497,34 @@ class _DocumentCard extends StatelessWidget {
                   ),
                 ),
               ),
-            TextField(
-              controller: form.number,
-              focusNode: form.numberFocus,
-              decoration: InputDecoration(
-                labelText: '$label number *',
-                hintText: '${config['hint'] ?? ''}',
-                errorText: errorText,
+            if ('${config['key'] ?? ''}' == 'address_proof') ...[
+              DropdownButtonFormField<String>(
+                value: form.proofType,
+                decoration: const InputDecoration(
+                  labelText: 'Proof you are sending',
+                ),
+                items: (config['proof_types'] as List? ?? const [])
+                    .whereType<Map>()
+                    .map(
+                      (item) => DropdownMenuItem(
+                        value: '${item['key']}',
+                        child: Text('${item['label'] ?? item['key']}'),
+                      ),
+                    )
+                    .toList(),
+                onChanged: (value) => form.proofType = value,
               ),
-            ),
+              const SizedBox(height: 8),
+            ] else
+              TextField(
+                controller: form.number,
+                focusNode: form.numberFocus,
+                decoration: InputDecoration(
+                  labelText: '$label number *',
+                  hintText: '${config['hint'] ?? ''}',
+                  errorText: errorText,
+                ),
+              ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: pick,

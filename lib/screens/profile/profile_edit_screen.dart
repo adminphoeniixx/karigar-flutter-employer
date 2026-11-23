@@ -2,9 +2,11 @@ import 'dart:io';
 
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart' hide Text;
+import 'package:flutter/services.dart';
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:geocoding/geocoding.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
@@ -19,10 +21,31 @@ class ProfileEditScreen extends StatefulWidget {
   State<ProfileEditScreen> createState() => _ProfileEditScreenState();
 }
 
+class _GstinFormatter extends TextInputFormatter {
+  const _GstinFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final text = newValue.text.toUpperCase().replaceAll(
+      RegExp(r'[^A-Z0-9]'),
+      '',
+    );
+    final limited = text.length > 15 ? text.substring(0, 15) : text;
+    return TextEditingValue(
+      text: limited,
+      selection: TextSelection.collapsed(offset: limited.length),
+    );
+  }
+}
+
 class _ProfileEditScreenState extends State<ProfileEditScreen> {
   LatLng _siteLocation = const LatLng(13.0827, 80.2707);
   final emailController = TextEditingController();
   final gstinController = TextEditingController();
+  final gstinFocusNode = FocusNode();
   final companyController = TextEditingController();
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
@@ -32,9 +55,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final cityController = TextEditingController();
   bool loading = true;
   bool saving = false;
+  String? gstinError;
   bool uploadingLogo = false;
   bool _loaded = false;
   List<String> hiringCategories = const [];
+  List<String> states = const [];
+  List<String> cities = const [];
   final selectedHiringCategories = <String>{};
 
   @override
@@ -83,16 +109,97 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           )
           .where((item) => item.isNotEmpty)
           .toList();
-      setState(
-        () => hiringCategories = {
+      final referenceStates = (reference['states'] as List? ?? const [])
+          .map(
+            (item) => item is Map
+                ? '${item['name'] ?? item['label'] ?? ''}'
+                : '$item',
+          )
+          .where((item) => item.isNotEmpty)
+          .toList();
+      setState(() {
+        hiringCategories = {
           ...categories,
           ...selectedHiringCategories,
-        }.toList(),
-      );
+        }.toList();
+        states = {
+          ...referenceStates,
+          stateController.text,
+        }.where((item) => item.isNotEmpty).toList();
+      });
+      if (stateController.text.isNotEmpty)
+        await _loadCities(stateController.text, keepCity: true);
     } catch (_) {
       // Keep the saved categories visible if reference data is temporarily unavailable.
     }
     setState(() => loading = false);
+  }
+
+  Future<void> _loadCities(
+    String selectedState, {
+    bool keepCity = false,
+  }) async {
+    setState(() {
+      stateController.text = selectedState;
+      if (!keepCity) cityController.clear();
+      cities = const [];
+    });
+    try {
+      final result = await AppScope.of(context).api.cities(selectedState);
+      if (mounted && stateController.text == selectedState) {
+        setState(
+          () => cities = {
+            ...result,
+            cityController.text,
+          }.where((item) => item.isNotEmpty).toList(),
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _pickState() async {
+    final picked = await showSearchableOptionSheet(
+      context,
+      title: 'Select state',
+      values: states,
+    );
+    if (picked != null && mounted) _loadCities(picked);
+  }
+
+  Future<void> _pickCity() async {
+    if (stateController.text.isEmpty) return;
+    final picked = await showSearchableOptionSheet(
+      context,
+      title: 'Select city',
+      values: cities,
+      citySearch: true,
+      stateName: stateController.text,
+    );
+    if (picked != null && mounted) {
+      setState(() => cityController.text = picked);
+      _pinFromEnteredLocation();
+    }
+  }
+
+  Future<void> _pinFromEnteredLocation() async {
+    final query = [
+      cityController.text.trim(),
+      stateController.text.trim(),
+      'India',
+    ].where((part) => part.isNotEmpty).join(', ');
+    if (query.isEmpty) return;
+    try {
+      final places = await locationFromAddress(query);
+      if (!mounted || places.isEmpty) return;
+      setState(
+        () => _siteLocation = LatLng(
+          places.first.latitude,
+          places.first.longitude,
+        ),
+      );
+    } catch (_) {
+      // The location can still be chosen directly on the map.
+    }
   }
 
   Future<void> _save() async {
@@ -117,6 +224,13 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       );
       return;
     }
+    final gstError = _gstinProblem();
+    if (gstError != null) {
+      setState(() => gstinError = gstError);
+      gstinFocusNode.requestFocus();
+      return;
+    }
+    if (gstinError != null) setState(() => gstinError = null);
     setState(() => saving = true);
     final profile = AppScope.of(context).profile;
     final success = await profile.save({
@@ -125,7 +239,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           : emailController.text.trim(),
       'gstin': gstinController.text.trim().isEmpty
           ? null
-          : gstinController.text.trim().toUpperCase(),
+          : _normalizedGstin(gstinController.text),
       'company_name': companyController.text.trim(),
       'name': nameController.text.trim(),
       'phone': phoneController.text.replaceAll(RegExp(r'\D'), ''),
@@ -147,6 +261,40 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
 
     Navigator.pop(context, true);
+  }
+
+  String _normalizedGstin(String value) =>
+      value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
+
+  String? _gstinProblem() {
+    final gst = _normalizedGstin(gstinController.text);
+    if (gst.isEmpty) return null;
+    if (gst.length != 15) {
+      return 'A GST number has 15 characters, like 22ABCDE1234F1ZA.';
+    }
+    if (!RegExp(
+      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$',
+    ).hasMatch(gst)) {
+      return 'Enter the GST number in the format 22ABCDE1234F1ZA.';
+    }
+    final stateCode = int.parse(gst.substring(0, 2));
+    if (!((stateCode >= 1 &&
+            stateCode <= 38 &&
+            stateCode != 25 &&
+            stateCode != 28) ||
+        stateCode == 97)) {
+      return 'A GST number starts with a state code (01–38). Check the first two digits.';
+    }
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    var sum = 0;
+    for (var index = 0; index < 14; index++) {
+      final value = chars.indexOf(gst[index]) * (index.isEven ? 1 : 2);
+      sum += value ~/ 36 + value % 36;
+    }
+    if (gst[14] != chars[(36 - sum % 36) % 36]) {
+      return 'This GST number is not valid. Check it for a typing mistake.';
+    }
+    return null;
   }
 
   Future<void> _pickLogo() async {
@@ -233,6 +381,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     ]) {
       controller.dispose();
     }
+    gstinFocusNode.dispose();
     super.dispose();
   }
 
@@ -343,9 +492,12 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 ),
                 LabeledField(
                   'GSTIN (optional)',
-                  hint: 'Business GSTIN',
+                  hint: '22ABCDE1234F1ZA',
                   controller: gstinController,
-                  maxLength: 15,
+                  focusNode: gstinFocusNode,
+                  errorText: gstinError,
+                  textCapitalization: TextCapitalization.characters,
+                  inputFormatters: const [_GstinFormatter()],
                 ),
                 LabeledField(
                   'Industry',
@@ -388,18 +540,28 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                 Row(
                   children: [
                     Expanded(
-                      child: LabeledField(
-                        'State',
-                        hint: 'Tamil Nadu',
+                      child: TextField(
                         controller: stateController,
+                        readOnly: true,
+                        onTap: _pickState,
+                        decoration: const InputDecoration(
+                          labelText: 'State',
+                          hintText: 'Select state',
+                          suffixIcon: Icon(Icons.expand_more),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: LabeledField(
-                        'City',
-                        hint: 'Chennai',
+                      child: TextField(
                         controller: cityController,
+                        readOnly: true,
+                        onTap: _pickCity,
+                        decoration: const InputDecoration(
+                          labelText: 'City',
+                          hintText: 'Type a city name',
+                          suffixIcon: Icon(Icons.search),
+                        ),
                       ),
                     ),
                   ],
@@ -413,7 +575,8 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   height: 280,
                   child: LocationMap(
                     initialLocation: _siteLocation,
-                    onLocationChanged: (point) => _siteLocation = point,
+                    onLocationChanged: (point) =>
+                        setState(() => _siteLocation = point),
                   ),
                 ),
                 const SizedBox(height: 6),
