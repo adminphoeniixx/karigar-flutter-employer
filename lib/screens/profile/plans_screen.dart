@@ -12,6 +12,7 @@ import 'package:razorpay_flutter/razorpay_flutter.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
+import 'package:employer_kariger_app/widgets/common.dart';
 import 'package:employer_kariger_app/screens/profile/payment_success_screen.dart';
 
 class PlansScreen extends StatefulWidget {
@@ -28,6 +29,10 @@ class _PlansScreenState extends State<PlansScreen> {
   String? error;
   Map<String, dynamic> unlocks = const {};
   List<Map<String, dynamic>> plans = const [];
+  List<Map<String, dynamic>> aiCallPacks = const [];
+  List<String> aiCallRules = const [];
+  Json? aiCredits;
+  bool canBuyAiCredits = false;
   List<Map<String, dynamic>> currentPlans = const [];
   Json? database;
   Json payment = {};
@@ -37,10 +42,14 @@ class _PlansScreenState extends State<PlansScreen> {
   int? checkoutPlanId;
   bool verifyingPayment = false;
   String? pendingSubscriptionId;
+  String? pendingAiOrderId;
+  int? checkoutAiPackId;
+  late String selectedTab;
 
   @override
   void initState() {
     super.initState();
+    selectedTab = widget.focusDatabase ? 'database' : 'jobs';
     unawaited(
       MetaAnalytics.instance.viewContent('plan_catalog', 'employer_plans'),
     );
@@ -86,7 +95,8 @@ class _PlansScreenState extends State<PlansScreen> {
       error = null;
     });
     try {
-      final response = await AppScope.of(context).api.plans();
+      final api = AppScope.of(context).api;
+      final response = await api.plans();
       if (!mounted) return;
       setState(() {
         unlocks = response['unlocks'] is Map
@@ -102,6 +112,15 @@ class _PlansScreenState extends State<PlansScreen> {
             ? Json.from(response['job_posts'])
             : null;
         billingEmail = response['billing_email']?.toString();
+        aiCredits = response['ai_credits'] is Map
+            ? Json.from(response['ai_credits'])
+            : null;
+        aiCallPacks = _maps(response['ai_call_packs']);
+        aiCallRules = (response['ai_call_rules'] as List? ?? const [])
+            .map((rule) => '$rule')
+            .where((rule) => rule.isNotEmpty)
+            .toList();
+        canBuyAiCredits = response['can_buy_ai_credits'] == true;
         currentPlans = _maps([
           if (response['current'] is Map) response['current'],
           if (response['current_database'] is Map) response['current_database'],
@@ -113,6 +132,10 @@ class _PlansScreenState extends State<PlansScreen> {
             final bDatabase = b['type'] == 'database';
             return aDatabase == bDatabase ? 0 : (aDatabase ? -1 : 1);
           });
+        if (selectedTab == 'database' &&
+            !plans.any((plan) => plan['type'] == 'database')) {
+          selectedTab = 'jobs';
+        }
       });
     } catch (exception) {
       if (mounted) setState(() => error = '$exception');
@@ -230,6 +253,68 @@ class _PlansScreenState extends State<PlansScreen> {
     }
   }
 
+  Future<void> _buyAiCallPack(Map<String, dynamic> pack) async {
+    if (checkingOut ||
+        pendingSubscriptionId != null ||
+        pendingAiOrderId != null) {
+      return;
+    }
+    final packId = (pack['id'] as num?)?.toInt();
+    final checkout = razorpay;
+    if (packId == null || !canBuyAiCredits) return;
+    if (checkout == null) {
+      _checkoutUnavailable();
+      return;
+    }
+    final email = await _invoiceEmail();
+    if (!mounted || email == null) return;
+    try {
+      setState(() {
+        checkingOut = true;
+        checkoutAiPackId = packId;
+      });
+      final order = await AppScope.of(
+        context,
+      ).api.aiCreditsCheckout(packId, email: email);
+      final orderId = order['razorpay_order_id']?.toString();
+      if (orderId == null ||
+          order['razorpay_key'] == null ||
+          order['amount_paise'] == null) {
+        throw const FormatException(
+          'Payment details are missing. Please try again.',
+        );
+      }
+      pendingAiOrderId = orderId;
+      checkout.open({
+        'key': order['razorpay_key'],
+        'order_id': orderId,
+        'amount': order['amount_paise'],
+        'currency': 'INR',
+        'name': 'Karigar',
+        'description': '${pack['name'] ?? 'AI call credits'}',
+        'theme': {'color': '#F97316'},
+        'prefill': {
+          if (email.isNotEmpty) 'email': email,
+          if (_checkoutPhone.isNotEmpty) 'contact': _checkoutPhone,
+        },
+      });
+    } catch (exception) {
+      pendingAiOrderId = null;
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('$exception')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          checkingOut = false;
+          checkoutAiPackId = null;
+        });
+      }
+    }
+  }
+
   String get _checkoutPhone {
     final source =
         AppScope.of(context).profile.profile?.phone ??
@@ -240,7 +325,25 @@ class _PlansScreenState extends State<PlansScreen> {
 
   Future<String?> _invoiceEmail() async {
     final existing = billingEmail?.trim() ?? '';
-    if (existing.isNotEmpty) return existing;
+    if (_isValidInvoiceEmail(existing)) return existing;
+    final savedEmail =
+        AppScope.of(context).profile.profile?.email?.trim() ?? '';
+    if (_isValidInvoiceEmail(savedEmail)) {
+      billingEmail = savedEmail;
+      return savedEmail;
+    }
+    try {
+      final api = AppScope.of(context).api;
+      final profile = await api.profile();
+      if (!mounted) return null;
+      final profileEmail = (profile.email ?? '').trim();
+      if (_isValidInvoiceEmail(profileEmail)) {
+        billingEmail = profileEmail;
+        return profileEmail;
+      }
+    } catch (_) {
+      // Ask for an email if the profile cannot be loaded.
+    }
     final controller = TextEditingController();
     final result = await showDialog<String>(
       context: context,
@@ -282,6 +385,11 @@ class _PlansScreenState extends State<PlansScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => controller.dispose());
     return result;
   }
+
+  bool _isValidInvoiceEmail(String email) =>
+      email.isNotEmpty &&
+      !email.endsWith('@phone.karigar') &&
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
 
   Future<bool> _confirmCheckout(Json response) async {
     final raw = response['amounts'];
@@ -353,6 +461,39 @@ class _PlansScreenState extends State<PlansScreen> {
   Future<void> _paymentSuccess(PaymentSuccessResponse response) async {
     if (!mounted || verifyingPayment) return;
     verifyingPayment = true;
+    final aiOrderId =
+        pendingAiOrderId ?? response.data?['razorpay_order_id']?.toString();
+    if (aiOrderId != null) {
+      try {
+        if (response.paymentId == null || response.signature == null) {
+          throw const FormatException(
+            'Payment details are incomplete. Refresh plans to check payment status.',
+          );
+        }
+        await AppScope.of(context).api.aiCreditsCallback({
+          'razorpay_payment_id': response.paymentId,
+          'razorpay_order_id': aiOrderId,
+          'razorpay_signature': response.signature,
+        });
+        if (!mounted) return;
+        await _load();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('AI call credits added.')),
+          );
+        }
+      } catch (exception) {
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('$exception')));
+        }
+      } finally {
+        verifyingPayment = false;
+        pendingAiOrderId = null;
+      }
+      return;
+    }
     pendingSubscriptionId ??= response.data?['razorpay_subscription_id']
         ?.toString();
     try {
@@ -398,6 +539,7 @@ class _PlansScreenState extends State<PlansScreen> {
       name: 'SuperKarigar.Payment',
     );
     pendingSubscriptionId = null;
+    pendingAiOrderId = null;
     if (mounted) {
       final cancelled = response.code == Razorpay.PAYMENT_CANCELLED;
       final detail =
@@ -458,8 +600,10 @@ class _PlansScreenState extends State<PlansScreen> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(
-                        LucideIcons.walletCards,
+                      Icon(
+                        selectedTab == 'ai_calls'
+                            ? LucideIcons.botMessageSquare
+                            : LucideIcons.walletCards,
                         color: Colors.white,
                         size: 28,
                       ),
@@ -469,10 +613,12 @@ class _PlansScreenState extends State<PlansScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              (database?['title']?.toString() ??
-                                      (unlocks['unmetered'] == true
-                                          ? 'Unlimited unlocks'
-                                          : '${unlocks['plan_remaining'] ?? 0} unlocks'))
+                              (selectedTab == 'ai_calls'
+                                      ? '${aiCredits?['available'] ?? aiCredits?['balance'] ?? 0} AI call credits'
+                                      : database?['title']?.toString() ??
+                                            (unlocks['unmetered'] == true
+                                                ? 'Unlimited unlocks'
+                                                : '${unlocks['plan_remaining'] ?? 0} unlocks'))
                                   .replaceAll('Worker', 'Karigar')
                                   .replaceAll('worker', 'karigar'),
                               style: const TextStyle(
@@ -482,8 +628,10 @@ class _PlansScreenState extends State<PlansScreen> {
                               ),
                             ),
                             Text(
-                              (database?['subtitle']?.toString() ??
-                                      'Choose a plan to unlock karigar contacts')
+                              (selectedTab == 'ai_calls'
+                                      ? 'About ${aiCredits?['minutes'] ?? aiCredits?['available'] ?? 0} minutes of AI calling available'
+                                      : database?['subtitle']?.toString() ??
+                                            'Choose a plan to unlock karigar contacts')
                                   .replaceAll('Worker', 'Karigar')
                                   .replaceAll('worker', 'karigar'),
                               style: const TextStyle(
@@ -512,19 +660,26 @@ class _PlansScreenState extends State<PlansScreen> {
                   ),
                 _ActivePlanBanner(plans: plans, currentPlans: currentPlans),
                 const SizedBox(height: 26),
-                _PlanSection(
-                  title: 'Job plans',
-                  subtitle:
-                      'Post jobs, see applicants and open the Karigar Database.',
-                  plans: plans
-                      .where((plan) => plan['type'] != 'database')
-                      .toList(),
-                  gstPercent: asDouble(payment['gst_percent']),
-                  checkoutPlanId: checkoutPlanId,
-                  onChoose: _subscribe,
+                _CatalogTabs(
+                  selected: selectedTab,
+                  showDatabase: plans.any((plan) => plan['type'] == 'database'),
+                  showAiCalls: aiCallPacks.isNotEmpty,
+                  onChanged: (value) => setState(() => selectedTab = value),
                 ),
-                if (plans.any((plan) => plan['type'] == 'database')) ...[
-                  const SizedBox(height: 28),
+                const SizedBox(height: 20),
+                if (selectedTab == 'jobs')
+                  _PlanSection(
+                    title: 'Job plans',
+                    subtitle:
+                        'Post jobs, see applicants and open the Karigar Database.',
+                    plans: plans
+                        .where((plan) => plan['type'] != 'database')
+                        .toList(),
+                    gstPercent: asDouble(payment['gst_percent']),
+                    checkoutPlanId: checkoutPlanId,
+                    onChoose: _subscribe,
+                  )
+                else if (selectedTab == 'database')
                   _PlanSection(
                     title: 'Database plans',
                     subtitle:
@@ -535,11 +690,230 @@ class _PlansScreenState extends State<PlansScreen> {
                     gstPercent: asDouble(payment['gst_percent']),
                     checkoutPlanId: checkoutPlanId,
                     onChoose: _subscribe,
+                  )
+                else
+                  _AiCallsSection(
+                    credits: aiCredits,
+                    packs: aiCallPacks,
+                    rules: aiCallRules,
+                    canBuy: canBuyAiCredits,
+                    buyingPackId: checkoutAiPackId,
+                    onBuy: _buyAiCallPack,
                   ),
-                ],
               ],
             ),
           ),
+  );
+}
+
+class _CatalogTabs extends StatelessWidget {
+  const _CatalogTabs({
+    required this.selected,
+    required this.showDatabase,
+    required this.showAiCalls,
+    required this.onChanged,
+  });
+  final String selected;
+  final bool showDatabase, showAiCalls;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final tabs = <String, String>{
+      'jobs': 'Job plans',
+      if (showDatabase) 'database': 'Database plans',
+      if (showAiCalls) 'ai_calls': 'AI calls',
+    };
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: tabs.entries
+            .map(
+              (tab) => Expanded(
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => onChanged(tab.key),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: selected == tab.key
+                          ? Theme.of(context).colorScheme.surface
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      tab.value,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: selected == tab.key
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            )
+            .toList(),
+      ),
+    );
+  }
+}
+
+class _AiCallsSection extends StatelessWidget {
+  const _AiCallsSection({
+    required this.credits,
+    required this.packs,
+    required this.rules,
+    required this.canBuy,
+    required this.buyingPackId,
+    required this.onBuy,
+  });
+  final Json? credits;
+  final List<Map<String, dynamic>> packs;
+  final List<String> rules;
+  final bool canBuy;
+  final int? buyingPackId;
+  final ValueChanged<Map<String, dynamic>> onBuy;
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      if (credits != null)
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.brand50,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            '${credits!['available'] ?? credits!['balance'] ?? 0} AI credits · about ${credits!['minutes'] ?? credits!['available'] ?? 0} min of calls',
+            style: const TextStyle(
+              color: AppColors.brandDark,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      if (credits != null) const SizedBox(height: 20),
+      const Text(
+        'AI call packs',
+        style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+      ),
+      const SizedBox(height: 4),
+      Text(
+        'Recharge once for AI calling. Credits never renew automatically.',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+      const SizedBox(height: 16),
+      ...packs.map(
+        (pack) => _AiCallPackCard(
+          pack: pack,
+          canBuy: canBuy,
+          buying: buyingPackId == (pack['id'] as num?)?.toInt(),
+          onBuy: () => onBuy(pack),
+        ),
+      ),
+      if (rules.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        const Text(
+          'How credits work',
+          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 6),
+        ...rules.map(
+          (rule) => Padding(
+            padding: const EdgeInsets.only(bottom: 5),
+            child: Text(
+              '• $rule',
+              style: const TextStyle(color: AppColors.muted),
+            ),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+class _AiCallPackCard extends StatelessWidget {
+  const _AiCallPackCard({
+    required this.pack,
+    required this.canBuy,
+    required this.buying,
+    required this.onBuy,
+  });
+  final Map<String, dynamic> pack;
+  final bool canBuy, buying;
+  final VoidCallback onBuy;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(
+        color: pack['popular'] == true ? AppColors.primary : AppColors.line,
+      ),
+    ),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${pack['name'] ?? 'AI call pack'}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (pack['popular'] == true) const BrandChip('Most popular'),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Text(
+          '${pack['total_credits'] ?? pack['credits'] ?? 0} credits · ≈ ${pack['minutes'] ?? 0} min of calls',
+          style: const TextStyle(color: AppColors.muted),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '₹${asDouble(pack['price_with_gst']).round()} incl. GST',
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: canBuy && !buying ? onBuy : null,
+            child: buying
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : Text(
+                    canBuy
+                        ? 'Buy credits'
+                        : 'Only the account owner can buy credits',
+                  ),
+          ),
+        ),
+      ],
+    ),
   );
 }
 

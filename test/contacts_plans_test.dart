@@ -148,6 +148,40 @@ void main() {
     expect(find.text('Best seller'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('plans shows AI call packs from its own catalog response', (
+    tester,
+  ) async {
+    final api = service(
+      (_) async => jsonResponse({
+        'plans': [],
+        'ai_credits': {'available': 50, 'minutes': 50},
+        'ai_call_packs': [
+          {
+            'id': 9,
+            'type': 'ai_calls',
+            'name': 'Starter',
+            'price_with_gst': 588.82,
+            'total_credits': 40,
+            'minutes': 40,
+            'popular': true,
+          },
+        ],
+        'ai_call_rules': ['1 credit = 1 minute of AI calling.'],
+        'can_buy_ai_credits': true,
+      }),
+    );
+    await tester.pumpWidget(harness(api, const PlansScreen()));
+    await tester.pump(const Duration(milliseconds: 120));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('AI calls'));
+    await tester.pumpAndSettle();
+    expect(find.text('AI call packs'), findsOneWidget);
+    expect(find.text('Starter'), findsOneWidget);
+    expect(find.text('40 credits · ≈ 40 min of calls'), findsOneWidget);
+    expect(find.text('₹589 incl. GST'), findsOneWidget);
+    expect(find.text('Buy credits'), findsOneWidget);
+  });
   testWidgets('plan reminder opens database plans and uses the server title', (
     tester,
   ) async {

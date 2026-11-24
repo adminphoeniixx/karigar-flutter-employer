@@ -30,7 +30,8 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
   Map<String, dynamic> _totals = const {}, _ledgerMeta = const {};
   List<Map<String, dynamic>> _packs = const [], _ledger = const [];
   int _ledgerPage = 1;
-  bool _loadingMore = false;
+  bool _loadingMore = false, _loadingLedger = false;
+  int _ledgerRequest = 0;
   List<String> _rules = const [];
   String? _billingEmail;
 
@@ -79,6 +80,7 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
   Future<void> _load() async {
+    _ledgerRequest++;
     setState(() {
       _loading = true;
       _error = null;
@@ -147,8 +149,55 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
     }
   }
 
+  Future<void> _loadLedger() async {
+    final request = ++_ledgerRequest;
+    setState(() => _loadingLedger = true);
+    try {
+      final history = await AppScope.of(
+        context,
+      ).api.aiCreditsLedger(filter: _filter, page: _ledgerPage);
+      if (!mounted || request != _ledgerRequest) return;
+      final rows = history['data'] ?? history['ledger'];
+      setState(() {
+        _ledger = _maps(rows is Map ? rows['data'] : rows);
+        _ledgerMeta = history['meta'] is Map
+            ? Map<String, dynamic>.from(history['meta'] as Map)
+            : rows is Map && rows['meta'] is Map
+            ? Map<String, dynamic>.from(rows['meta'] as Map)
+            : const {};
+      });
+    } catch (error) {
+      if (mounted && request == _ledgerRequest) _snack('$error');
+    } finally {
+      if (mounted && request == _ledgerRequest) {
+        setState(() => _loadingLedger = false);
+      }
+    }
+  }
+
   Future<String?> _email() async {
-    if ((_billingEmail ?? '').trim().isNotEmpty) return _billingEmail;
+    final catalogEmail = (_billingEmail ?? '').trim();
+    if (_isValidInvoiceEmail(catalogEmail)) return catalogEmail;
+    final savedEmail =
+        AppScope.of(context).profile.profile?.email?.trim() ?? '';
+    if (_isValidInvoiceEmail(savedEmail)) {
+      _billingEmail = savedEmail;
+      return savedEmail;
+    }
+    // The AI catalog does not always carry billing_email. Reuse the employer's
+    // saved email before interrupting a purchase with a manual prompt.
+    try {
+      final api = AppScope.of(context).api;
+      final profile = await api.profile();
+      if (!mounted) return null;
+      final profileEmail = (profile.email ?? '').trim();
+      if (_isValidInvoiceEmail(profileEmail)) {
+        _billingEmail = profileEmail;
+        return profileEmail;
+      }
+    } catch (_) {
+      // Fall through to the invoice email prompt.
+    }
     final controller = TextEditingController();
     final value = await showDialog<String>(
       context: context,
@@ -178,6 +227,11 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
     controller.dispose();
     return value;
   }
+
+  bool _isValidInvoiceEmail(String email) =>
+      email.isNotEmpty &&
+      !email.endsWith('@phone.karigar') &&
+      RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
 
   Future<void> _buy(Map<String, dynamic> pack) async {
     final id = (pack['id'] as num?)?.toInt();
@@ -341,13 +395,18 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
                                 _filter = tab.key;
                                 _ledgerPage = 1;
                               });
-                              _load();
+                              _loadLedger();
                             },
                           ),
                         ),
                     ],
                   ),
                 ),
+                if (_loadingLedger)
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 10),
+                    child: LinearProgressIndicator(),
+                  ),
                 if (_ledger.isEmpty)
                   const Text(
                     'No credit activity yet.',
