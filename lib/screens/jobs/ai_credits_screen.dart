@@ -32,13 +32,24 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
   int _ledgerPage = 1;
   bool _loadingMore = false, _loadingLedger = false;
   int _ledgerRequest = 0;
+  final ScrollController _scrollController = ScrollController();
   List<String> _rules = const [];
   String? _billingEmail;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_loadMoreWhenNearEnd);
     _initRazorpay();
+  }
+
+  void _loadMoreWhenNearEnd() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.maxScrollExtent -
+                _scrollController.position.pixels <
+            240) {
+      _loadMore();
+    }
   }
 
   Future<void> _initRazorpay() async {
@@ -64,6 +75,7 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _razorpay?.clear();
     super.dispose();
   }
@@ -216,8 +228,9 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
           FilledButton(
             onPressed: () {
               final email = controller.text.trim();
-              if (RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email))
+              if (RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email)) {
                 Navigator.pop(context, email);
+              }
             },
             child: const Text('Continue'),
           ),
@@ -254,10 +267,11 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
       final orderId = order['razorpay_order_id']?.toString();
       if (orderId == null ||
           order['razorpay_key'] == null ||
-          order['amount_paise'] == null)
+          order['amount_paise'] == null) {
         throw const FormatException(
           'Payment details are missing. Please try again.',
         );
+      }
       _pendingOrder = orderId;
       checkout.open({
         'key': order['razorpay_key'],
@@ -284,10 +298,11 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
     try {
       if (payment.paymentId == null ||
           payment.signature == null ||
-          _pendingOrder == null)
+          _pendingOrder == null) {
         throw const FormatException(
           'Payment verification details are incomplete. Refresh to check your credits.',
         );
+      }
       final result = await AppScope.of(context).api.aiCreditsCallback({
         'razorpay_payment_id': payment.paymentId,
         'razorpay_order_id': _pendingOrder,
@@ -322,10 +337,11 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
   }
 
   void _snack(String value) {
-    if (mounted)
+    if (mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(value)));
+    }
   }
 
   @override
@@ -340,13 +356,16 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
+              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
                 _BalanceCard(credits: _credits),
                 const SizedBox(height: 12),
-                _CreditTotals(totals: _totals),
-                const SizedBox(height: 20),
+                if (_credits['enabled'] != false) ...[
+                  _CreditTotals(totals: _totals),
+                  const SizedBox(height: 20),
+                ],
                 const SectionTitle('Recharge packs'),
                 ..._packs.map(
                   (pack) => _PackCard(
@@ -370,52 +389,55 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
                       ),
                     ),
                   ),
-                const SectionTitle('Credit history'),
-                Container(
-                  margin: const EdgeInsets.only(top: 8, bottom: 10),
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    border: Border.all(color: AppColors.line),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      for (final tab in const {
-                        'all': 'All',
-                        'added': 'Added',
-                        'spent': 'Spent',
-                      }.entries)
-                        Expanded(
-                          child: _CreditHistoryTab(
-                            label: tab.value,
-                            selected: _filter == tab.key,
-                            onTap: () {
-                              setState(() {
-                                _filter = tab.key;
-                                _ledgerPage = 1;
-                              });
-                              _loadLedger();
-                            },
+                if (_credits['enabled'] != false)
+                  const SectionTitle('Credit history'),
+                if (_credits['enabled'] != false)
+                  Container(
+                    margin: const EdgeInsets.only(top: 8, bottom: 10),
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      border: Border.all(color: AppColors.line),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        for (final tab in const {
+                          'all': 'All',
+                          'added': 'Added',
+                          'spent': 'Spent',
+                        }.entries)
+                          Expanded(
+                            child: _CreditHistoryTab(
+                              label: tab.value,
+                              selected: _filter == tab.key,
+                              onTap: () {
+                                setState(() {
+                                  _filter = tab.key;
+                                  _ledgerPage = 1;
+                                });
+                                _loadLedger();
+                              },
+                            ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                if (_loadingLedger)
+                if (_credits['enabled'] != false && _loadingLedger)
                   const Padding(
                     padding: EdgeInsets.only(bottom: 10),
                     child: LinearProgressIndicator(),
                   ),
-                if (_ledger.isEmpty)
-                  const Text(
-                    'No credit activity yet.',
+                if (_credits['enabled'] != false && _ledger.isEmpty)
+                  Text(
+                    _creditHistoryEmptyText(_filter),
                     style: TextStyle(color: AppColors.muted),
                   )
-                else
+                else if (_credits['enabled'] != false)
                   ..._ledger.map(_LedgerRow.new),
-                if ((_ledgerMeta['current_page'] as num? ?? 1) <
-                    (_ledgerMeta['last_page'] as num? ?? 1))
+                if (_credits['enabled'] != false &&
+                    (_ledgerMeta['current_page'] as num? ?? 1) <
+                        (_ledgerMeta['last_page'] as num? ?? 1))
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: OutlinedButton(
@@ -481,46 +503,74 @@ class _CreditTotals extends StatelessWidget {
       ('Spent', '${totals['spent'] ?? 0}', LucideIcons.minus),
       ('Calls', '${totals['calls'] ?? 0}', LucideIcons.phoneCall),
     ];
-    return Row(
-      children: entries
-          .map(
-            (entry) => Expanded(
-              child: Container(
-                margin: EdgeInsets.only(right: entry == entries.last ? 0 : 8),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: colors.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: colors.outlineVariant),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(entry.$3, size: 16, color: colors.onSurfaceVariant),
-                    const SizedBox(height: 8),
-                    Text(
-                      entry.$2,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w800,
-                      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: entries
+              .map(
+                (entry) => Expanded(
+                  child: Container(
+                    margin: EdgeInsets.only(
+                      right: entry == entries.last ? 0 : 8,
                     ),
-                    Text(
-                      entry.$1,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colors.onSurfaceVariant,
-                      ),
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: colors.surfaceContainerLow,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: colors.outlineVariant),
                     ),
-                  ],
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          entry.$3,
+                          size: 16,
+                          color: colors.onSurfaceVariant,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          entry.$2,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          entry.$1,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: colors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
+              )
+              .toList(),
+        ),
+        if ((totals['recharged_amount'] as num? ?? 0) > 0)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              '₹${(totals['recharged_amount'] as num).toStringAsFixed(2)} paid for recharges',
+              style: const TextStyle(
+                color: AppColors.muted,
+                fontWeight: FontWeight.w600,
               ),
             ),
-          )
-          .toList(),
+          ),
+      ],
     );
   }
 }
+
+String _creditHistoryEmptyText(String filter) => switch (filter) {
+  'added' => 'No credits added yet',
+  'spent' => 'No AI calls charged yet',
+  _ => 'No credit activity yet',
+};
 
 class _BalanceCard extends StatelessWidget {
   const _BalanceCard({required this.credits});
@@ -772,85 +822,312 @@ class _LedgerRow extends StatelessWidget {
         (row['direction'] == null && amount >= 0);
     final paid = row['amount_paid'];
     final colors = Theme.of(context).colorScheme;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: ListTile(
-        contentPadding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: added ? colors.tertiaryContainer : colors.errorContainer,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            added ? LucideIcons.plus : LucideIcons.phoneCall,
-            size: 18,
-            color: added ? colors.onTertiaryContainer : colors.onErrorContainer,
-          ),
-        ),
-        title: Row(
-          children: [
-            Expanded(
-              child: Text(
-                '${row['description'] ?? ''}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ),
-            const SizedBox(width: 6),
-            BrandChip(
-              '${row['type_label'] ?? row['type'] ?? ''}',
-              neutral: true,
-            ),
-          ],
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            '${row['created_label'] ?? ''}\nBalance ${row['balance_after'] ?? ''}${paid is num ? ' · Paid ₹${paid.toStringAsFixed(2)}' : ''}',
-          ),
-        ),
-        isThreeLine: true,
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '${added ? '+' : '−'}${amount.abs()}',
-              style: TextStyle(
-                color: added ? colors.tertiary : colors.error,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (invoice is Map)
-              TextButton(
-                onPressed: () {
-                  final id = (invoice['id'] as num?)?.toInt();
-                  if (id != null)
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => InvoiceScreen(invoiceId: id),
-                      ),
-                    );
-                },
-                child: const Text('Invoice'),
-              ),
-          ],
-        ),
-        onTap: callId == null
-            ? null
-            : () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ScreeningConversationScreen(
-                    callId: callId,
-                    workerName: 'Karigar',
-                  ),
+    final icon = switch ('${row['type']}') {
+      'call' => LucideIcons.phoneCall,
+      'recharge' => LucideIcons.creditCard,
+      'bonus' || 'welcome' => LucideIcons.gift,
+      'refund' => LucideIcons.rotateCcw,
+      'admin_credit' || 'admin_debit' => LucideIcons.shieldCheck,
+      _ => LucideIcons.receiptText,
+    };
+    final invoiceNumber = invoice is Map ? '${invoice['number'] ?? ''}' : '';
+    return InkWell(
+      borderRadius: BorderRadius.circular(16),
+      onTap: callId == null
+          ? null
+          : () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ScreeningConversationScreen(
+                  callId: callId,
+                  workerName: 'Karigar',
                 ),
               ),
+            ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: AppColors.line2)),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: added ? colors.tertiaryContainer : colors.errorContainer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: added ? colors.tertiary : colors.error,
+              ),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '${row['type_label'] ?? row['type'] ?? 'Credit activity'}',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      Text(
+                        '${added ? '+' : '−'}${amount.abs()}',
+                        style: TextStyle(
+                          color: added ? colors.tertiary : colors.error,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if ('${row['description'] ?? ''}'.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(
+                      '${row['description']}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.muted,
+                      ),
+                    ),
+                  ],
+                  if (paid is num || invoiceNumber.isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Wrap(
+                      spacing: 5,
+                      children: [
+                        if (paid is num)
+                          Text(
+                            'Paid ₹${paid.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        if (invoiceNumber.isNotEmpty)
+                          InkWell(
+                            onTap: () {
+                              final id = (invoice['id'] as num?)?.toInt();
+                              if (id != null) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) =>
+                                        InvoiceScreen(invoiceId: id),
+                                  ),
+                                );
+                              }
+                            },
+                            child: Text(
+                              'Invoice $invoiceNumber',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  Text(
+                    '${row['created_label'] ?? ''}   Balance ${row['balance_after'] ?? ''}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+/// Reusable ledger for the Plans catalog as well as the dedicated credits page.
+class AiCreditHistory extends StatefulWidget {
+  const AiCreditHistory({super.key, this.initialCredits});
+  final Map<String, dynamic>? initialCredits;
+
+  @override
+  State<AiCreditHistory> createState() => _AiCreditHistoryState();
+}
+
+class _AiCreditHistoryState extends State<AiCreditHistory> {
+  String _filter = 'all';
+  Map<String, dynamic> _credits = const {};
+  Map<String, dynamic> _totals = const {};
+  Map<String, dynamic> _meta = const {};
+  List<Map<String, dynamic>> _rows = const [];
+  bool _loading = true;
+  bool _loadingMore = false;
+  ScrollPosition? _scrollPosition;
+
+  @override
+  void initState() {
+    super.initState();
+    _credits = widget.initialCredits ?? const {};
+    _refresh();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final position = Scrollable.maybeOf(context)?.position;
+    if (position == _scrollPosition) return;
+    _scrollPosition?.removeListener(_onScroll);
+    _scrollPosition = position;
+    _scrollPosition?.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final position = _scrollPosition;
+    if (position != null && position.maxScrollExtent - position.pixels < 240) {
+      _loadMore();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollPosition?.removeListener(_onScroll);
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> _maps(Object? value) =>
+      (value as List? ?? const [])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+
+  Future<void> _refresh() async {
+    setState(() => _loading = true);
+    try {
+      final results = await Future.wait([
+        AppScope.of(context).api.aiCredits(),
+        AppScope.of(context).api.aiCreditsLedger(filter: _filter),
+      ]);
+      if (!mounted) return;
+      final catalog = results[0];
+      final history = results[1];
+      final data = history['data'];
+      setState(() {
+        _credits = catalog['credits'] is Map
+            ? Map<String, dynamic>.from(catalog['credits'])
+            : _credits;
+        _totals = catalog['totals'] is Map
+            ? Map<String, dynamic>.from(catalog['totals'])
+            : _totals;
+        _rows = _maps(data);
+        _meta = history['meta'] is Map
+            ? Map<String, dynamic>.from(history['meta'])
+            : const {};
+      });
+    } catch (_) {
+      // Keep the Plans page useful if the independent history request fails.
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final current = (_meta['current_page'] as num?)?.toInt() ?? 1;
+    final last = (_meta['last_page'] as num?)?.toInt() ?? 1;
+    if (_loadingMore || current >= last) return;
+    setState(() => _loadingMore = true);
+    try {
+      final history = await AppScope.of(
+        context,
+      ).api.aiCreditsLedger(filter: _filter, page: current + 1);
+      if (!mounted) return;
+      setState(() {
+        _rows = [..._rows, ..._maps(history['data'])];
+        _meta = history['meta'] is Map
+            ? Map<String, dynamic>.from(history['meta'])
+            : _meta;
+      });
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_credits['enabled'] == false) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 24),
+        if (_totals.isNotEmpty) ...[
+          _CreditTotals(totals: _totals),
+          const SizedBox(height: 22),
+        ],
+        const Text(
+          'Credit history',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(3),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            border: Border.all(color: AppColors.line),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              for (final tab in const {
+                'all': 'All',
+                'added': 'Added',
+                'spent': 'Spent',
+              }.entries)
+                Expanded(
+                  child: _CreditHistoryTab(
+                    label: tab.value,
+                    selected: _filter == tab.key,
+                    onTap: () {
+                      setState(() => _filter = tab.key);
+                      _refresh();
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+        if (_loading)
+          const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_rows.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 18),
+            child: Text(
+              _creditHistoryEmptyText(_filter),
+              style: const TextStyle(color: AppColors.muted),
+            ),
+          )
+        else ...[
+          ..._rows.map(_LedgerRow.new),
+          if ((_meta['current_page'] as num? ?? 1) <
+              (_meta['last_page'] as num? ?? 1))
+            Center(
+              child: TextButton(
+                onPressed: _loadingMore ? null : _loadMore,
+                child: Text(_loadingMore ? 'Loading…' : 'Load more history'),
+              ),
+            ),
+        ],
+      ],
     );
   }
 }
