@@ -3,7 +3,7 @@ import 'package:employer_kariger_app/core/push/push_router.dart' as router;
 import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
-import '../../widgets/common.dart';
+import '../../widgets/job_summary_card.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -570,9 +570,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     final job = router.jobCard(item);
                     return Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: jobCard(
-                        job,
-                        () => Navigator.push(
+                      child: JobSummaryCard(
+                        job: job,
+                        onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => JobManageScreen(job: job),
@@ -1008,7 +1008,6 @@ class _ApplicantCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final normalizedStatus = stage.toLowerCase();
     final canManage = !{'hired', 'rejected'}.contains(normalizedStatus);
     final place = [
@@ -1030,233 +1029,348 @@ class _ApplicantCard extends StatelessWidget {
         ? AppColors.roseBg
         : AppColors.amberBg;
     final visibleSkills = skills.take(2).toList();
+    final shortlisted =
+        normalizedStatus == 'shortlisted' || normalizedStatus == 'interview';
+    final aiScore = (ai?['score'] as num?)?.round();
+    final aiLabel =
+        '${ai?['recommendation_label'] ?? ai?['recommendation'] ?? ''}'.trim();
+    final initials = displayName
+        .split(RegExp(r'\s+'))
+        .where((e) => e.isNotEmpty)
+        .map((e) => e[0])
+        .take(2)
+        .join()
+        .toUpperCase();
     return Card(
       elevation: 0,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: isDark
-                        ? colors.primary.withValues(alpha: .25)
-                        : AppColors.brand100,
-                    child: Text(
-                      displayName
-                          .split(RegExp(r'\s+'))
-                          .where((e) => e.isNotEmpty)
-                          .map((e) => e[0])
-                          .take(2)
-                          .join()
-                          .toUpperCase(),
-                      style: TextStyle(
-                        color: isDark
-                            ? const Color(0xFFFFC9B5)
-                            : AppColors.brandDark,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Flexible(
-                              child: Text(
-                                displayName,
-                                style: const TextStyle(
-                                  fontSize: 14.5,
-                                  fontWeight: FontWeight.w700,
+              Container(width: 5, color: statusColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 46,
+                                height: 46,
+                                alignment: Alignment.center,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: LinearGradient(
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
+                                    colors: [
+                                      AppColors.brand400,
+                                      AppColors.brandDark,
+                                    ],
+                                  ),
+                                ),
+                                child: Text(
+                                  initials,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 5),
-                            if (worker.verified)
-                              const Icon(
-                                LucideIcons.badgeCheck,
-                                size: 15,
-                                color: AppColors.green,
-                              ),
-                          ],
-                        ),
-                        Text(
-                          [
-                            worker.trade,
-                            if (worker.experience > 0)
-                              '${worker.experience} yrs experience',
-                            if (worker.rating > 0)
-                              '★ ${worker.rating.toStringAsFixed(1)}',
-                          ].join(' · '),
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colors.onSurfaceVariant,
+                              if (worker.verified)
+                                Positioned(
+                                  right: -2,
+                                  bottom: -2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(1.5),
+                                    decoration: BoxDecoration(
+                                      color: context.cardSurface,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      LucideIcons.badgeCheck,
+                                      size: 16,
+                                      color: context.accentText(
+                                        AppColors.green,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                        ),
-                        if (place.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            place.join(' · '),
-                            style: TextStyle(
-                              color: colors.onSurfaceVariant,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w400,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  displayName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 15.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const SizedBox(height: 1),
+                                Text(
+                                  [
+                                    worker.trade,
+                                    if (worker.experience > 0)
+                                      '${worker.experience} yrs',
+                                    if (worker.rating > 0)
+                                      '★ ${worker.rating.toStringAsFixed(1)}',
+                                  ].join(' · '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: colors.onSurfaceVariant,
+                                  ),
+                                ),
+                                if (place.isNotEmpty) ...[
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        LucideIcons.mapPin,
+                                        size: 12,
+                                        color: context.accentText(
+                                          AppColors.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 3),
+                                      Expanded(
+                                        child: Text(
+                                          place.join(' · '),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: colors.onSurfaceVariant,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: context.accentBackground(
+                                statusColor,
+                                statusBackground,
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    color: context.accentText(statusColor),
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  status,
+                                  style: TextStyle(
+                                    color: context.accentText(statusColor),
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
+                      ),
+                      if (visibleSkills.isNotEmpty || aiScore != null) ...[
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            if (aiScore != null)
+                              _AiMatchBadge(score: aiScore, label: aiLabel),
+                            ...visibleSkills.map(_ApplicantSkill.new),
+                            if (skills.length > visibleSkills.length)
+                              _ApplicantSkill(
+                                '+${skills.length - visibleSkills.length}',
+                              ),
+                          ],
+                        ),
                       ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: context.accentBackground(
-                        statusColor,
-                        statusBackground,
-                      ),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      status,
-                      style: TextStyle(
-                        color: context.accentText(statusColor),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Row(
-                children: [
-                  Icon(LucideIcons.sparkles, size: 13, color: AppColors.muted),
-                  SizedBox(width: 5),
-                  Text(
-                    'Skills',
-                    style: TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 7),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  ...visibleSkills.map(_ApplicantSkill.new),
-                  if (skills.length > visibleSkills.length)
-                    _ApplicantSkill(
-                      '+${skills.length - visibleSkills.length} more',
-                    ),
-                ],
-              ),
-              if (ai != null) ...[
-                const SizedBox(height: 12),
-                BrandChip(
-                  'AI match ${ai?['score'] ?? 0}% · '
-                  '${ai?['recommendation_label'] ?? ai?['recommendation'] ?? ''}',
-                ),
-              ],
-              if (screeningCall != null) ...[
-                const SizedBox(height: 10),
-                ApplicantScreeningCallPanel(
-                  call: screeningCall,
-                  workerName: displayName,
-                  summaryMaxLines: 2,
-                ),
-              ],
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Divider(height: 1),
-              ),
-              ContactActions(
-                phone: phone,
-                expanded: true,
-                onChat: onChat,
-                compact: true,
-                inline: true,
-              ),
-              if (canManage) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? colors.surfaceContainerHighest
-                        : AppColors.brand50,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: onPrimary,
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(38),
-                            padding: const EdgeInsets.symmetric(horizontal: 6),
-                            backgroundColor: colors.surface,
-                          ),
-                          icon: Icon(
-                            normalizedStatus == 'shortlisted' ||
-                                    normalizedStatus == 'interview'
-                                ? LucideIcons.star
-                                : LucideIcons.star,
-                            size: 16,
-                          ),
-                          label: Text(
-                            normalizedStatus == 'shortlisted' ||
-                                    normalizedStatus == 'interview'
-                                ? 'Shortlisted'
-                                : 'Shortlist',
-                          ),
+                      if (screeningCall != null) ...[
+                        const SizedBox(height: 10),
+                        ApplicantScreeningCallPanel(
+                          call: screeningCall,
+                          workerName: displayName,
+                          summaryMaxLines: 2,
                         ),
+                      ],
+                      const SizedBox(height: 10),
+                      ContactActions(
+                        phone: phone,
+                        expanded: true,
+                        onChat: onChat,
+                        compact: true,
+                        inline: true,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: onHire,
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(38),
-                          ),
-                          child: const Text('Hire'),
+                      if (canManage) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: onPrimary,
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                  foregroundColor: shortlisted
+                                      ? context.accentText(AppColors.amber)
+                                      : colors.onSurface,
+                                  backgroundColor: shortlisted
+                                      ? context.accentBackground(
+                                          AppColors.amber,
+                                          AppColors.amberBg,
+                                        )
+                                      : null,
+                                  side: BorderSide(
+                                    color: shortlisted
+                                        ? AppColors.amber.withValues(alpha: .5)
+                                        : colors.outlineVariant,
+                                  ),
+                                ),
+                                icon: Icon(
+                                  LucideIcons.star,
+                                  size: 16,
+                                  color: context.accentText(AppColors.amber),
+                                ),
+                                label: Text(
+                                  shortlisted ? 'Shortlisted' : 'Shortlist',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: onHire,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  LucideIcons.userCheck,
+                                  size: 16,
+                                ),
+                                label: const Text('Hire'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            SizedBox(
+                              width: 42,
+                              height: 40,
+                              child: IconButton(
+                                onPressed: onReject,
+                                tooltip: 'Reject',
+                                style: IconButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  backgroundColor: context.accentBackground(
+                                    AppColors.rose,
+                                    AppColors.roseBg,
+                                  ),
+                                  foregroundColor: context.accentText(
+                                    AppColors.rose,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                icon: const Icon(LucideIcons.x, size: 18),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                      const SizedBox(width: 6),
-                      SizedBox(
-                        width: 40,
-                        child: IconButton.outlined(
-                          onPressed: onReject,
-                          style: IconButton.styleFrom(
-                            minimumSize: const Size(40, 38),
-                            foregroundColor: AppColors.rose,
-                            side: const BorderSide(color: AppColors.line),
-                          ),
-                          icon: const Icon(LucideIcons.x, size: 18),
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
-              ],
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// "92% match" as one bold pill, coloured by the score (the recommendation
+/// label stays in the semantics so the chips fit on one row).
+class _AiMatchBadge extends StatelessWidget {
+  const _AiMatchBadge({required this.score, required this.label});
+  final int score;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = score >= 75
+        ? AppColors.green
+        : score >= 50
+        ? AppColors.amber
+        : AppColors.muted;
+    final accent = context.accentText(color);
+    return Semantics(
+      label: label.isEmpty ? '$score% match' : '$score% match, $label',
+      excludeSemantics: true,
+      child: Container(
+        constraints: const BoxConstraints(minHeight: 28),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+        decoration: BoxDecoration(
+          color: context.accentBackground(color, color.withValues(alpha: .10)),
+          border: Border.all(color: color.withValues(alpha: .35)),
+          borderRadius: BorderRadius.circular(9),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(LucideIcons.sparkles, size: 13, color: accent),
+            const SizedBox(width: 4),
+            Text(
+              '$score% match',
+              style: TextStyle(
+                color: accent,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1268,206 +1382,22 @@ class _ApplicantSkill extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Container(
-      constraints: const BoxConstraints(minHeight: 30),
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: colors.surfaceContainerHighest.withValues(alpha: .7),
-        borderRadius: BorderRadius.circular(9),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: colors.onSurfaceVariant,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-Widget jobCard(Job job, VoidCallback onTap) {
-  final status = job.status.toLowerCase();
-  final statusColor = switch (status) {
-    'active' => AppColors.green,
-    'draft' => AppColors.indigo,
-    'under review' => AppColors.amber,
-    'not approved' => AppColors.rose,
-    _ => AppColors.muted,
-  };
-  final statusBackground = switch (status) {
-    'active' => AppColors.greenBg,
-    'draft' => AppColors.indigoBg,
-    'under review' => AppColors.amberBg,
-    'not approved' => AppColors.roseBg,
-    _ => AppColors.brand50,
-  };
-  return Card(
-    clipBehavior: Clip.antiAlias,
-    child: InkWell(
-      onTap: onTap,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(17, 16, 15, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    job.category.toUpperCase(),
-                    style: const TextStyle(
-                      color: AppColors.muted,
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: .7,
-                    ),
-                  ),
-                ),
-                Builder(
-                  builder: (context) => Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 9,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: context.accentBackground(
-                        statusColor,
-                        statusBackground,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      job.status,
-                      style: TextStyle(
-                        color: context.accentText(statusColor),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(17, 8, 15, 0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    job.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 17,
-                      height: 1.18,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                const Icon(
-                  LucideIcons.chevronRight,
-                  size: 19,
-                  color: AppColors.muted2,
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(17, 11, 15, 0),
-            child: Wrap(
-              spacing: 14,
-              runSpacing: 6,
-              children: [
-                _HomeJobDetail(icon: LucideIcons.indianRupee, label: job.wage),
-                _HomeJobDetail(
-                  icon: LucideIcons.briefcaseBusiness,
-                  label:
-                      '${job.openings} opening${job.openings == 1 ? '' : 's'}',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.fromLTRB(17, 12, 17, 13),
-            decoration: BoxDecoration(
-              // A faint shade that reads in light and dark mode alike.
-              color: Colors.black.withValues(alpha: .035),
-              border: Border(top: BorderSide(color: AppColors.line2)),
-            ),
-            child: Row(
-              children: [
-                _HomeJobMetric(value: job.applied, label: 'Applicants'),
-                const _HomeMetricDivider(),
-                _HomeJobMetric(value: job.shortlisted, label: 'Shortlisted'),
-                const _HomeMetricDivider(),
-                _HomeJobMetric(value: job.hired, label: 'Hired'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _HomeJobDetail extends StatelessWidget {
-  const _HomeJobDetail({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(icon, size: 14, color: AppColors.muted),
-      const SizedBox(width: 5),
-      Text(
-        label,
-        style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
-      ),
-    ],
-  );
-}
-
-class _HomeJobMetric extends StatelessWidget {
-  const _HomeJobMetric({required this.value, required this.label});
-  final int value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$value',
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, color: AppColors.muted),
-        ),
-      ],
-    ),
-  );
-}
-
-class _HomeMetricDivider extends StatelessWidget {
-  const _HomeMetricDivider();
-
-  @override
   Widget build(BuildContext context) => Container(
-    width: 1,
-    height: 28,
-    margin: const EdgeInsets.only(right: 12),
-    color: AppColors.line,
+    constraints: const BoxConstraints(minHeight: 28),
+    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+    decoration: BoxDecoration(
+      color: context.brandTint,
+      border: Border.all(color: context.brandTintBorder),
+      borderRadius: BorderRadius.circular(9),
+    ),
+    child: Text(
+      label,
+      style: TextStyle(
+        color: context.accentText(AppColors.brandDark),
+        fontSize: 11.5,
+        fontWeight: FontWeight.w600,
+      ),
+    ),
   );
 }
 

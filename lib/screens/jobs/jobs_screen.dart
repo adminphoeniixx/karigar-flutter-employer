@@ -3,6 +3,7 @@ import 'package:employer_kariger_app/core/api/api_exception.dart';
 
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
+import '../../widgets/job_summary_card.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -297,8 +298,9 @@ class _JobsScreenState extends State<JobsScreen> with WidgetsBindingObserver {
                     sliver: SliverList.separated(
                       itemCount: liveJobs.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) => _JobListCard(
+                      itemBuilder: (context, index) => JobSummaryCard(
                         job: liveJobs[index],
+                        showModeration: true,
                         onTap: () => _openJob(liveJobs[index]),
                       ),
                     ),
@@ -330,81 +332,95 @@ class _JobsHeader extends StatelessWidget {
       children: [
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [AppColors.brandDark, AppColors.gradientEnd],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(18),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x334F1B0D),
-                blurRadius: 18,
-                offset: Offset(0, 8),
+                blurRadius: 16,
+                offset: Offset(0, 6),
               ),
             ],
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0x1FFFFFFF),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: const Color(0x40FFFFFF)),
+                ),
+                child: const Icon(
+                  LucideIcons.briefcaseBusiness,
+                  size: 20,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'MY JOBS',
-                      style: TextStyle(
-                        color: Color(0xFFFBECE5),
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.1,
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: AlignmentDirectional.centerStart,
+                      child: Text(
+                        count == 0
+                            ? 'Start hiring karigars'
+                            : '$count ${count == 1 ? 'job listing' : 'job listings'}',
+                        maxLines: 1,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 7),
-                    Text(
-                      count == 0
-                          ? 'Start hiring skilled workers'
-                          : '$count ${count == 1 ? 'job listing' : 'job listings'}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 5),
+                    const SizedBox(height: 2),
                     const Text(
                       'Review applicants and manage each posting.',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         color: Color(0xFFFBECE5),
-                        fontSize: 12.5,
+                        fontSize: 11.5,
                         height: 1.25,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: const Color(0x1FFFFFFF),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0x40FFFFFF)),
-                ),
-                child: const Icon(
-                  LucideIcons.briefcaseBusiness,
-                  size: 22,
-                  color: Colors.white,
+              const SizedBox(width: 10),
+              SizedBox(
+                height: 40,
+                child: FilledButton.icon(
+                  onPressed: onPostJob,
+                  style: FilledButton.styleFrom(
+                    minimumSize: Size.zero,
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.brandDark,
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(LucideIcons.plus, size: 18),
+                  label: const Text('Post Job'),
                 ),
               ),
             ],
           ),
         ),
 
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
         const Text(
           'JOB LISTINGS',
           style: TextStyle(
@@ -420,7 +436,9 @@ class _JobsHeader extends StatelessWidget {
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.line),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
+            ),
           ),
           child: Row(
             children: [
@@ -475,251 +493,14 @@ class _Segment extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: active ? Colors.white : AppColors.muted,
+            color: active
+                ? Colors.white
+                : Theme.of(context).colorScheme.onSurfaceVariant,
           ),
         ),
       ),
     );
   }
-}
-
-class _JobListCard extends StatelessWidget {
-  const _JobListCard({required this.job, required this.onTap});
-
-  final Job job;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final status = job.status.toLowerCase();
-    final checking = job.moderationStatus == 'checking';
-    final statusColor = switch (status) {
-      'active' => AppColors.green,
-      'draft' => AppColors.indigo,
-      'under review' => AppColors.amber,
-      'not approved' => AppColors.rose,
-      _ => AppColors.muted,
-    };
-    final statusBackground = switch (status) {
-      'active' => AppColors.greenBg,
-      'draft' => AppColors.indigoBg,
-      'under review' => AppColors.amberBg,
-      'not approved' => AppColors.roseBg,
-      _ => Theme.of(context).colorScheme.surfaceContainerHighest,
-    };
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.zero,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(17, 16, 15, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        job.category.toUpperCase(),
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: .7,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: statusBackground,
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: checking
-                          ? const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                SizedBox(
-                                  width: 12,
-                                  height: 12,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.indigo,
-                                  ),
-                                ),
-                                SizedBox(width: 6),
-                                Text(
-                                  'Checking…',
-                                  style: TextStyle(
-                                    color: AppColors.indigo,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Text(
-                              job.status,
-                              style: TextStyle(
-                                color: statusColor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(17, 8, 15, 0),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        job.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 17,
-                          height: 1.18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Icon(
-                      LucideIcons.chevronRight,
-                      size: 19,
-                      color: AppColors.muted2,
-                    ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(17, 11, 15, 0),
-                child: Wrap(
-                  spacing: 14,
-                  runSpacing: 6,
-                  children: [
-                    _JobDetail(
-                      icon: LucideIcons.indianRupee,
-                      label: context.trWage(job.wage),
-                    ),
-                    _JobDetail(
-                      icon: LucideIcons.briefcaseBusiness,
-                      label: context.trOpenings(job.openings),
-                    ),
-                  ],
-                ),
-              ),
-              if (job.moderationNote?.trim().isNotEmpty == true) ...[
-                const SizedBox(height: 11),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 17),
-                  child: Text(
-                    job.moderationNote!,
-                    style: const TextStyle(fontSize: 12, color: AppColors.rose),
-                  ),
-                ),
-              ],
-              if (job.moderationStatus == 'approved') ...[
-                const SizedBox(height: 11),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 17),
-                  child: Text(
-                    job.moderationMethod == 'phrases'
-                        ? 'Basic check'
-                        : 'AI checked ✓',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.green,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.fromLTRB(17, 12, 17, 13),
-                decoration: BoxDecoration(
-                  color: context.softSurface,
-                  border: Border(top: BorderSide(color: AppColors.line2)),
-                ),
-                child: Row(
-                  children: [
-                    _JobMetric(value: job.applied, label: 'Applicants'),
-                    const _MetricDivider(),
-                    _JobMetric(value: job.shortlisted, label: 'Shortlisted'),
-                    const _MetricDivider(),
-                    _JobMetric(value: job.hired, label: 'Hired'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _JobDetail extends StatelessWidget {
-  const _JobDetail({required this.icon, required this.label});
-  final IconData icon;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Row(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Icon(icon, size: 14, color: AppColors.muted),
-      const SizedBox(width: 5),
-      Text(
-        label,
-        style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
-      ),
-    ],
-  );
-}
-
-class _JobMetric extends StatelessWidget {
-  const _JobMetric({required this.value, required this.label});
-  final int value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '$value',
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-        Text(
-          label,
-          style: const TextStyle(fontSize: 11, color: AppColors.muted),
-        ),
-      ],
-    ),
-  );
-}
-
-class _MetricDivider extends StatelessWidget {
-  const _MetricDivider();
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: 1,
-    height: 28,
-    margin: const EdgeInsets.only(right: 12),
-    color: AppColors.line,
-  );
 }
 
 class _EmptyJobs extends StatelessWidget {

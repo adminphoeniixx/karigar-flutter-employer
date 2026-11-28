@@ -41,13 +41,12 @@ class _PostJobScreenState extends State<PostJobScreen> {
       'Shift & interview',
       'Preview & publish',
     ];
-    final dark = context.isDarkTheme;
-    final upcomingFill = dark
-        ? Theme.of(context).colorScheme.surfaceContainerHighest
-        : AppColors.card;
-    final upcomingLine = dark
-        ? Theme.of(context).colorScheme.outlineVariant
-        : AppColors.line;
+    const subtitles = [
+      'Job title, place and monthly pay',
+      'Who you want to hire',
+      'Timings, interview and perks',
+      'Check everything, then publish',
+    ];
 
     Widget dot(int index) {
       final done = index < _step;
@@ -61,33 +60,34 @@ class _PostJobScreenState extends State<PostJobScreen> {
           onTap: canOpen ? () => setState(() => _step = index) : null,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
-            width: 34,
-            height: 34,
+            width: current ? 34 : 28,
+            height: current ? 34 : 28,
             alignment: Alignment.center,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: done || current ? AppColors.primary : upcomingFill,
+              color: done || current ? Colors.white : const Color(0x1FFFFFFF),
               border: Border.all(
-                color: done || current ? AppColors.primary : upcomingLine,
+                color: done || current ? Colors.white : const Color(0x80FFFFFF),
                 width: 1.5,
               ),
               boxShadow: current
-                  ? [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: .22),
-                        spreadRadius: 5,
-                      ),
-                    ]
+                  ? const [BoxShadow(color: Color(0x40FFFFFF), spreadRadius: 4)]
                   : null,
             ),
             child: done
-                ? const Icon(LucideIcons.check, size: 17, color: Colors.white)
+                ? const Icon(
+                    LucideIcons.check,
+                    size: 15,
+                    color: AppColors.brandDark,
+                  )
                 : Text(
                     '${index + 1}',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: current ? 15 : 13,
                       fontWeight: FontWeight.w700,
-                      color: current ? Colors.white : AppColors.muted2,
+                      color: current
+                          ? AppColors.brandDark
+                          : const Color(0xE6FFFFFF),
                     ),
                   ),
           ),
@@ -99,9 +99,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 220),
         height: 3,
-        margin: const EdgeInsets.symmetric(horizontal: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: index < _step ? AppColors.primary : upcomingLine,
+          color: index < _step ? Colors.white : const Color(0x40FFFFFF),
           borderRadius: BorderRadius.circular(3),
         ),
       ),
@@ -109,46 +109,90 @@ class _PostJobScreenState extends State<PostJobScreen> {
 
     return Container(
       width: double.infinity,
-      decoration: BoxDecoration(
-        color: context.cardSurface,
-        border: Border(bottom: BorderSide(color: upcomingLine)),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.brandDark, AppColors.gradientEnd],
+        ),
       ),
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 14),
+      padding: const EdgeInsets.fromLTRB(18, 12, 18, 14),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      context.trArgs('Step {current} of {total}', {
+                        'current': '${_step + 1}',
+                        'total': '4',
+                      }).toUpperCase(),
+                      style: const TextStyle(
+                        color: Color(0xFFFBECE5),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      context.tr(labels[_step]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      context.tr(subtitles[_step]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFFFBECE5),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              // How far along: a small ring that fills a quarter per step.
+              SizedBox(
+                width: 44,
+                height: 44,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    CircularProgressIndicator(
+                      value: (_step + 1) / 4,
+                      strokeWidth: 4,
+                      backgroundColor: const Color(0x33FFFFFF),
+                      color: Colors.white,
+                    ),
+                    Text(
+                      '${((_step + 1) * 25)}%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               for (var i = 0; i < 4; i++) ...[dot(i), if (i < 3) joint(i)],
             ],
-          ),
-          const SizedBox(height: 12),
-          Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(
-                  text: context.trArgs('Step {current} of {total}', {
-                    'current': '${_step + 1}',
-                    'total': '4',
-                  }),
-                  style: const TextStyle(
-                    color: AppColors.muted,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const TextSpan(
-                  text: '  ·  ',
-                  style: TextStyle(color: AppColors.muted2),
-                ),
-                TextSpan(
-                  text: context.tr(labels[_step]),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Theme.of(context).colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-            style: const TextStyle(fontSize: 14),
           ),
         ],
       ),
@@ -186,7 +230,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                 'Finish your saved job “${titleController.text}”?',
                 style: const TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 3),
@@ -316,7 +360,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.mapPin, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.mapPin),
                 SizedBox(width: 10),
                 Text(
                   'Where is the work?',
@@ -417,7 +461,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.indianRupee, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.indianRupee),
                 SizedBox(width: 10),
                 Text(
                   'Pay',
@@ -543,17 +587,25 @@ class _PostJobScreenState extends State<PostJobScreen> {
     ],
   );
 
-  Widget _stepperButton(String label, VoidCallback onTap) => SizedBox(
-    width: 58,
-    child: Material(
-      color: AppColors.background,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(11),
-        child: Center(
-          child: Text(
-            label,
-            style: const TextStyle(fontSize: 25, fontWeight: FontWeight.w700),
+  Widget _stepperButton(String label, VoidCallback onTap) => Padding(
+    padding: const EdgeInsets.all(4),
+    child: SizedBox(
+      width: 48,
+      child: Material(
+        color: context.brandTint,
+        borderRadius: BorderRadius.circular(9),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(9),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w700,
+                color: context.accentText(AppColors.primary),
+              ),
+            ),
           ),
         ),
       ),
@@ -573,9 +625,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? AppColors.brand50 : AppColors.card,
+          color: selected ? context.brandTint : context.cardSurface,
           border: Border.all(
-            color: selected ? AppColors.brand200 : AppColors.line,
+            color: selected
+                ? context.brandTintBorder
+                : Theme.of(context).colorScheme.outlineVariant,
           ),
           borderRadius: BorderRadius.circular(selected ? 24 : 10),
         ),
@@ -602,7 +656,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                   style: TextStyle(
                     color: AppColors.green,
                     fontSize: 10,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: .7,
                   ),
                 ),
@@ -739,7 +793,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.locateFixed, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.locateFixed),
                 SizedBox(width: 10),
                 Text(
                   'Get karigars from',
@@ -824,7 +878,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
               if (city != null)
                 TextButton(
                   style: TextButton.styleFrom(
-                    backgroundColor: AppColors.brand50,
+                    backgroundColor: context.brandTint,
                     foregroundColor: AppColors.primary,
                     shape: const StadiumBorder(),
                   ),
@@ -871,7 +925,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.sparkles, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.sparkles),
                 SizedBox(width: 10),
                 Text(
                   'Skills',
@@ -895,7 +949,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.listFilter, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.listFilter),
                 SizedBox(width: 10),
                 Text(
                   'More filters',
@@ -1138,7 +1192,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           height: 52,
           child: TextButton(
             style: TextButton.styleFrom(
-              backgroundColor: AppColors.brand50,
+              backgroundColor: context.brandTint,
               foregroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(horizontal: 18),
               shape: RoundedRectangleBorder(
@@ -1270,7 +1324,9 @@ class _PostJobScreenState extends State<PostJobScreen> {
             child: Text(
               time == null ? 'Select time' : time.format(context),
               style: TextStyle(
-                color: time == null ? AppColors.muted : AppColors.foreground,
+                color: time == null
+                    ? Theme.of(context).colorScheme.onSurfaceVariant
+                    : Theme.of(context).colorScheme.onSurface,
               ),
             ),
           ),
@@ -1293,7 +1349,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: selected ? AppColors.brand50 : AppColors.card,
+          color: selected ? context.brandTint : context.cardSurface,
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.line,
           ),
@@ -1316,7 +1372,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                     title,
                     style: const TextStyle(
                       fontSize: 17,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
@@ -1345,11 +1401,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.clock3, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.clock3),
                 SizedBox(width: 10),
                 Text(
                   'Working hours',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -1398,11 +1454,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.house, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.house),
                 SizedBox(width: 10),
                 Text(
                   'Where will the karigar work?',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -1422,11 +1478,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.calendarDays, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.calendarDays),
                 SizedBox(width: 10),
                 Text(
                   'Interview',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -1480,11 +1536,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.gift, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.gift),
                 SizedBox(width: 10),
                 Text(
                   'Perks',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -1495,11 +1551,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
             const SizedBox(height: 18),
             const Row(
               children: [
-                Icon(LucideIcons.walletCards, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.walletCards),
                 SizedBox(width: 10),
                 Text(
                   'Does the karigar pay anything?',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -1640,7 +1696,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                 title,
                 style: const TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
@@ -1680,7 +1736,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: isSelected ? AppColors.brand50 : AppColors.card,
+            color: isSelected ? context.brandTint : context.cardSurface,
             border: Border.all(
               color: isSelected ? AppColors.primary : AppColors.line,
             ),
@@ -1703,7 +1759,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       title,
                       style: const TextStyle(
                         fontSize: 17,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -1739,11 +1795,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
         children: [
           const Row(
             children: [
-              Icon(LucideIcons.userRoundCheck, color: AppColors.primary),
+              _HeadingIcon(LucideIcons.userRoundCheck),
               SizedBox(width: 10),
               Text(
                 'Karigars ready for this job',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -1751,7 +1807,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
           Text.rich(
             TextSpan(
               text: '12 ',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
               children: [
                 TextSpan(
                   text: 'karigars match, in $localCity.',
@@ -1778,7 +1834,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                       person.$1,
                       style: const TextStyle(
                         color: AppColors.brandDark,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
@@ -1791,7 +1847,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           person.$2,
                           style: const TextStyle(
                             fontSize: 16,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                         Text(
@@ -1840,7 +1896,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
               titleController.text.trim().isEmpty
                   ? 'Your job title'
                   : titleController.text.trim(),
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 3),
             if (AppScope.maybeOf(
@@ -1980,11 +2036,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.phone, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.phone),
                 SizedBox(width: 10),
                 Text(
                   'How should karigars reach you?',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -2013,11 +2069,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.userRound, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.userRound),
                 SizedBox(width: 10),
                 Text(
                   'Contact person',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -2068,11 +2124,11 @@ class _PostJobScreenState extends State<PostJobScreen> {
           children: [
             const Row(
               children: [
-                Icon(LucideIcons.flame, color: AppColors.primary),
+                _HeadingIcon(LucideIcons.flame),
                 SizedBox(width: 10),
                 Text(
                   'When should they join?',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -3900,7 +3956,7 @@ class _PostJobScreenState extends State<PostJobScreen> {
                           child: OutlinedButton(
                             onPressed: loading ? null : () => _submit('draft'),
                             style: OutlinedButton.styleFrom(
-                              minimumSize: const Size.fromHeight(44),
+                              minimumSize: const Size.fromHeight(48),
                               foregroundColor: colors.onSurface,
                               side: BorderSide(color: colors.outlineVariant),
                             ),
@@ -3917,16 +3973,35 @@ class _PostJobScreenState extends State<PostJobScreen> {
                               : _step < 3
                               ? _goNext
                               : () => _submit(canDraft ? 'active' : liveStatus),
-                          child: Text(
-                            loading
-                                ? 'Saving...'
-                                : _step < 3
-                                ? 'Next'
-                                : widget.job == null
-                                ? 'Post job'
-                                : editingDraft
-                                ? 'Publish'
-                                : 'Save changes',
+                          style: FilledButton.styleFrom(
+                            minimumSize: const Size.fromHeight(48),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  loading
+                                      ? 'Saving...'
+                                      : _step < 3
+                                      ? 'Next'
+                                      : widget.job == null
+                                      ? 'Post job'
+                                      : editingDraft
+                                      ? 'Publish'
+                                      : 'Save changes',
+                                ),
+                              ),
+                              if (!loading) ...[
+                                const SizedBox(width: 6),
+                                Icon(
+                                  _step < 3
+                                      ? LucideIcons.arrowRight
+                                      : LucideIcons.send,
+                                  size: 17,
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       ),
@@ -4224,7 +4299,7 @@ class _JobTitleOption extends StatelessWidget {
               TextSpan(text: title.substring(0, index)),
               TextSpan(
                 text: title.substring(index, index + query.length),
-                style: const TextStyle(fontWeight: FontWeight.w800),
+                style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               TextSpan(text: title.substring(index + query.length)),
             ],
@@ -4279,7 +4354,7 @@ class _WorkInterviewCard extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
               decoration: BoxDecoration(
-                color: active ? AppColors.brand50 : colors.surface,
+                color: active ? context.brandTint : colors.surface,
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: active ? AppColors.primary : AppColors.line,
@@ -4409,7 +4484,7 @@ class _AiHelpCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: AppColors.background,
+                color: context.softSurface,
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -4422,9 +4497,9 @@ class _AiHelpCard extends StatelessWidget {
                         children: [
                           TextSpan(
                             text: '$creditsBalance',
-                            style: const TextStyle(
-                              color: AppColors.foreground,
-                              fontWeight: FontWeight.w800,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],
@@ -4526,8 +4601,8 @@ class _Label extends StatelessWidget {
               style: TextStyle(color: AppColors.rose),
             ),
         ],
-        style: const TextStyle(
-          color: AppColors.foreground,
+        style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
           fontSize: 12.5,
           fontWeight: FontWeight.w700,
         ),
@@ -4689,7 +4764,10 @@ class _Hint extends StatelessWidget {
     padding: const EdgeInsets.only(top: 6),
     child: Text(
       text,
-      style: const TextStyle(color: AppColors.muted, fontSize: 11.5),
+      style: TextStyle(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+        fontSize: 11.5,
+      ),
     ),
   );
 }
@@ -4704,27 +4782,71 @@ class _Choice extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
   @override
-  Widget build(BuildContext context) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(20),
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.primary : AppColors.card,
-        border: Border.all(
-          color: selected ? AppColors.primary : AppColors.line,
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        constraints: const BoxConstraints(minHeight: 34),
+        padding: EdgeInsets.fromLTRB(selected ? 9 : 13, 7, 13, 7),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : context.cardSurface,
+          border: Border.all(
+            color: selected ? AppColors.primary : colors.outlineVariant,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: selected
+              ? const [
+                  BoxShadow(
+                    color: Color(0x33BF3A16),
+                    blurRadius: 8,
+                    offset: Offset(0, 3),
+                  ),
+                ]
+              : null,
         ),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: selected ? Colors.white : AppColors.muted,
-          fontSize: 12,
-          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) ...[
+              const Icon(LucideIcons.check, size: 14, color: Colors.white),
+              const SizedBox(width: 4),
+            ],
+            Flexible(
+              child: Text(
+                text,
+                style: TextStyle(
+                  color: selected ? Colors.white : colors.onSurface,
+                  fontSize: 12.5,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
+    );
+  }
+}
+
+/// The icon in front of a section title: a tinted rounded square, so each
+/// section starts with a clear marker.
+class _HeadingIcon extends StatelessWidget {
+  const _HeadingIcon(this.icon);
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    width: 34,
+    height: 34,
+    decoration: BoxDecoration(
+      color: context.brandTint,
+      border: Border.all(color: context.brandTintBorder),
+      borderRadius: BorderRadius.circular(10),
     ),
+    child: Icon(icon, size: 18, color: context.accentText(AppColors.primary)),
   );
 }
 
