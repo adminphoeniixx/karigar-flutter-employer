@@ -1,4 +1,8 @@
+import 'dart:async';
+
 import 'post_job_screen.dart';
+import '../../core/push/push_router.dart' show jobCard;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -8,6 +12,7 @@ import '../../widgets/contact_actions.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
+import 'package:employer_kariger_app/core/app_strings.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/models/api_models.dart';
@@ -15,6 +20,8 @@ import 'package:employer_kariger_app/screens/jobs/applicant_features_screen.dart
 import 'package:employer_kariger_app/screens/workers/worker_profile_screen.dart';
 import 'package:employer_kariger_app/screens/messages/chat_screen.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
+import 'package:employer_kariger_app/core/dialog_controllers.dart';
+import 'package:employer_kariger_app/widgets/confirm_action.dart';
 
 class JobManageScreen extends StatefulWidget {
   const JobManageScreen({super.key, required this.job});
@@ -78,6 +85,7 @@ class _JobSummaryCard extends StatelessWidget {
           Wrap(
             spacing: 7,
             runSpacing: 7,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [BrandChip(job.category), StatusPill(job.status)],
           ),
           const SizedBox(height: 11),
@@ -96,7 +104,7 @@ class _JobSummaryCard extends StatelessWidget {
               const SizedBox(width: 4),
               Expanded(
                 child: Text(
-                  job.wage,
+                  context.trWage(job.wage),
                   style: const TextStyle(
                     fontSize: 12.5,
                     color: AppColors.muted,
@@ -113,7 +121,7 @@ class _JobSummaryCard extends StatelessWidget {
               ),
               const SizedBox(width: 4),
               Text(
-                '${job.openings} opening${job.openings == 1 ? '' : 's'}',
+                context.trOpenings(job.openings),
                 style: const TextStyle(fontSize: 12.5, color: AppColors.muted),
               ),
             ],
@@ -125,6 +133,7 @@ class _JobSummaryCard extends StatelessWidget {
               [job.workModeLabel, job.interviewModeLabel]
                   .whereType<String>()
                   .where((value) => value.isNotEmpty)
+                  .map(context.tr)
                   .join(' · '),
               style: const TextStyle(fontSize: 12, color: AppColors.muted),
             ),
@@ -208,7 +217,20 @@ class _JobManageScreenState extends State<JobManageScreen> {
   Map<String, dynamic> counts = const {};
   String stage = 'all';
 
-  Job get job => widget.job;
+  // The job as last loaded. The tiles (Applied, Shortlisted, Hired) used to
+  // show the numbers from when the screen opened, even after a hire.
+  Job? _fresh;
+  Timer? _callPoll;
+
+  Job get job => _fresh ?? widget.job;
+
+  static const _liveCallStates = {
+    'queued',
+    'dialing',
+    'ringing',
+    'in_progress',
+    'calling',
+  };
 
   @override
   void didChangeDependencies() {
@@ -216,19 +238,53 @@ class _JobManageScreenState extends State<JobManageScreen> {
     if (loading && applicants.isEmpty && error == null) _load();
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _callPoll?.cancel();
+    super.dispose();
+  }
+
+  /// While an AI call is on, check every 10 s; it used to say "Dialing"
+  /// until the screen was opened again.
+  void _watchCalls() {
+    final live = applicants.any(
+      (a) => _liveCallStates.contains(
+        '${a.screeningCall?['status'] ?? ''}'.toLowerCase(),
+      ),
+    );
+    if (!live) {
+      _callPoll?.cancel();
+      _callPoll = null;
+      return;
+    }
+    _callPoll ??= Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted && !loading) _load(quiet: true);
+    });
+  }
+
+  Future<void> _load({bool quiet = false}) async {
     if (job.id == 0) {
       setState(() => loading = false);
       return;
     }
-    setState(() {
-      loading = true;
-      error = null;
-    });
+    if (!quiet) {
+      setState(() {
+        loading = true;
+        error = null;
+      });
+    }
+    final api = AppScope.of(context).api;
+    // The job's numbers alongside; a failure keeps the ones shown.
+    unawaited(
+      api
+          .job(job.id)
+          .then((fresh) {
+            if (mounted) setState(() => _fresh = jobCard(fresh));
+          })
+          .catchError((Object _) {}),
+    );
     try {
-      final response = await AppScope.of(
-        context,
-      ).api.applicants(job.id, stage: stage);
+      final response = await api.applicants(job.id, stage: stage);
       final rows = response['data'] as List? ?? const [];
       if (!mounted) return;
       setState(() {
@@ -240,8 +296,9 @@ class _JobManageScreenState extends State<JobManageScreen> {
             ? Map<String, dynamic>.from(response['counts'])
             : const {};
       });
+      _watchCalls();
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted && !quiet) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -259,16 +316,38 @@ class _JobManageScreenState extends State<JobManageScreen> {
       // is rendered immediately (Dialing or Scheduled).
       await _load();
     } catch (exception) {
-      _message('$exception');
+      _message(errorText(exception));
     }
   }
 
+  /// Takes a rejection back (the AI's auto-reject included): the server
+  /// sets the application to pending and shortlists it.
+  Future<void> _shortlistAgain(Applicant applicant) async {
+    final sure = await confirmAction(
+      context,
+      title: 'Shortlist ${applicant.worker.name} again?',
+      message:
+          'This takes the rejection back. They will be told they are shortlisted.',
+      confirmLabel: 'Shortlist',
+      destructive: false,
+    );
+    if (!sure || !mounted) return;
+    await _shortlist(applicant);
+  }
+
   Future<void> _reject(Applicant applicant) async {
+    final sure = await confirmAction(
+      context,
+      title: 'Reject ${applicant.worker.name}?',
+      message: 'They will be told they were not selected for this job.',
+      confirmLabel: 'Reject',
+    );
+    if (!sure || !mounted) return;
     try {
       await AppScope.of(context).api.applicantStatus(applicant.id, 'rejected');
       await _load();
     } catch (exception) {
-      _message('$exception');
+      _message(errorText(exception));
     }
   }
 
@@ -324,7 +403,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
                   if (value != null) setDialogState(() => startDate = value);
                 },
                 icon: const Icon(LucideIcons.calendarDays),
-                label: Text('Joining date * · ${_dateValue(startDate)}'),
+                label: Text('Joining date * · ${_dateLabel(startDate)}'),
               ),
             ],
           ),
@@ -354,8 +433,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
     );
     final offeredWage = num.tryParse(wage.text);
     final message = offerMessage.text.trim();
-    wage.dispose();
-    offerMessage.dispose();
+    disposeAfterClose([wage, offerMessage]);
     if (confirmed != true) return;
     try {
       await api.applicantStatus(
@@ -368,41 +446,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
       await _load();
       _message('Hire offer sent.');
     } catch (exception) {
-      _message('$exception');
-    }
-  }
-
-  Future<void> _interview(Applicant applicant) async {
-    final date = await showDatePicker(
-      context: context,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (date == null || !mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.now(),
-    );
-    if (time == null || !mounted) return;
-    final at = DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    );
-    try {
-      final api = AppScope.of(context).api;
-      final details = job.id == 0 ? null : await api.job(job.id);
-      await api.scheduleInterview(
-        applicant.id,
-        interviewAt: at.toIso8601String(),
-        mode: details?.interviewMode == 'remote' ? 'phone' : 'site',
-      );
-      await _load();
-      _message('Interview invitation sent.');
-    } catch (exception) {
-      _message('$exception');
+      _message(errorText(exception));
     }
   }
 
@@ -412,7 +456,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
       await _load();
       _message('Interview cancelled.');
     } catch (exception) {
-      if (mounted) _message('$exception');
+      if (mounted) _message(errorText(exception));
     }
   }
 
@@ -433,7 +477,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
         ),
       );
     } catch (exception) {
-      if (mounted) _message('$exception');
+      if (mounted) _message(errorText(exception));
     }
   }
 
@@ -552,8 +596,8 @@ class _JobManageScreenState extends State<JobManageScreen> {
         ),
       ),
     );
-    if (confirmed != true) {
-      messageController.dispose();
+    if (confirmed != true || !mounted) {
+      disposeAfterClose([messageController]);
       return;
     }
     try {
@@ -613,9 +657,9 @@ class _JobManageScreenState extends State<JobManageScreen> {
         ),
       );
     } catch (e) {
-      if (mounted) _message('$e');
+      if (mounted) _message(errorText(e));
     } finally {
-      messageController.dispose();
+      disposeAfterClose([messageController]);
     }
   }
 
@@ -640,8 +684,27 @@ class _JobManageScreenState extends State<JobManageScreen> {
       }
       _message('Resume saved.');
     } catch (exception) {
-      if (mounted) _message('$exception');
+      if (mounted) _message(errorText(exception));
     }
+  }
+
+  /// "27 Nov 2026" for the button; [_dateValue] stays the API's format.
+  String _dateLabel(DateTime value) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${value.day} ${months[value.month - 1]} ${value.year}';
   }
 
   String _dateValue(DateTime value) =>
@@ -704,6 +767,14 @@ class _JobManageScreenState extends State<JobManageScreen> {
           _message('Share link copied.');
         }
       } else if (action == 'close') {
+        final sure = await confirmAction(
+          context,
+          title: 'Close this job?',
+          message:
+              'Karigars will no longer see it or apply. Its applicants stay in your list.',
+          confirmLabel: 'Close job',
+        );
+        if (!sure || !mounted) return;
         final jobsController = AppScope.of(context).jobs;
         await AppScope.of(context).api.closeJob(job.id);
         jobsController.markClosed(job.id);
@@ -711,7 +782,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
         if (mounted) Navigator.pop(context, JobManageResult.closed);
       }
     } catch (exception) {
-      _message('$exception');
+      _message(errorText(exception));
     }
   }
 
@@ -734,9 +805,22 @@ class _JobManageScreenState extends State<JobManageScreen> {
         children: [
           _JobSummaryCard(job: job),
           const SectionTitle('Performance'),
+          // How far applicants got, so a hired karigar also counts as
+          // shortlisted; the filters under Applicants show where each one is
+          // now. Same counting as Home and the website.
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Text(
+              'Everyone who reached each step. A hired karigar also counts as shortlisted.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
           _JobMetrics(
             values: [
-              ('Views', 124, LucideIcons.eye),
+              ('Views', job.views, LucideIcons.eye),
               ('Applied', job.applied, LucideIcons.fileText),
               ('Shortlisted', job.shortlisted, LucideIcons.bookmarkCheck),
               ('Hired', job.hired, LucideIcons.circleCheck),
@@ -784,7 +868,9 @@ class _JobManageScreenState extends State<JobManageScreen> {
                   return ChoiceChip(
                     selected: selected,
                     showCheckmark: false,
-                    label: Text('${item.$2} (${counts[item.$1] ?? 0})'),
+                    label: Text(
+                      '${context.tr(item.$2)} (${counts[item.$1] ?? 0})',
+                    ),
                     selectedColor: AppColors.primary,
                     backgroundColor: Theme.of(context).colorScheme.surface,
                     side: BorderSide(
@@ -824,156 +910,170 @@ class _JobManageScreenState extends State<JobManageScreen> {
                 profile.distanceKm ?? 0,
                 profile.expectedWage,
                 profile.skills,
-                status: applicant.statusLabel,
+                status: applicant.stageLabel,
                 verified: profile.verified,
               );
+              // One card per applicant. The details used to sit in a second
+              // box under it, so one applicant looked like two.
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: Column(
-                  children: [
-                    WorkerCard(
-                      worker: worker,
-                      onTap: () {
-                        if (profile.id <= 0) {
-                          _message(
-                            'This applicant has not completed a profile yet.',
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    children: [
+                      WorkerCard(
+                        flat: true,
+                        worker: worker,
+                        onTap: () {
+                          if (profile.id <= 0) {
+                            _message(
+                              'This applicant has not completed a profile yet.',
+                            );
+                            return;
+                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => WorkerProfileScreen(
+                                worker: worker,
+                                profileId: profile.id,
+                                workerUserId: profile.userId,
+                                jobId: job.id,
+                                phone: profile.phone,
+                                contactUnlocked: true,
+                                canMessage: true,
+                                alwaysShowContact: true,
+                              ),
+                            ),
                           );
-                          return;
-                        }
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => WorkerProfileScreen(
-                              worker: worker,
-                              profileId: profile.id,
-                              workerUserId: profile.userId,
-                              jobId: job.id,
-                              phone: profile.phone,
-                              contactUnlocked: true,
-                              canMessage: true,
-                              alwaysShowContact: true,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        border: Border.all(color: AppColors.line),
-                        borderRadius: BorderRadius.circular(14),
+                        },
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (applicant.ai != null)
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: BrandChip(
-                                'AI match ${applicant.ai?['score'] ?? 0}% · '
-                                '${applicant.ai?['recommendation_label'] ?? applicant.ai?['recommendation'] ?? ''}',
-                              ),
-                            ),
-                          const SizedBox(height: 8),
-
-                          if (applicant.screeningCall != null)
-                            ApplicantScreeningCallPanel(
-                              call: applicant.screeningCall,
-                              workerName: profile.name,
-                            ),
-
-                          if (applicant.interview != null &&
-                              applicant.interviewReminderCall != null)
-                            InterviewReminderCallPanel(
-                              call: applicant.interviewReminderCall,
-                              workerName: profile.name,
-                            ),
-
-                          if (applicant.resume != null)
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: () => _downloadResume(applicant),
-                                icon: const Icon(
-                                  LucideIcons.fileText,
-                                  size: 17,
-                                ),
-                                label: Text(
-                                  'Resume · ${applicant.resume?['name'] ?? 'PDF'}',
+                      const Divider(height: 1, indent: 14, endIndent: 14),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (applicant.ai != null)
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: BrandChip(
+                                  '${context.tr('AI match')} ${applicant.ai?['score'] ?? 0}% · '
+                                  '${context.tr('${applicant.ai?['recommendation_label'] ?? applicant.ai?['recommendation'] ?? ''}')}',
                                 ),
                               ),
-                            ),
-                          SizedBox(
-                            width: double.infinity,
-                            child: TextButton.icon(
-                              onPressed: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => ScreeningCallsScreen(
-                                    applicantId: applicant.id,
-                                    workerName: profile.name,
+                            const SizedBox(height: 8),
+
+                            if (applicant.screeningCall != null)
+                              ApplicantScreeningCallPanel(
+                                call: applicant.screeningCall,
+                                workerName: profile.name,
+                              ),
+
+                            if (applicant.interview != null &&
+                                applicant.interviewReminderCall != null)
+                              InterviewReminderCallPanel(
+                                call: applicant.interviewReminderCall,
+                                workerName: profile.name,
+                              ),
+
+                            if (applicant.resume != null)
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _downloadResume(applicant),
+                                  icon: const Icon(
+                                    LucideIcons.fileText,
+                                    size: 17,
+                                  ),
+                                  label: Text(
+                                    'Resume · ${applicant.resume?['name'] ?? 'PDF'}',
                                   ),
                                 ),
-                              ).then((_) => _load()),
-                              icon: const Icon(LucideIcons.phoneCall, size: 17),
-                              label: const Text('AI screening calls'),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          ContactActions(
-                            phone: profile.phone,
-                            email: profile.email,
-                            expanded: true,
-                            onChat: () => _chat(applicant, worker),
-                          ),
-                          if (applicant.stage != 'hired' &&
-                              applicant.stage != 'rejected')
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: OutlinedButton(
-                                    onPressed: () => _shortlist(applicant),
-                                    child: Text(
-                                      applicant.stage == 'interview' ||
-                                              applicant.stage == 'shortlisted'
-                                          ? 'Shortlisted ★'
-                                          : 'Shortlist',
+                              ),
+                            SizedBox(
+                              width: double.infinity,
+                              child: TextButton.icon(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ScreeningCallsScreen(
+                                      applicantId: applicant.id,
+                                      workerName: profile.name,
                                     ),
                                   ),
+                                ).then((_) => _load()),
+                                icon: const Icon(
+                                  LucideIcons.phoneCall,
+                                  size: 17,
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: () => _hire(applicant),
-                                    child: const Text('Hire'),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                IconButton.outlined(
-                                  onPressed: () => _reject(applicant),
-                                  color: Colors.red,
-                                  icon: const Icon(LucideIcons.x, size: 18),
-                                ),
-                              ],
-                            ),
-                          if (applicant.stage == 'interview')
-                            SizedBox(
-                              width: double.infinity,
-                              child: TextButton(
-                                onPressed: () => _cancelInterview(applicant),
-                                child: const Text('Cancel interview'),
+                                label: const Text('AI screening calls'),
                               ),
                             ),
-                          if (applicant.stage == 'hired' &&
-                              applicant.offer != null)
-                            _OfferSentCard(offer: applicant.offer!),
-                        ],
+                            const SizedBox(height: 8),
+                            ContactActions(
+                              phone: profile.phone,
+                              email: profile.email,
+                              expanded: true,
+                              onChat: () => _chat(applicant, worker),
+                            ),
+                            if (applicant.stage != 'hired' &&
+                                applicant.stage != 'rejected')
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton(
+                                      onPressed: () => _shortlist(applicant),
+                                      child: Text(
+                                        applicant.stage == 'interview' ||
+                                                applicant.stage == 'shortlisted'
+                                            ? 'Shortlisted ★'
+                                            : 'Shortlist',
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: FilledButton(
+                                      onPressed: () => _hire(applicant),
+                                      child: const Text('Hire'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  IconButton.outlined(
+                                    onPressed: () => _reject(applicant),
+                                    color: Colors.red,
+                                    icon: const Icon(LucideIcons.x, size: 18),
+                                  ),
+                                ],
+                              ),
+                            // A rejection (often the AI's) can be overruled.
+                            if (applicant.stage == 'rejected')
+                              SizedBox(
+                                width: double.infinity,
+                                child: OutlinedButton.icon(
+                                  onPressed: () => _shortlistAgain(applicant),
+                                  icon: const Icon(LucideIcons.undo2, size: 17),
+                                  label: const Text('Shortlist again'),
+                                ),
+                              ),
+                            if (applicant.stage == 'interview')
+                              SizedBox(
+                                width: double.infinity,
+                                child: TextButton(
+                                  onPressed: () => _cancelInterview(applicant),
+                                  child: const Text('Cancel interview'),
+                                ),
+                              ),
+                            if (applicant.stage == 'hired' &&
+                                applicant.offer != null)
+                              _OfferSentCard(offer: applicant.offer!),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               );
             }),

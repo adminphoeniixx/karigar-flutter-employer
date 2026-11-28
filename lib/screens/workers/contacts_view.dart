@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/push/push_router.dart' as router;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../../core/app_scope.dart';
@@ -32,6 +34,8 @@ class _ContactsViewState extends State<ContactsView> {
   bool loading = false, started = false;
   String? error;
   int page = 1, lastPage = 1, generation = 0;
+  // Rows across every page; the heading showed only the loaded page (20).
+  int? total;
 
   @override
   void initState() {
@@ -84,10 +88,13 @@ class _ContactsViewState extends State<ContactsView> {
             .toList();
         page = next;
         lastPage = asInt(contacts['last_page']);
+        total = contacts['total'] == null ? null : asInt(contacts['total']);
       });
       widget.onUsage(usage);
     } catch (e) {
-      if (mounted && request == generation) setState(() => error = '$e');
+      if (mounted && request == generation) {
+        setState(() => error = errorText(e));
+      }
     } finally {
       if (mounted && request == generation) setState(() => loading = false);
     }
@@ -244,19 +251,7 @@ class _ContactsViewState extends State<ContactsView> {
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => JobManageScreen(
-              job: Job(
-                job.title,
-                job.category,
-                job.wageLabel,
-                job.vacancies,
-                asInt(job.stats['applicants']),
-                asInt(job.stats['shortlisted']),
-                asInt(job.stats['hired']),
-                job.status,
-                id: job.id,
-              ),
-            ),
+            builder: (_) => JobManageScreen(job: router.jobCard(job)),
           ),
         );
       } catch (e) {
@@ -299,7 +294,7 @@ class _ContactsViewState extends State<ContactsView> {
         children: [
           _ContactsHeader(
             applicants: widget.source == 'applicants',
-            count: rows.length,
+            count: total ?? rows.length,
           ),
           const SizedBox(height: 14),
           TextField(
@@ -324,7 +319,9 @@ class _ContactsViewState extends State<ContactsView> {
               ),
             ),
           ),
-          if (usage.isNotEmpty)
+          // Database unlocks only matter on the Database list: applicants'
+          // numbers are always shown, so "subscribe to unlock" misled there.
+          if (usage.isNotEmpty && widget.source == 'database')
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Card(
@@ -447,7 +444,13 @@ class _ContactsViewState extends State<ContactsView> {
                             ),
                           ),
                           if (widget.source == 'applicants')
-                            _StageTag('${row['stage'] ?? 'Applicant'}'),
+                            StatusPill(
+                              row['status'] == 'withdrawn'
+                                  ? 'Withdrawn'
+                                  : applicationStageLabel(
+                                      '${row['stage'] ?? ''}',
+                                    ),
+                            ),
                         ],
                       ),
                       if (row['job'] is Map) ...[
@@ -458,7 +461,7 @@ class _ContactsViewState extends State<ContactsView> {
                             vertical: 5,
                           ),
                           decoration: BoxDecoration(
-                            color: AppColors.brand50,
+                            color: context.brandTint,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
@@ -574,8 +577,8 @@ class _ContactsHeader extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: AppColors.brand50,
-      border: Border.all(color: AppColors.brand200),
+      color: context.brandTint,
+      border: Border.all(color: context.brandTintBorder),
       borderRadius: BorderRadius.circular(18),
     ),
     child: Row(
@@ -628,27 +631,6 @@ class _ContactsHeader extends StatelessWidget {
           ),
         ),
       ],
-    ),
-  );
-}
-
-class _StageTag extends StatelessWidget {
-  const _StageTag(this.stage);
-  final String stage;
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-    decoration: BoxDecoration(
-      color: AppColors.indigoBg,
-      borderRadius: BorderRadius.circular(8),
-    ),
-    child: Text(
-      stage,
-      style: const TextStyle(
-        color: AppColors.indigo,
-        fontSize: 10.5,
-        fontWeight: FontWeight.w700,
-      ),
     ),
   );
 }

@@ -11,6 +11,8 @@ import 'package:employer_kariger_app/screens/auth/onboarding_screen.dart';
 import 'package:employer_kariger_app/screens/profile/account_management_screen.dart';
 import 'package:employer_kariger_app/screens/profile/legal_support_screen.dart';
 import 'package:employer_kariger_app/screens/profile/ai_call_settings_screen.dart';
+import 'package:employer_kariger_app/screens/jobs/ai_credits_screen.dart'
+    show AiCreditHistoryScreen;
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -79,7 +81,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
       return false;
     }
@@ -96,7 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       setState(() => darkTheme = oldValue);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('$exception')));
+      ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       return;
     }
     if (!await _updatePreference({'theme': value ? 'dark' : 'light'})) {
@@ -158,6 +160,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: LucideIcons.moon,
                   title: context.tr('Dark theme'),
                   subtitle: context.tr('Switch to a darker screen'),
+                  // The whole row toggles, like the karigar app; only the
+                  // small switch did.
+                  onTap: () => _changeDarkTheme(!darkTheme),
                   trailing: _CompactSwitch(
                     value: darkTheme,
                     onChanged: _changeDarkTheme,
@@ -167,6 +172,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: LucideIcons.bell,
                   title: context.tr('Applicant alerts'),
                   subtitle: context.tr('Get notified on new applications'),
+                  onTap: () => _changeAlert(
+                    value: !applicantAlerts,
+                    isApplicantAlert: true,
+                  ),
                   trailing: _CompactSwitch(
                     value: applicantAlerts,
                     onChanged: (value) =>
@@ -177,6 +186,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: LucideIcons.messageSquare,
                   title: context.tr('Message alerts'),
                   subtitle: context.tr('Get notified about karigar messages'),
+                  onTap: () => _changeAlert(
+                    value: !messageAlerts,
+                    isApplicantAlert: false,
+                  ),
                   trailing: _CompactSwitch(
                     value: messageAlerts,
                     onChanged: (value) =>
@@ -192,6 +205,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => const AiCallSettingsScreen(),
+                    ),
+                  ),
+                ),
+                _SettingsRow(
+                  icon: LucideIcons.history,
+                  title: 'AI credit history',
+                  subtitle: 'Credits added and spent on AI calls',
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AiCreditHistoryScreen(),
                     ),
                   ),
                 ),
@@ -244,6 +268,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
                   child: OutlinedButton.icon(
                     onPressed: () async {
+                      // One tap at the bottom of a long list is easy to hit
+                      // by mistake, and logging back in needs an OTP.
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (dialogContext) => AlertDialog(
+                          title: const Text('Log out?'),
+                          content: const Text(
+                            'You will need an OTP to log in again.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, false),
+                              child: const Text('Cancel'),
+                            ),
+                            FilledButton(
+                              onPressed: () =>
+                                  Navigator.pop(dialogContext, true),
+                              child: const Text('Log out'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed != true || !context.mounted) return;
                       await AppScope.of(context).auth.logout();
                       if (!context.mounted) return;
                       Navigator.pushAndRemoveUntil(
@@ -342,7 +390,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text('$exception')));
+          ).showSnackBar(SnackBar(content: Text(errorText(exception))));
         }
       }
     }
@@ -374,7 +422,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setSheetState(() => details = response);
             } catch (error) {
               if (!sheetContext.mounted) return;
-              setSheetState(() => loadError = readableMessage('$error'));
+              setSheetState(
+                () => loadError = readableMessage(errorText(error)),
+              );
             } finally {
               loadingDetails = false;
             }
@@ -577,11 +627,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _completeAccountDeletion(String? message) async {
     final scope = AppScope.of(context);
     await scope.api.client.setToken(null);
+    // AccountDataReset (app.dart) drops the account's jobs, karigars,
+    // dashboard and profile when this signs out.
     scope.auth.clearSession();
-    scope.dashboard.clear();
-    scope.jobs.clear();
-    scope.workers.clear();
-    scope.profile.clear();
     if (!mounted) return;
     Navigator.pop(context);
     Navigator.pushAndRemoveUntil(

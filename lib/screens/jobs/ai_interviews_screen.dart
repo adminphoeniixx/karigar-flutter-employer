@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -36,23 +37,63 @@ class _AiInterviewsScreenState extends State<AiInterviewsScreen> {
       final response = await AppScope.of(
         context,
       ).api.aiInterviews(filter: filter);
-      final raw = response['interviews'];
-      final data = raw is Map ? raw['data'] : const [];
       if (!mounted) return;
       setState(() {
         counts = response['counts'] is Map
             ? Map<String, dynamic>.from(response['counts'] as Map)
             : const {};
-        interviews = (data as List? ?? const [])
-            .whereType<Map>()
-            .map((row) => Map<String, dynamic>.from(row))
-            .toList();
+        _apply(response, more: false);
       });
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  int _page = 1, _lastPage = 1;
+  bool _loadingMore = false;
+
+  /// 20 calls come at a time; older ones load as the list nears its end.
+  Future<void> _loadMore() async {
+    if (_loadingMore || loading || _page >= _lastPage) return;
+    final current = filter;
+    setState(() => _loadingMore = true);
+    try {
+      final response = await AppScope.of(
+        context,
+      ).api.aiInterviews(filter: current, page: _page + 1);
+      if (mounted && current == filter) {
+        setState(() => _apply(response, more: true));
+      }
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
+      }
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _apply(Map<String, dynamic> response, {required bool more}) {
+    final raw = response['interviews'] is Map
+        ? Map<String, dynamic>.from(response['interviews'] as Map)
+        : <String, dynamic>{};
+    final incoming = (raw['data'] as List? ?? const [])
+        .whereType<Map>()
+        .map((row) => Map<String, dynamic>.from(row))
+        .toList();
+    final known = {for (final row in interviews) row['id']};
+    interviews = more
+        ? [
+            ...interviews,
+            ...incoming.where((row) => !known.contains(row['id'])),
+          ]
+        : incoming;
+    _page = (raw['current_page'] as num?)?.toInt() ?? 1;
+    _lastPage = (raw['last_page'] as num?)?.toInt() ?? _page;
   }
 
   Future<void> _cancel(int id) async {
@@ -63,7 +104,7 @@ class _AiInterviewsScreenState extends State<AiInterviewsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     }
   }
@@ -76,7 +117,7 @@ class _AiInterviewsScreenState extends State<AiInterviewsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     }
   }
@@ -114,13 +155,16 @@ class _AiInterviewsScreenState extends State<AiInterviewsScreen> {
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(16, 2, 16, 24),
                     sliver: SliverList.separated(
-                      itemCount: interviews.length,
+                      itemCount:
+                          interviews.length + (_page < _lastPage ? 1 : 0),
                       separatorBuilder: (_, _) => const SizedBox(height: 12),
-                      itemBuilder: (_, index) => _InterviewCard(
-                        item: interviews[index],
-                        onCancel: _cancel,
-                        onConfirm: _confirm,
-                      ),
+                      itemBuilder: (_, index) => index == interviews.length
+                          ? PageEndLoader(onReached: _loadMore)
+                          : _InterviewCard(
+                              item: interviews[index],
+                              onCancel: _cancel,
+                              onConfirm: _confirm,
+                            ),
                     ),
                   ),
               ],
@@ -367,8 +411,10 @@ class _InterviewCard extends StatelessWidget {
               const SizedBox(height: 8),
               _InterviewDetail(
                 icon: LucideIcons.clock3,
-                text:
-                    '${_callDuration(item['duration_seconds'])} · ${item['credits_charged']} credits',
+                text: [
+                  ?_callDuration(item['duration_seconds']),
+                  '${item['credits_charged']} credits',
+                ].join(' · '),
               ),
             ],
             if (sourceLabel != null) ...[
@@ -389,7 +435,7 @@ class _InterviewCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: AppColors.brand50,
+                  color: context.brandTint,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -475,8 +521,11 @@ class _InterviewCard extends StatelessWidget {
   }
 }
 
-String _callDuration(Object? seconds) {
-  final value = (seconds as num?)?.toInt() ?? 0;
+/// "2 min 15 s", or null when the server did not send the length; showing
+/// "0 min 0 s" next to the credits charged read as a free call.
+String? _callDuration(Object? seconds) {
+  final value = num.tryParse('${seconds ?? ''}')?.toInt();
+  if (value == null || value <= 0) return null;
   return '${value ~/ 60} min ${value % 60} s';
 }
 

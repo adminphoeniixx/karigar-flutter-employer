@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import '../../core/billing/billing.dart';
@@ -46,7 +47,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
         buyer = _map(response['buyer']);
       });
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -90,7 +91,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     } finally {
       if (mounted) setState(() => downloading = false);
@@ -159,9 +160,9 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                           ),
                         if (invoice['credits'] != null)
                           _line('AI call credits', '${invoice['credits']}'),
-                        _line('Subtotal', '₹${invoice['subtotal'] ?? 0}'),
+                        _line('Subtotal', money(invoice['subtotal'])),
                         if (invoice['discount'] != null)
-                          _line('Discount', '-₹${invoice['discount']}'),
+                          _line('Discount', '-${money(invoice['discount'])}'),
                         ...taxLines(
                           invoice,
                           invoice: true,
@@ -175,11 +176,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
                           '${invoice['sac'] ?? seller['sac'] ?? 'Not available'}',
                         ),
                         const Divider(),
-                        _line(
-                          'Total',
-                          '₹${invoice['total'] ?? 0}',
-                          strong: true,
-                        ),
+                        _line('Total', money(invoice['total']), strong: true),
                       ],
                     ),
                   ),

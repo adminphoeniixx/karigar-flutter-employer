@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
 import '../../models/api_models.dart';
@@ -37,6 +38,11 @@ class _WorkersScreenState extends State<WorkersScreen> {
     ..addListener(_loadNextPageIfNeeded);
   bool _loaded = false;
 
+  /// Whether the shared list holds this screen's Find results. The Rejected
+  /// tab replaces them, and a screen opened on Database or Applicants never
+  /// asks for them, so Find loads them when it is next shown.
+  bool _findLoaded = false;
+
   List<String> categories = const ['All'];
 
   @override
@@ -48,7 +54,9 @@ class _WorkersScreenState extends State<WorkersScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_loaded) {
+    // As a bottom tab this screen is built hidden at app start; it loads the
+    // first time it is shown, not before.
+    if (!_loaded && Visibility.of(context)) {
       _loaded = true;
       controller.addListener(_refresh);
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -58,6 +66,14 @@ class _WorkersScreenState extends State<WorkersScreen> {
   }
 
   Future<void> _initializeDirectory() async {
+    await _loadCategories();
+    // Database and Applicants load their own lists.
+    if (mounted && (tab == 0 || tab == 3)) await _search();
+  }
+
+  /// The craft chips. Asked again on Retry if the first try failed (the app
+  /// opened offline), or the chips never came back.
+  Future<void> _loadCategories() async {
     try {
       final reference = await AppScope.of(context).api.reference();
       final values = (reference['job_categories'] as List? ?? const [])
@@ -70,7 +86,6 @@ class _WorkersScreenState extends State<WorkersScreen> {
     } catch (_) {
       // The directory remains searchable even if reference options are offline.
     }
-    if (mounted) await _search();
   }
 
   void _refresh() {
@@ -135,6 +150,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
         );
       }
     }
+    _findLoaded = !filters.containsKey('rejected');
     await controller.search(filters);
   }
 
@@ -216,7 +232,10 @@ class _WorkersScreenState extends State<WorkersScreen> {
                   _DirectoryTab(
                     label: 'Find',
                     selected: tab == 0,
-                    onSelected: () => setState(() => tab = 0),
+                    onSelected: () {
+                      setState(() => tab = 0);
+                      if (!_findLoaded) _search();
+                    },
                   ),
                   const SizedBox(width: 8),
                   _DirectoryTab(
@@ -258,7 +277,10 @@ class _WorkersScreenState extends State<WorkersScreen> {
               },
             )
           : !controller.hasLoaded
-          ? const Center(child: CircularProgressIndicator())
+          // Not shown yet: a spinner here would keep the hidden tab drawing.
+          ? (_loaded
+                ? const Center(child: CircularProgressIndicator())
+                : const SizedBox.shrink())
           : Column(
               children: [
                 Container(
@@ -359,19 +381,30 @@ class _WorkersScreenState extends State<WorkersScreen> {
                               ),
                               const SizedBox(height: 8),
                               OutlinedButton(
-                                onPressed: _search,
+                                onPressed: () async {
+                                  if (categories.length <= 1) {
+                                    await _loadCategories();
+                                  }
+                                  if (mounted) await _search();
+                                },
                                 child: const Text('Retry'),
                               ),
                             ],
                           ),
                         ),
-                      Text(
-                        '${controller.total == 0 ? visible.length : controller.total} karigar found',
-                        style: const TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 11.5,
+                      // No count beside a load error: "0 karigar found" read
+                      // as if nobody matched.
+                      if (controller.error == null || visible.isNotEmpty)
+                        Text(
+                          controller.total == 1 ||
+                                  (controller.total == 0 && visible.length == 1)
+                              ? '1 karigar found'
+                              : '${_grouped(controller.total == 0 ? visible.length : controller.total)} karigars found',
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 11.5,
+                          ),
                         ),
-                      ),
                       const SizedBox(height: 11),
                       if (visible.isEmpty &&
                           !controller.loading &&
@@ -442,7 +475,7 @@ class _WorkersScreenState extends State<WorkersScreen> {
       }
       if (mounted) await _search();
     } catch (error) {
-      if (mounted) _message('$error');
+      if (mounted) _message(errorText(error));
     } finally {
       if (mounted) setState(() => rejecting = null);
     }
@@ -688,7 +721,8 @@ class _WorkerResultCard extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                           ],
-                          if (data.profile.available)
+                          if (data.profile.available) ...[
+                            const SizedBox(width: 8),
                             const Text(
                               '● Available',
                               style: TextStyle(
@@ -697,6 +731,7 @@ class _WorkerResultCard extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
+                          ],
                         ],
                       ),
                     ],
@@ -755,14 +790,21 @@ class _WorkerResultCard extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: busy ? null : onUnlock,
                       icon: const Icon(Icons.lock_open, size: 18),
-                      label: Text(busy ? 'Unlocking…' : 'Unlock contact'),
+                      // One line: the label broke into two on 360 dp phones.
+                      label: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(busy ? 'Unlocking…' : 'Unlock contact'),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   OutlinedButton.icon(
                     onPressed: rejecting ? null : onReject,
                     icon: const Icon(LucideIcons.thumbsDown, size: 17),
-                    label: Text(rejecting ? 'Please wait' : 'Not interested'),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(rejecting ? 'Please wait' : 'Not interested'),
+                    ),
                   ),
                 ],
               )
@@ -842,8 +884,8 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
   Widget build(BuildContext context) => FractionallySizedBox(
     heightFactor: .88,
     child: Container(
-      decoration: const BoxDecoration(
-        color: AppColors.card,
+      decoration: BoxDecoration(
+        color: context.cardSurface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
       child: Column(
@@ -1014,8 +1056,8 @@ class _WorkerFiltersSheetState extends State<_WorkerFiltersSheet> {
           ),
           Container(
             padding: const EdgeInsets.fromLTRB(18, 11, 18, 20),
-            decoration: const BoxDecoration(
-              color: AppColors.card,
+            decoration: BoxDecoration(
+              color: context.cardSurface,
               border: Border(top: BorderSide(color: AppColors.line)),
             ),
             child: Row(
@@ -1139,7 +1181,7 @@ class _FilterSelect extends StatelessWidget {
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: context.cardSurface,
         border: Border.all(color: AppColors.line),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -1214,3 +1256,9 @@ class _FilterSwitch extends StatelessWidget {
     ),
   );
 }
+
+/// 1000 as "1,000".
+String _grouped(int value) => value.toString().replaceAllMapped(
+  RegExp(r'\B(?=(\d{3})+(?!\d))'),
+  (_) => ',',
+);

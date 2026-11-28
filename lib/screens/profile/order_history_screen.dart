@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -46,7 +47,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             .toList();
       });
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -85,7 +86,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     } finally {
       if (mounted) setState(() => downloadingInvoices.remove(id));
@@ -170,7 +171,7 @@ class _OrderCard extends StatelessWidget {
                   height: 38,
                   margin: const EdgeInsets.only(right: 10),
                   decoration: BoxDecoration(
-                    color: AppColors.brand50,
+                    color: context.brandTint,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
@@ -179,27 +180,46 @@ class _OrderCard extends StatelessWidget {
                     color: AppColors.brandDark,
                   ),
                 ),
+                // Name and plan type on their own lines: as one string
+                // beside the badge it broke as "Single Job ·" / "Job plan".
                 Expanded(
-                  child: Text(
-                    '${order['plan'] ?? 'Plan'} · ${order['plan_type'] == 'database' ? 'Database plan' : 'Job plan'}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 17,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${order['plan'] ?? 'Plan'}',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 17,
+                        ),
+                      ),
+                      Text(
+                        order['plan_type'] == 'database'
+                            ? 'Database plan'
+                            : 'Job plan',
+                        style: TextStyle(color: colors.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    _StatusBadge(
+                      label: '${order['payment_label'] ?? status}',
+                      status: status,
                     ),
-                  ),
+                    if (status == 'paid' &&
+                        '${order['plan_label'] ?? ''}'.isNotEmpty) ...[
+                      const SizedBox(height: 5),
+                      _StatusBadge(
+                        label: '${order['plan_label']}',
+                        status: '${order['plan_status'] ?? ''}',
+                      ),
+                    ],
+                  ],
                 ),
-                _StatusBadge(
-                  label: '${order['payment_label'] ?? status}',
-                  status: status,
-                ),
-                if (status == 'paid' &&
-                    '${order['plan_label'] ?? ''}'.isNotEmpty) ...[
-                  const SizedBox(width: 6),
-                  _StatusBadge(
-                    label: '${order['plan_label']}',
-                    status: '${order['plan_status'] ?? ''}',
-                  ),
-                ],
               ],
             ),
             const SizedBox(height: 8),

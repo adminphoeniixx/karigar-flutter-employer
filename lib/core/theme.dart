@@ -245,3 +245,40 @@ abstract final class AppTheme {
     );
   }
 }
+
+/// Light-only tints that also work in dark mode. Boxes coloured with the
+/// fixed light values (brand50, card, #F8F5F0) kept a light background while
+/// their text turned light in dark mode, and could not be read.
+extension ThemeTints on BuildContext {
+  bool get isDarkTheme => Theme.of(this).brightness == Brightness.dark;
+
+  /// A status/accent colour readable on the dark surface: dark greens and
+  /// indigos were close to invisible there.
+  Color accentText(Color color) =>
+      isDarkTheme ? Color.lerp(color, Colors.white, .45)! : color;
+
+  /// The pill background for [color]: [lightBackground] in light mode, a dark
+  /// wash of the colour in dark mode (the light tints stayed white there).
+  Color accentBackground(Color color, Color lightBackground) => isDarkTheme
+      ? Color.alphaBlend(
+          color.withValues(alpha: .26),
+          Theme.of(this).colorScheme.surface,
+        )
+      : lightBackground;
+
+  /// [AppColors.brand50], or a dark warm tint in dark mode.
+  Color get brandTint =>
+      isDarkTheme ? const Color(0xFF3A2119) : AppColors.brand50;
+
+  /// [AppColors.brand200] as a border, darker in dark mode.
+  Color get brandTintBorder =>
+      isDarkTheme ? const Color(0xFF6A3524) : AppColors.brand200;
+
+  /// The soft strip colour (#F8F5F0), or a dark one in dark mode.
+  Color get softSurface =>
+      isDarkTheme ? const Color(0xFF2B251F) : const Color(0xFFF8F5F0);
+
+  /// [AppColors.card], or the dark card colour in dark mode.
+  Color get cardSurface =>
+      isDarkTheme ? Theme.of(this).colorScheme.surface : AppColors.card;
+}

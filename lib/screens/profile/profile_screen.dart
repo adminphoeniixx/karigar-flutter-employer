@@ -17,6 +17,17 @@ import 'package:employer_kariger_app/screens/profile/settings_screen.dart';
 import 'package:employer_kariger_app/screens/workers/shortlisted_screen.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 
+/// What the verification was done with. An individual / household verifies
+/// with Aadhaar and a residence proof, a business with its GST number or,
+/// without one, its PAN and documents.
+@visibleForTesting
+String kycSubtitle(EmployerProfile? profile) {
+  if (profile?.verified != true) return 'Complete your business verification';
+  if (profile!.hiringAs == 'individual') return 'Aadhaar & address verified';
+  if (profile.gstin?.trim().isNotEmpty == true) return 'GST verified';
+  return 'Business verified';
+}
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -24,7 +35,8 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with WidgetsBindingObserver {
   late final controller = AppScope.of(context).profile;
   bool requested = false;
 
@@ -33,10 +45,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.didChangeDependencies();
     if (!requested) {
       requested = true;
+      WidgetsBinding.instance.addObserver(this);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) controller.load();
       });
+    } else if (Visibility.of(context)) {
+      _retryAfterError();
     }
+  }
+
+  /// Shown again after a failed load (e.g. the app opened offline): try once
+  /// more by itself rather than waiting for Retry.
+  void _retryAfterError() {
+    if (controller.error != null && !controller.loading) controller.load();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) _retryAfterError();
+  }
+
+  @override
+  void dispose() {
+    if (requested) WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _open(Widget page, {bool refresh = false}) async {
@@ -49,7 +81,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: controller,
+    // The KYC row depends on the dashboard; without listening to it the row
+    // stayed hidden when Profile was opened before Home finished loading.
+    listenable: Listenable.merge([controller, AppScope.of(context).dashboard]),
     builder: (context, _) {
       final profile = controller.profile;
       final verificationEnabled =
@@ -86,13 +120,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ? const Center(child: CircularProgressIndicator())
             : controller.error != null && profile == null
             ? Center(
-                child: OutlinedButton(
-                  onPressed: controller.load,
-                  child: Text(context.tr('Retry')),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Only a Retry button used to show, with no reason.
+                      Text(controller.error!, textAlign: TextAlign.center),
+                      const SizedBox(height: 12),
+                      OutlinedButton(
+                        onPressed: controller.load,
+                        child: Text(context.tr('Retry')),
+                      ),
+                    ],
+                  ),
                 ),
               )
             : RefreshIndicator(
-                onRefresh: controller.load,
+                onRefresh: () async {
+                  await controller.load();
+                  // The last profile stays on screen; say it is not fresh.
+                  if (!context.mounted || controller.error == null) return;
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(controller.error!)));
+                },
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
@@ -145,9 +197,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       _ProfileRow(
                         icon: LucideIcons.shield,
                         title: context.tr('KYC Verification'),
-                        subtitle: profile?.verified == true
-                            ? 'GST & PAN verified'
-                            : 'Complete your business verification',
+                        subtitle: kycSubtitle(profile),
                         verified: profile?.verified == true,
                         onTap: () => _open(const KycScreen(), refresh: true),
                       ),
@@ -245,8 +295,12 @@ class _BusinessHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
+                  // An individual has no business name: show their own
+                  // name rather than "Your business".
                   profile?.companyName.isNotEmpty == true
                       ? profile!.companyName
+                      : profile?.name.isNotEmpty == true
+                      ? profile!.name
                       : 'Your business',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -468,17 +522,31 @@ class _ProfileRow extends StatelessWidget {
                       horizontal: 9,
                       vertical: 5,
                     ),
+                    // Green like every other "done" state in the app (Hired,
+                    // payment success); the theme's tertiary is a pending
+                    // yellow.
                     decoration: BoxDecoration(
-                      color: colors.tertiaryContainer,
+                      color: AppColors.greenBg,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(
-                      'Verified',
-                      style: TextStyle(
-                        color: colors.onTertiaryContainer,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          LucideIcons.badgeCheck,
+                          size: 13,
+                          color: AppColors.green,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          'Verified',
+                          style: TextStyle(
+                            color: AppColors.green,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 else ...[

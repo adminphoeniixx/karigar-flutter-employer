@@ -17,8 +17,32 @@ class MainShell extends StatefulWidget {
   State<MainShell> createState() => _MainShellState();
 }
 
+/// Set by a screen outside the shell (the job form's "View my jobs") to
+/// switch tabs once it closes.
+final shellTabRequest = ValueNotifier<int?>(null);
+
 class _MainShellState extends State<MainShell> {
   int index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    shellTabRequest.addListener(_onTabRequest);
+  }
+
+  @override
+  void dispose() {
+    shellTabRequest.removeListener(_onTabRequest);
+    super.dispose();
+  }
+
+  void _onTabRequest() {
+    final requested = shellTabRequest.value;
+    if (requested == null) return;
+    shellTabRequest.value = null;
+    _selectTab(requested);
+  }
+
   final List<int> _tabHistory = [0];
   final pages = const [
     HomeScreen(),
@@ -165,7 +189,7 @@ class _BottomNav extends StatelessWidget {
   }
 }
 
-void openNotifications(BuildContext context) => Navigator.push(
+Future<void> openNotifications(BuildContext context) => Navigator.push(
   context,
   MaterialPageRoute(builder: (_) => const NotificationsScreen()),
 );

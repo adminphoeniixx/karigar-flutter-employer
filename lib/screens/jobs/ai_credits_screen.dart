@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import '../../core/api/api_exception.dart';
+
 import 'package:flutter/material.dart' hide Text;
 import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -13,6 +15,8 @@ import 'package:employer_kariger_app/screens/jobs/applicant_features_screen.dart
 import 'package:employer_kariger_app/screens/jobs/ai_credits_success_screen.dart';
 import 'package:employer_kariger_app/screens/profile/invoice_screen.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
+import 'package:employer_kariger_app/core/dialog_controllers.dart';
+import '../../core/billing/billing.dart';
 
 class AiCreditsScreen extends StatefulWidget {
   const AiCreditsScreen({super.key});
@@ -25,31 +29,16 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
   bool _loading = true, _verifying = false;
   String? _buyingPackKey;
   String? _error, _pendingOrder;
-  String _filter = 'all';
   Map<String, dynamic> _credits = const {};
-  Map<String, dynamic> _totals = const {}, _ledgerMeta = const {};
-  List<Map<String, dynamic>> _packs = const [], _ledger = const [];
-  int _ledgerPage = 1;
-  bool _loadingMore = false, _loadingLedger = false;
-  int _ledgerRequest = 0;
-  final ScrollController _scrollController = ScrollController();
+  Map<String, dynamic> _totals = const {};
+  List<Map<String, dynamic>> _packs = const [];
   List<String> _rules = const [];
   String? _billingEmail;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_loadMoreWhenNearEnd);
     _initRazorpay();
-  }
-
-  void _loadMoreWhenNearEnd() {
-    if (_scrollController.hasClients &&
-        _scrollController.position.maxScrollExtent -
-                _scrollController.position.pixels <
-            240) {
-      _loadMore();
-    }
   }
 
   Future<void> _initRazorpay() async {
@@ -75,7 +64,6 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
 
   @override
   void dispose() {
-    _scrollController.dispose();
     _razorpay?.clear();
     super.dispose();
   }
@@ -91,22 +79,17 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
+
+  /// Balance, totals and packs. The credit history lives on its own page,
+  /// Settings → AI credit history ([AiCreditHistoryScreen]).
   Future<void> _load() async {
-    _ledgerRequest++;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        AppScope.of(context).api.aiCredits(),
-        AppScope.of(
-          context,
-        ).api.aiCreditsLedger(filter: _filter, page: _ledgerPage),
-      ]);
+      final catalog = await AppScope.of(context).api.aiCredits();
       if (!mounted) return;
-      final catalog = results[0];
-      final history = results[1];
       setState(() {
         _credits = catalog['credits'] is Map
             ? Map<String, dynamic>.from(catalog['credits'] as Map)
@@ -120,70 +103,11 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
             .where((rule) => rule.isNotEmpty)
             .toList();
         _billingEmail = catalog['billing_email']?.toString();
-        final rows = history['data'] ?? history['ledger'];
-        _ledger = _maps(rows is Map ? rows['data'] : rows);
-        _ledgerMeta = history['meta'] is Map
-            ? Map<String, dynamic>.from(history['meta'] as Map)
-            : rows is Map && rows['meta'] is Map
-            ? Map<String, dynamic>.from(rows['meta'] as Map)
-            : const {};
       });
     } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+      if (mounted) setState(() => _error = errorText(e));
     } finally {
       if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _loadMore() async {
-    final current = (_ledgerMeta['current_page'] as num?)?.toInt() ?? 1;
-    final last = (_ledgerMeta['last_page'] as num?)?.toInt() ?? 1;
-    if (_loadingMore || current >= last) return;
-    setState(() => _loadingMore = true);
-    try {
-      final history = await AppScope.of(
-        context,
-      ).api.aiCreditsLedger(filter: _filter, page: current + 1);
-      if (!mounted) return;
-      final rows = history['data'] ?? history['ledger'];
-      setState(() {
-        _ledger.addAll(_maps(rows is Map ? rows['data'] : rows));
-        _ledgerMeta = history['meta'] is Map
-            ? Map<String, dynamic>.from(history['meta'] as Map)
-            : rows is Map && rows['meta'] is Map
-            ? Map<String, dynamic>.from(rows['meta'] as Map)
-            : _ledgerMeta;
-      });
-    } catch (error) {
-      _snack('$error');
-    } finally {
-      if (mounted) setState(() => _loadingMore = false);
-    }
-  }
-
-  Future<void> _loadLedger() async {
-    final request = ++_ledgerRequest;
-    setState(() => _loadingLedger = true);
-    try {
-      final history = await AppScope.of(
-        context,
-      ).api.aiCreditsLedger(filter: _filter, page: _ledgerPage);
-      if (!mounted || request != _ledgerRequest) return;
-      final rows = history['data'] ?? history['ledger'];
-      setState(() {
-        _ledger = _maps(rows is Map ? rows['data'] : rows);
-        _ledgerMeta = history['meta'] is Map
-            ? Map<String, dynamic>.from(history['meta'] as Map)
-            : rows is Map && rows['meta'] is Map
-            ? Map<String, dynamic>.from(rows['meta'] as Map)
-            : const {};
-      });
-    } catch (error) {
-      if (mounted && request == _ledgerRequest) _snack('$error');
-    } finally {
-      if (mounted && request == _ledgerRequest) {
-        setState(() => _loadingLedger = false);
-      }
     }
   }
 
@@ -237,7 +161,7 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
         ],
       ),
     );
-    controller.dispose();
+    disposeAfterClose([controller]);
     return value;
   }
 
@@ -278,14 +202,14 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
         'order_id': orderId,
         'amount': order['amount_paise'],
         'currency': 'INR',
-        'name': 'Karigar',
+        'name': 'Super Karigar',
         'description': '${pack['name'] ?? 'AI call credits'}',
-        'theme': {'color': '#F97316'},
+        'theme': {'color': '#BF3A16'},
         'prefill': {'email': email},
       });
     } catch (e) {
       _pendingOrder = null;
-      if (mounted) _snack('$e');
+      if (mounted) _snack(errorText(e));
     } finally {
       if (mounted) setState(() => _buyingPackKey = null);
     }
@@ -324,7 +248,7 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
         if (mounted) await _load();
       }
     } catch (e) {
-      if (mounted) _snack('$e');
+      if (mounted) _snack(errorText(e));
     } finally {
       _verifying = false;
       _pendingOrder = null;
@@ -356,7 +280,6 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView(
-              controller: _scrollController,
               padding: const EdgeInsets.all(16),
               physics: const AlwaysScrollableScrollPhysics(),
               children: [
@@ -387,68 +310,6 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
                         '• $rule',
                         style: const TextStyle(color: AppColors.muted),
                       ),
-                    ),
-                  ),
-                if (_credits['enabled'] != false)
-                  const SectionTitle('Credit history'),
-                if (_credits['enabled'] != false)
-                  Container(
-                    margin: const EdgeInsets.only(top: 8, bottom: 10),
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      border: Border.all(color: AppColors.line),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        for (final tab in const {
-                          'all': 'All',
-                          'added': 'Added',
-                          'spent': 'Spent',
-                        }.entries)
-                          Expanded(
-                            child: _CreditHistoryTab(
-                              label: tab.value,
-                              selected: _filter == tab.key,
-                              onTap: () {
-                                setState(() {
-                                  _filter = tab.key;
-                                  _ledgerPage = 1;
-                                });
-                                _loadLedger();
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                if (_credits['enabled'] != false && _loadingLedger)
-                  const Padding(
-                    padding: EdgeInsets.only(bottom: 10),
-                    child: LinearProgressIndicator(),
-                  ),
-                if (_credits['enabled'] != false && _ledger.isEmpty)
-                  Text(
-                    _creditHistoryEmptyText(_filter),
-                    style: TextStyle(color: AppColors.muted),
-                  )
-                else if (_credits['enabled'] != false)
-                  ..._ledger.map(_LedgerRow.new),
-                if (_credits['enabled'] != false &&
-                    (_ledgerMeta['current_page'] as num? ?? 1) <
-                        (_ledgerMeta['last_page'] as num? ?? 1))
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: OutlinedButton(
-                      onPressed: _loadingMore ? null : _loadMore,
-                      child: _loadingMore
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Load more history'),
                     ),
                   ),
               ],
@@ -554,7 +415,7 @@ class _CreditTotals extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: 10),
             child: Text(
-              '₹${(totals['recharged_amount'] as num).toStringAsFixed(2)} paid for recharges',
+              '${money(totals['recharged_amount'])} paid for recharges',
               style: const TextStyle(
                 color: AppColors.muted,
                 fontWeight: FontWeight.w600,
@@ -752,7 +613,7 @@ class _PackCard extends StatelessWidget {
                     vertical: 7,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.brand50,
+                    color: context.brandTint,
                     borderRadius: BorderRadius.circular(9),
                   ),
                   child: Text(
@@ -766,7 +627,9 @@ class _PackCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '${bonus > 0 ? '+ $bonus bonus · ' : ''}about ${pack['minutes'] ?? 0} min',
+                    // The credits above already include the bonus; "+ 14 bonus"
+                    // read as 14 more than that.
+                    '${bonus > 0 ? 'incl. $bonus bonus · ' : ''}about ${pack['minutes'] ?? 0} min',
                     style: const TextStyle(
                       color: AppColors.muted,
                       fontSize: 12,
@@ -777,7 +640,7 @@ class _PackCard extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             Text(
-              '₹${pack['price'] ?? 0} + ₹${pack['gst_amount'] ?? 0} GST = ₹${pack['price_with_gst'] ?? 0}',
+              '${money(pack['price'])} + ${money(pack['gst_amount'])} GST = ${money(pack['price_with_gst'])}',
               style: const TextStyle(color: AppColors.muted),
             ),
             const SizedBox(height: 12),
@@ -904,7 +767,7 @@ class _LedgerRow extends StatelessWidget {
                       children: [
                         if (paid is num)
                           Text(
-                            'Paid ₹${paid.toStringAsFixed(2)}',
+                            'Paid ${money(paid)}',
                             style: const TextStyle(
                               fontSize: 12,
                               color: AppColors.muted,
@@ -954,7 +817,26 @@ class _LedgerRow extends StatelessWidget {
   }
 }
 
-/// Reusable ledger for the Plans catalog as well as the dedicated credits page.
+/// Settings → AI credit history: every credit added and spent, on a page of
+/// its own (it used to sit at the bottom of the Plans page).
+class AiCreditHistoryScreen extends StatelessWidget {
+  const AiCreditHistoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('AI credit history')),
+    body: const SafeArea(
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: AiCreditHistory(),
+      ),
+    ),
+  );
+}
+
+/// The credit ledger: All / Added / Spent, with paging, on
+/// [AiCreditHistoryScreen]. (The recharge page lists the ledger with its own
+/// code.)
 class AiCreditHistory extends StatefulWidget {
   const AiCreditHistory({super.key, this.initialCredits});
   final Map<String, dynamic>? initialCredits;
@@ -973,16 +855,24 @@ class _AiCreditHistoryState extends State<AiCreditHistory> {
   bool _loadingMore = false;
   ScrollPosition? _scrollPosition;
 
+  bool _requested = false;
+  String? _error;
+
   @override
   void initState() {
     super.initState();
     _credits = widget.initialCredits ?? const {};
-    _refresh();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // The first load needs AppScope, which initState may not read: started
+    // there, it threw, the catch hid it and the history stayed empty.
+    if (!_requested) {
+      _requested = true;
+      _refresh();
+    }
     final position = Scrollable.maybeOf(context)?.position;
     if (position == _scrollPosition) return;
     _scrollPosition?.removeListener(_onScroll);
@@ -1010,7 +900,10 @@ class _AiCreditHistoryState extends State<AiCreditHistory> {
           .toList();
 
   Future<void> _refresh() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final results = await Future.wait([
         AppScope.of(context).api.aiCredits(),
@@ -1032,8 +925,9 @@ class _AiCreditHistoryState extends State<AiCreditHistory> {
             ? Map<String, dynamic>.from(history['meta'])
             : const {};
       });
-    } catch (_) {
-      // Keep the Plans page useful if the independent history request fails.
+    } catch (exception) {
+      // The rest of the Plans page still works; say why the history is empty.
+      if (mounted) setState(() => _error = errorText(exception));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1107,6 +1001,21 @@ class _AiCreditHistoryState extends State<AiCreditHistory> {
           const Padding(
             padding: EdgeInsets.all(16),
             child: Center(child: CircularProgressIndicator()),
+          )
+        else if (_error != null && _rows.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _error!,
+                    style: const TextStyle(color: AppColors.muted),
+                  ),
+                ),
+                TextButton(onPressed: _refresh, child: const Text('Retry')),
+              ],
+            ),
           )
         else if (_rows.isEmpty)
           Padding(

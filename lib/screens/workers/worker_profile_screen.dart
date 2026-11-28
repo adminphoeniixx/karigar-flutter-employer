@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
 import '../profile/plans_screen.dart';
@@ -77,7 +78,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     } finally {
       if (mounted) setState(() => loadingProfile = false);
@@ -138,7 +139,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     } finally {
       if (mounted) setState(() => busy = false);
@@ -248,7 +249,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                 ),
                                 const SizedBox(height: 5),
                                 Text(
-                                  '${[details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ').isNotEmpty ? [details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ') : 'Location unavailable'}${displayDistance > 0 ? ' · ${displayDistance.toStringAsFixed(1)} km' : ''}',
+                                  '${[details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ').isNotEmpty ? [details?.city, details?.state].whereType<String>().where((value) => value.trim().isNotEmpty).join(', ') : 'Location unavailable'}${displayDistance > 0 ? ' · ${formatKm(displayDistance)}' : ''}',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 13,
@@ -313,7 +314,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                     width: 40,
                                     height: 40,
                                     decoration: BoxDecoration(
-                                      color: AppColors.brand50,
+                                      color: context.brandTint,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     child: const Icon(
@@ -502,7 +503,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                       icon: LucideIcons.navigation,
                                       label: 'Distance',
                                       value: displayDistance > 0
-                                          ? '${displayDistance.toStringAsFixed(1)} km away'
+                                          ? '${formatKm(displayDistance)} away'
                                           : 'Not available',
                                     ),
                                   ),
@@ -542,7 +543,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                                 width: 38,
                                 height: 38,
                                 decoration: BoxDecoration(
-                                  color: AppColors.brand50,
+                                  color: context.brandTint,
                                   borderRadius: BorderRadius.circular(11),
                                 ),
                                 child: const Icon(

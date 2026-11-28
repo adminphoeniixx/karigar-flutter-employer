@@ -23,6 +23,7 @@ class _KycScreenState extends State<KycScreen> {
   Map<String, dynamic> kyc = const {};
   Map<String, dynamic> fieldErrors = const {};
   Map<String, dynamic> digilocker = const {};
+  String? gstin;
   String? type, error, digilockerMessage;
   bool loading = true, submitting = false;
 
@@ -70,8 +71,12 @@ class _KycScreenState extends State<KycScreen> {
       final business = response['business'] is Map
           ? Map<String, dynamic>.from(response['business'] as Map)
           : const {};
+      gstin = response['gstin']?.toString();
+      // A verified account may have no business row of its own; its type
+      // then lives on the KYC record.
       type =
           business['business_type']?.toString() ??
+          kyc['business_type']?.toString() ??
           (AppScope.of(context).profile.profile?.hiringAs == 'individual'
               ? 'individual'
               : null);
@@ -87,7 +92,7 @@ class _KycScreenState extends State<KycScreen> {
           ? 'Business verification is currently unavailable.'
           : e.message;
     } catch (e) {
-      error = '$e';
+      error = errorText(e);
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -106,6 +111,8 @@ class _KycScreenState extends State<KycScreen> {
   void _syncDocuments() {
     final selected = _first(types, (e) => '${e['key']}' == type);
     final keys = (selected?['documents'] as List? ?? const [])
+        // Document keys ("aadhaar", "address_proof"), not errors: running
+        // them through errorText turned each into "Something went wrong".
         .map((e) => '$e')
         .toSet();
     final saved = (kyc['documents'] as List? ?? const []).whereType<Map>().map(
@@ -269,7 +276,7 @@ class _KycScreenState extends State<KycScreen> {
         setState(() => digilockerMessage = e.message);
       }
     } catch (e) {
-      if (mounted) setState(() => digilockerMessage = '$e');
+      if (mounted) setState(() => digilockerMessage = errorText(e));
     }
   }
 
@@ -308,139 +315,253 @@ class _KycScreenState extends State<KycScreen> {
             children: [
               Card(
                 child: ListTile(
-                  leading: const Icon(
+                  leading: Icon(
                     LucideIcons.shieldCheck,
-                    color: AppColors.primary,
+                    color: kyc['status'] == 'verified'
+                        ? AppColors.green
+                        : AppColors.primary,
                   ),
                   title: Text(
                     '${kyc['status_label'] ?? 'Verify your business'}',
                   ),
-                  subtitle: kyc['remarks'] == null
-                      ? const Text('Submit your details for review.')
-                      : Text('${kyc['remarks']}'),
+                  subtitle: Text(_statusLine),
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text(
-                'Business details',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-              ),
-              const SizedBox(height: 12),
-              DropdownButtonFormField<String>(
-                initialValue: type,
-                decoration: const InputDecoration(labelText: 'Business type'),
-                items: types
-                    .map(
-                      (e) => DropdownMenuItem(
-                        value: '${e['key']}',
-                        child: Text('${e['label']}'),
-                      ),
-                    )
-                    .toList(),
-                onChanged: (value) => setState(() {
-                  type = value;
-                  _syncDocuments();
-                }),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: legalName,
-                decoration: InputDecoration(
-                  labelText: type == 'individual'
-                      ? 'Full name (as on Aadhaar)'
-                      : 'Legal name',
+              if (_submitted)
+                ..._submittedDetails()
+              else ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Business details',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: address,
-                minLines: 2,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  labelText: type == 'individual'
-                      ? 'Address'
-                      : 'Registered address',
-                ),
-              ),
-              const SizedBox(height: 22),
-              const Text(
-                'Documents',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-              ),
-              ...forms.entries.map((e) {
-                final saved = _first(
-                  (kyc['documents'] as List? ?? const []).whereType<Map>().map(
-                    (item) => Map<String, dynamic>.from(item),
-                  ),
-                  (item) => '${item['type']}' == e.key,
-                );
-                return _DocumentCard(
-                  label: '${docs[e.key]?['label'] ?? e.key}',
-                  config: {...?docs[e.key], 'key': e.key},
-                  form: e.value,
-                  pick: () => _pick(e.value),
-                  photoRequired: _needsPhoto(e.key, saved),
-                  check: saved?['check'] is Map
-                      ? Map<String, dynamic>.from(saved!['check'] as Map)
-                      : null,
-                  errorText: _fieldError(
-                    '${docs[e.key]?['number_field'] ?? '${e.key}_number'}',
-                  ),
-                  fileError: _fieldError('${e.key}_doc'),
-                );
-              }),
-              if ((type == 'individual' || type == 'proprietorship') &&
-                  forms.containsKey('aadhaar')) ...[
                 const SizedBox(height: 12),
-                if (digilockerMessage != null)
-                  Card(
-                    color: Theme.of(context).colorScheme.errorContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(digilockerMessage!),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: [
-                              TextButton(
-                                onPressed: _verifyDigiLocker,
-                                child: const Text('Try again'),
-                              ),
-                              TextButton(
-                                onPressed: _typeAadhaarNumber,
-                                child: const Text('Type Aadhaar number'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
+                DropdownButtonFormField<String>(
+                  initialValue: type,
+                  decoration: const InputDecoration(labelText: 'Business type'),
+                  items: types
+                      .map(
+                        (e) => DropdownMenuItem(
+                          value: '${e['key']}',
+                          child: Text('${e['label']}'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    type = value;
+                    _syncDocuments();
+                  }),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: legalName,
+                  decoration: InputDecoration(
+                    labelText: type == 'individual'
+                        ? 'Full name (as on Aadhaar)'
+                        : 'Legal name',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: address,
+                  minLines: 2,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    labelText: type == 'individual'
+                        ? 'Address'
+                        : 'Registered address',
+                  ),
+                ),
+                const SizedBox(height: 22),
+                const Text(
+                  'Documents',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+                ),
+                // Business and contractor accounts start with no type, and
+                // the list below stayed empty with only Submit under it.
+                if (type == null)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Choose your business type above to see the documents you need.',
+                      style: TextStyle(color: AppColors.muted),
                     ),
                   ),
-                OutlinedButton.icon(
-                  onPressed: digilocker['verified'] == true
-                      ? null
-                      : _verifyDigiLocker,
-                  icon: const Icon(LucideIcons.shieldCheck),
-                  label: Text(
-                    digilocker['verified'] == true
-                        ? 'Aadhaar verified with DigiLocker'
-                        : 'Verify with DigiLocker',
+                ...forms.entries.map((e) {
+                  final saved = _first(
+                    (kyc['documents'] as List? ?? const [])
+                        .whereType<Map>()
+                        .map((item) => Map<String, dynamic>.from(item)),
+                    (item) => '${item['type']}' == e.key,
+                  );
+                  return _DocumentCard(
+                    label: '${docs[e.key]?['label'] ?? e.key}',
+                    config: {...?docs[e.key], 'key': e.key},
+                    form: e.value,
+                    pick: () => _pick(e.value),
+                    photoRequired: _needsPhoto(e.key, saved),
+                    check: saved?['check'] is Map
+                        ? Map<String, dynamic>.from(saved!['check'] as Map)
+                        : null,
+                    errorText: _fieldError(
+                      '${docs[e.key]?['number_field'] ?? '${e.key}_number'}',
+                    ),
+                    fileError: _fieldError('${e.key}_doc'),
+                  );
+                }),
+                if ((type == 'individual' || type == 'proprietorship') &&
+                    forms.containsKey('aadhaar')) ...[
+                  const SizedBox(height: 12),
+                  if (digilockerMessage != null)
+                    Card(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(digilockerMessage!),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              children: [
+                                TextButton(
+                                  onPressed: _verifyDigiLocker,
+                                  child: const Text('Try again'),
+                                ),
+                                TextButton(
+                                  onPressed: _typeAadhaarNumber,
+                                  child: const Text('Type Aadhaar number'),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: digilocker['verified'] == true
+                        ? null
+                        : _verifyDigiLocker,
+                    icon: const Icon(LucideIcons.shieldCheck),
+                    label: Text(
+                      digilocker['verified'] == true
+                          ? 'Aadhaar verified with DigiLocker'
+                          : 'Verify with DigiLocker',
+                    ),
                   ),
+                ],
+                const SizedBox(height: 16),
+                FilledButton.icon(
+                  onPressed: submitting ? null : _submit,
+                  icon: const Icon(LucideIcons.shieldCheck),
+                  // This label is also spoken verbatim in the verification call.
+                  label: material.Text(submitting ? 'Submitting...' : 'Submit'),
                 ),
               ],
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: submitting ? null : _submit,
-                icon: const Icon(LucideIcons.shieldCheck),
-                // This label is also spoken verbatim in the verification call.
-                label: material.Text(submitting ? 'Submitting...' : 'Submit'),
-              ),
             ],
           ),
   );
+
+  /// Verified or under review: sending the form again would put a verified
+  /// business back into review, so show what was sent instead of a form.
+  bool get _submitted => const {'verified', 'pending'}.contains(kyc['status']);
+
+  String get _statusLine => switch (kyc['status']) {
+    'verified' => 'Your business is verified. You can post jobs.',
+    'pending' =>
+      'We are checking your documents. This usually takes a working day.',
+    _ =>
+      kyc['remarks']?.toString().trim().isNotEmpty == true
+          ? '${kyc['remarks']}'
+          : 'Submit your details for review.',
+  };
+
+  List<Widget> _submittedDetails() {
+    final typeLabel =
+        _first(types, (t) => '${t['key']}' == type)?['label']?.toString() ??
+        (type == null
+            ? null
+            : '${type![0].toUpperCase()}${type!.substring(1).replaceAll('_', ' ')}');
+    final documents = (kyc['documents'] as List? ?? const [])
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .where((d) => d['missing'] != true)
+        .toList();
+    Widget row(String label, String value) => Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+    return [
+      const SizedBox(height: 16),
+      Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Business details',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+              ),
+              if (typeLabel != null) row('Business type', typeLabel),
+              if (legalName.text.trim().isNotEmpty)
+                row('Legal name', legalName.text.trim()),
+              if (gstin?.isNotEmpty == true) row('GST number', gstin!),
+              if (documents.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                const Text(
+                  'Documents',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                ),
+                for (final document in documents)
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                    leading: const Icon(
+                      LucideIcons.fileCheck,
+                      color: AppColors.green,
+                    ),
+                    title: Text('${document['label'] ?? document['type']}'),
+                    subtitle: document['number']?.toString().isNotEmpty == true
+                        ? Text('${document['number']}')
+                        : document['has_file'] == true
+                        ? const Text('Photo sent')
+                        : null,
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 12),
+      Text(
+        kyc['status'] == 'verified'
+            ? 'To change these details, contact support.'
+            : 'We will tell you if anything needs fixing.',
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+    ];
+  }
 }
 
 class _DocumentForm {
@@ -499,7 +620,8 @@ class _DocumentCard extends StatelessWidget {
               ),
             if ('${config['key'] ?? ''}' == 'address_proof') ...[
               DropdownButtonFormField<String>(
-                value: form.proofType,
+                // Set only by this dropdown, so a starting value is enough.
+                initialValue: form.proofType,
                 decoration: const InputDecoration(
                   labelText: 'Proof you are sending',
                 ),

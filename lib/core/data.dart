@@ -9,6 +9,7 @@ class Job {
     this.hired,
     this.status, {
     this.id = 0,
+    this.views = 0,
     this.moderationNote,
     this.moderationStatus,
     this.moderationMethod,
@@ -25,6 +26,9 @@ class Job {
   final int shortlisted;
   final int hired;
   final int id;
+
+  /// How many times karigars opened the job (the API's `stats.views`).
+  final int views;
   final String? moderationNote;
   final String? moderationStatus, moderationMethod;
   final String? workModeLabel, interviewModeLabel;
@@ -59,22 +63,29 @@ class Worker {
       .where((e) => e.isNotEmpty)
       .map((e) => e[0])
       .take(2)
-      .join();
+      .join()
+      .toUpperCase();
 }
 
-String monthlyWage(num? amount) {
-  if (amount == null || amount <= 0) return '—';
-  final value = amount.round().toString();
-  if (value.length <= 3) return '₹$value/month';
-  final tail = value.substring(value.length - 3);
-  var head = value.substring(0, value.length - 3);
+/// Indian digit grouping: 1178 → "1,178", 150000 → "1,50,000".
+String indianDigits(int value) {
+  final negative = value < 0;
+  final digits = value.abs().toString();
+  if (digits.length <= 3) return '${negative ? '-' : ''}$digits';
+  final tail = digits.substring(digits.length - 3);
+  var head = digits.substring(0, digits.length - 3);
   final groups = <String>[];
   while (head.length > 2) {
     groups.insert(0, head.substring(head.length - 2));
     head = head.substring(0, head.length - 2);
   }
   if (head.isNotEmpty) groups.insert(0, head);
-  return '₹${groups.join(',')},$tail/month';
+  return '${negative ? '-' : ''}${groups.join(',')},$tail';
+}
+
+String monthlyWage(num? amount) {
+  if (amount == null || amount <= 0) return '—';
+  return '₹${indianDigits(amount.round())}/month';
 }
 
 const jobs = [

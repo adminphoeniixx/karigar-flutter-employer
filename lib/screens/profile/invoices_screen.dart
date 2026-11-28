@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 
 import '../../core/app_scope.dart';
 import '../../core/billing/billing.dart';
@@ -39,7 +40,7 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
             .toList();
       });
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -87,7 +88,12 @@ class _InvoicesScreenState extends State<InvoicesScreen> {
                               invoice['item'] is Map
                                   ? (invoice['item'] as Map)['title']
                                   : invoice['plan'],
-                              invoice['date'],
+                              // Non-breaking, so "26 Nov 2026" moves to the
+                              // next line whole instead of splitting.
+                              '${invoice['date'] ?? ''}'.replaceAll(
+                                ' ',
+                                '\u00A0',
+                              ),
                             ].where((value) => '$value'.isNotEmpty).join(' · '),
                           ),
                           trailing: Text(

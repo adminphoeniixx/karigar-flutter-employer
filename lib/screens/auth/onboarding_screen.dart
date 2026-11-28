@@ -64,7 +64,7 @@ class OnboardingScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 10),
                       const Text(
-                        'Post a job for free and reach thousands of verified, work-ready karigars near you. No middlemen.',
+                        'Post your job and reach thousands of work-ready karigars near you. Talk to them directly — no middlemen.',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 15.5,

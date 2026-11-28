@@ -16,7 +16,7 @@ Future<void> showContactError(BuildContext context, Object error) async {
   }
   ScaffoldMessenger.of(
     context,
-  ).showSnackBar(SnackBar(content: Text(readableMessage('$error'))));
+  ).showSnackBar(SnackBar(content: Text(errorText(error))));
 }
 
 class ContactActions extends StatelessWidget {
@@ -28,12 +28,16 @@ class ContactActions extends StatelessWidget {
     this.onChat,
     this.showChat = false,
     this.compact = false,
+    this.inline = false,
   });
   final String? phone, email;
   final bool expanded;
   final VoidCallback? onChat;
   final bool showChat;
   final bool compact;
+
+  /// One row of equal buttons (icon + word, no caption), for list cards.
+  final bool inline;
 
   Future<void> _open(BuildContext context, Uri uri) async {
     try {
@@ -88,6 +92,16 @@ class ContactActions extends StatelessWidget {
             onTap: () => _open(context, Uri(scheme: 'mailto', path: email)),
           ),
       ];
+      if (inline) {
+        return Row(
+          children: [
+            for (var i = 0; i < actions.length; i++) ...[
+              if (i > 0) const SizedBox(width: 8),
+              Expanded(child: _InlineContactButton(action: actions[i])),
+            ],
+          ],
+        );
+      }
       return LayoutBuilder(
         builder: (context, constraints) {
           final width = (constraints.maxWidth - 8) / 2;
@@ -154,62 +168,134 @@ class _ContactActionData {
   final VoidCallback? onTap;
 }
 
+class _InlineContactButton extends StatelessWidget {
+  const _InlineContactButton({required this.action});
+  final _ContactActionData action;
+
+  @override
+  Widget build(BuildContext context) {
+    final dark = context.isDarkTheme;
+    final surface = Theme.of(context).colorScheme.surface;
+    final background = dark
+        ? Color.alphaBlend(action.color.withValues(alpha: .28), surface)
+        : action.background;
+    final foreground = dark
+        ? Color.lerp(action.color, Colors.white, .55)!
+        : action.color;
+    return Semantics(
+      button: true,
+      label: action.caption,
+      child: Material(
+        color: action.onTap == null
+            ? background.withValues(alpha: .52)
+            : background,
+        borderRadius: BorderRadius.circular(11),
+        child: InkWell(
+          onTap: action.onTap,
+          borderRadius: BorderRadius.circular(11),
+          child: SizedBox(
+            height: 42,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(action.icon, size: 16, color: foreground),
+                    const SizedBox(width: 6),
+                    Text(
+                      action.label,
+                      maxLines: 1,
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ContactActionTile extends StatelessWidget {
   const _ContactActionTile({required this.action});
   final _ContactActionData action;
 
   @override
-  Widget build(BuildContext context) => Material(
-    color: action.onTap == null
-        ? action.background.withValues(alpha: .52)
-        : action.background,
-    borderRadius: BorderRadius.circular(13),
-    child: InkWell(
-      onTap: action.onTap,
+  Widget build(BuildContext context) {
+    // The light tint backgrounds stayed light in dark mode; there the tile
+    // takes a dark wash of the action colour and lighter text instead.
+    final dark = context.isDarkTheme;
+    final surface = Theme.of(context).colorScheme.surface;
+    final background = dark
+        ? Color.alphaBlend(action.color.withValues(alpha: .28), surface)
+        : action.background;
+    final foreground = dark
+        ? Color.lerp(action.color, Colors.white, .55)!
+        : action.color;
+    return Material(
+      color: action.onTap == null
+          ? background.withValues(alpha: .52)
+          : background,
       borderRadius: BorderRadius.circular(13),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 11),
-        child: Row(
-          children: [
-            Container(
-              width: 31,
-              height: 31,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .72),
-                borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        onTap: action.onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 31,
+                height: 31,
+                decoration: BoxDecoration(
+                  color: dark
+                      ? surface.withValues(alpha: .45)
+                      : Colors.white.withValues(alpha: .72),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(action.icon, size: 16, color: foreground),
               ),
-              child: Icon(action.icon, size: 16, color: action.color),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    action.label,
-                    style: TextStyle(
-                      color: action.color,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      action.label,
+                      style: TextStyle(
+                        color: foreground,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 1),
-                  Text(
-                    action.caption,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      color: AppColors.muted,
+                    const SizedBox(height: 1),
+                    Text(
+                      action.caption,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        color: dark
+                            ? Theme.of(context).colorScheme.onSurfaceVariant
+                            : AppColors.muted,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }

@@ -68,8 +68,8 @@ class AiCreditsSuccessScreen extends StatelessWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: AppColors.brand50,
-                    border: Border.all(color: AppColors.brand200),
+                    color: context.brandTint,
+                    border: Border.all(color: context.brandTintBorder),
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Column(

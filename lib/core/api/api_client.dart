@@ -17,6 +17,12 @@ class BinaryResponse {
   final String? contentType;
 }
 
+/// What the employer sees when the phone cannot reach the server: no
+/// internet, a dropped connection or the server not answering. On a phone
+/// these come as a SocketException or a ClientException wrapping one.
+const noConnectionMessage =
+    'No internet connection. Check your internet and try again.';
+
 class ApiClient {
   ApiClient({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
@@ -46,12 +52,6 @@ class ApiClient {
 
   Future<void> setToken(String? token) async {
     _token = token;
-    // Development-only diagnostic requested for verifying the exact auth header.
-    // Do not leave this enabled in a production build.
-    // ignore: avoid_print
-    print(
-      'Bearer token: ${token == null || token.isEmpty ? '(cleared)' : 'Bearer $token'}',
-    );
     try {
       final preferences = await SharedPreferences.getInstance();
       if (token == null || token.isEmpty) {
@@ -120,9 +120,7 @@ class ApiClient {
       );
     } on SocketException catch (error) {
       _logNetworkError('GET', uri, error);
-      throw const ApiException(
-        'Could not connect to the server. Check your internet connection and API URL.',
-      );
+      throw const ApiException(noConnectionMessage);
     } on http.ClientException catch (error) {
       _logNetworkError('GET', uri, error);
       throw const ApiException('The download could not be completed.');
@@ -158,12 +156,10 @@ class ApiClient {
       return _decode(response, elapsed: stopwatch.elapsed);
     } on SocketException catch (error) {
       _logNetworkError('POST', request.url, error);
-      throw const ApiException(
-        'Could not connect to the server. Check your internet connection and API URL.',
-      );
+      throw const ApiException(noConnectionMessage);
     } on http.ClientException catch (error) {
       _logNetworkError('POST', request.url, error);
-      throw const ApiException('The network request could not be completed.');
+      throw const ApiException(noConnectionMessage);
     }
   }
 
@@ -186,12 +182,10 @@ class ApiClient {
       return _decode(response, elapsed: stopwatch.elapsed);
     } on SocketException catch (error) {
       _logNetworkError(method, request.url, error);
-      throw const ApiException(
-        'Could not connect to the server. Check your internet connection and API URL.',
-      );
+      throw const ApiException(noConnectionMessage);
     } on http.ClientException catch (error) {
       _logNetworkError(method, request.url, error);
-      throw const ApiException('The network request could not be completed.');
+      throw const ApiException(noConnectionMessage);
     }
   }
 
@@ -291,10 +285,13 @@ class ApiClient {
     debugPrint(buffer.toString());
   }
 
+  /// Whether a token is sent, never the token itself: anyone with the phone's
+  /// log (logcat, a bug report) could otherwise sign in as this employer.
   String _tokenDebugState() {
     final token = _token;
-    if (token == null || token.isEmpty) return 'Bearer token missing';
-    return 'Bearer $token';
+    return token == null || token.isEmpty
+        ? 'Bearer token missing'
+        : 'Bearer token sent';
   }
 
   void _logResponse(

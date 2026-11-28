@@ -1,3 +1,5 @@
+import 'package:employer_kariger_app/controllers/auth_controller.dart'
+    show employerNeedsRegistration;
 import 'dart:async';
 
 import 'package:flutter/material.dart' hide Text;
@@ -157,8 +159,7 @@ class _OtpScreenState extends State<OtpScreen> {
         response['needs_registration'] == true ||
         response['is_new'] == true ||
         (user is Map &&
-            (user['company_name'] == null ||
-                user['company_name'].toString().trim().isEmpty));
+            employerNeedsRegistration(Map<String, dynamic>.from(user)));
 
     Navigator.pushAndRemoveUntil(
       context,
@@ -264,6 +265,9 @@ class _OtpScreenState extends State<OtpScreen> {
                         onChange: () => setState(() => sent = false),
                         resendSeconds: _resendSeconds,
                         onResend: _resendOtp,
+                        onCompleted: () {
+                          if (!loading) _continue();
+                        },
                       ),
                     const SizedBox(height: 12),
                     FilledButton(
@@ -406,8 +410,12 @@ class _VerificationForm extends StatelessWidget {
     required this.focusNodes,
     required this.resendSeconds,
     required this.onResend,
+    required this.onCompleted,
   });
   final VoidCallback onChange;
+
+  /// Called once every box has a digit.
+  final VoidCallback onCompleted;
   final String phone;
   final List<TextEditingController> controllers;
   final List<FocusNode> focusNodes;
@@ -462,11 +470,40 @@ class _VerificationForm extends StatelessWidget {
                     controller: controllers[index],
                     focusNode: focusNodes[index],
                     autofocus: index == 0,
+                    autofillHints: index == 0
+                        ? const [AutofillHints.oneTimeCode]
+                        : null,
                     onChanged: (value) {
-                      if (value.isNotEmpty && index < controllers.length - 1) {
+                      // Several digits in one box: a pasted or auto-filled
+                      // code, or a digit typed before the focus moved on.
+                      // maxLength 1 used to drop them ("1234" became "134").
+                      if (value.length > 1 && index == controllers.length - 1) {
+                        // Last box: the newest digit replaces the old one.
+                        controllers[index].text = value.substring(
+                          value.length - 1,
+                        );
+                      } else if (value.length > 1) {
+                        var next = index;
+                        for (final digit in value.split('')) {
+                          if (next >= controllers.length) break;
+                          controllers[next].text = digit;
+                          next++;
+                        }
+                        if (next < controllers.length) {
+                          focusNodes[next].requestFocus();
+                        }
+                      } else if (value.isNotEmpty &&
+                          index < controllers.length - 1) {
                         focusNodes[index + 1].requestFocus();
                       } else if (value.isEmpty && index > 0) {
                         focusNodes[index - 1].requestFocus();
+                      }
+                      // All digits in: verify straight away. The button sat
+                      // under the keyboard, so the code looked stuck.
+                      if (value.isNotEmpty &&
+                          controllers.every((c) => c.text.length == 1)) {
+                        FocusScope.of(context).unfocus();
+                        onCompleted();
                       }
                     },
                     onTap: () {
@@ -477,7 +514,6 @@ class _VerificationForm extends StatelessWidget {
                     },
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     textAlign: TextAlign.center,
-                    maxLength: 1,
                     keyboardType: TextInputType.number,
                     textInputAction: index == controllers.length - 1
                         ? TextInputAction.done

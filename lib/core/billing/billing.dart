@@ -1,6 +1,15 @@
 import '../../models/api_models.dart';
+import '../data.dart';
 
-String money(dynamic value) => '₹${asDouble(value).toStringAsFixed(2)}';
+export '../data.dart' show indianDigits;
+
+/// "₹1,178.82": rupees with Indian grouping and paise.
+String money(dynamic value) {
+  final fixed = asDouble(value).toStringAsFixed(2);
+  final dot = fixed.indexOf('.');
+  return '₹${indianDigits(int.parse(fixed.substring(0, dot)))}${fixed.substring(dot)}';
+}
+
 String percent(dynamic value) =>
     asDouble(value).toStringAsFixed(2).replaceFirst(RegExp(r'\.?0+$'), '');
 

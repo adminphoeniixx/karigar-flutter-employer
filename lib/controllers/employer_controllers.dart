@@ -1,3 +1,6 @@
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:employer_kariger_app/core/gstin.dart';
+
 import '../models/api_models.dart';
 import '../services/employer_api_service.dart';
 import 'base_controller.dart';
@@ -7,15 +10,51 @@ class DashboardController extends BaseController {
   DashboardController(this.api);
   final EmployerApiService api;
   DashboardData? data;
+
+  /// The business name from the last dashboard that loaded, kept on the
+  /// phone so the header can greet the employer by name while offline.
+  String? savedGreeting;
+  static const _greetingKey = 'employer_dashboard_greeting';
+
+  /// A failed refresh keeps the last dashboard on screen and sets [error].
   Future<void> load() async {
-    data = await run(api.dashboard);
+    final result = await run(api.dashboard);
+    if (result != null) {
+      data = result;
+      if (result.greeting.isNotEmpty) await _saveGreeting(result.greeting);
+    } else if (savedGreeting == null) {
+      await _readGreeting();
+    }
     notifyListeners();
   }
 
+  Future<void> _saveGreeting(String greeting) async {
+    savedGreeting = greeting;
+    try {
+      await (await SharedPreferences.getInstance()).setString(
+        _greetingKey,
+        greeting,
+      );
+    } catch (_) {}
+  }
+
+  Future<void> _readGreeting() async {
+    try {
+      savedGreeting = (await SharedPreferences.getInstance()).getString(
+        _greetingKey,
+      );
+    } catch (_) {}
+  }
+
+  /// On sign-out: the next account must not be greeted with this name.
   void clear() {
     data = null;
+    savedGreeting = null;
     error = null;
     hasLoaded = false;
+    SharedPreferences.getInstance()
+        .then((preferences) => preferences.remove(_greetingKey))
+        .catchError((_) => false);
     notifyListeners();
   }
 }
@@ -132,15 +171,18 @@ class ProfileController extends BaseController {
   final EmployerApiService api;
   EmployerProfile? profile;
   Map<String, dynamic> validationErrors = const {};
+
+  /// A failed refresh keeps the last profile on screen and sets [error].
   Future<void> load() async {
-    profile = await run(api.profile);
+    final result = await run(api.profile);
+    if (result != null) profile = result;
     notifyListeners();
   }
 
   Future<bool> save(Json values) async {
     // Keep the profile API from being reached with an invalid GSTIN even when
     // a caller outside the registration form saves the profile.
-    final gstinError = _gstinProblem(values['gstin']);
+    final gstinError = gstinProblem(values['gstin']?.toString());
     if (gstinError != null) {
       error = gstinError;
       validationErrors = {
@@ -168,37 +210,6 @@ class ProfileController extends BaseController {
       hasLoaded = true;
       notifyListeners();
     }
-  }
-
-  String? _gstinProblem(dynamic rawValue) {
-    if (rawValue == null) return null;
-    final gst = '$rawValue'.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
-    if (gst.isEmpty) return null;
-    if (gst.length != 15) {
-      return 'A GST number has 15 characters, like 22ABCDE1234F1ZA.';
-    }
-    if (!RegExp(
-      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$',
-    ).hasMatch(gst)) {
-      return 'Enter the GST number in the format 22ABCDE1234F1ZA.';
-    }
-    final stateCode = int.parse(gst.substring(0, 2));
-    if (!((stateCode >= 1 &&
-            stateCode <= 38 &&
-            stateCode != 25 &&
-            stateCode != 28) ||
-        stateCode == 97)) {
-      return 'A GST number starts with a state code (01–38). Check the first two digits.';
-    }
-    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    var sum = 0;
-    for (var index = 0; index < 14; index++) {
-      final value = chars.indexOf(gst[index]) * (index.isEven ? 1 : 2);
-      sum += value ~/ 36 + value % 36;
-    }
-    return gst[14] == chars[(36 - sum % 36) % 36]
-        ? null
-        : 'This GST number is not valid. Check it for a typing mistake.';
   }
 
   void clear() {

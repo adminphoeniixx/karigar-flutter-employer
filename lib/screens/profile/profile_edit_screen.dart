@@ -1,4 +1,6 @@
 import 'dart:io';
+import 'package:employer_kariger_app/core/gstin.dart';
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart' hide Text;
@@ -127,8 +129,9 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           stateController.text,
         }.where((item) => item.isNotEmpty).toList();
       });
-      if (stateController.text.isNotEmpty)
+      if (stateController.text.isNotEmpty) {
         await _loadCities(stateController.text, keepCity: true);
+      }
     } catch (_) {
       // Keep the saved categories visible if reference data is temporarily unavailable.
     }
@@ -224,10 +227,15 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       );
       return;
     }
-    final gstError = _gstinProblem();
+    final gstError = gstinProblem(gstinController.text);
     if (gstError != null) {
       setState(() => gstinError = gstError);
       gstinFocusNode.requestFocus();
+      // Save sits far below the GST box, so its error alone went unseen and
+      // Save looked like it did nothing.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Check the GST number: $gstError')),
+      );
       return;
     }
     if (gstinError != null) setState(() => gstinError = null);
@@ -239,7 +247,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
           : emailController.text.trim(),
       'gstin': gstinController.text.trim().isEmpty
           ? null
-          : _normalizedGstin(gstinController.text),
+          : normalizeGstin(gstinController.text),
       'company_name': companyController.text.trim(),
       'name': nameController.text.trim(),
       'phone': phoneController.text.replaceAll(RegExp(r'\D'), ''),
@@ -261,40 +269,6 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
     }
 
     Navigator.pop(context, true);
-  }
-
-  String _normalizedGstin(String value) =>
-      value.toUpperCase().replaceAll(RegExp(r'[^A-Z0-9]'), '');
-
-  String? _gstinProblem() {
-    final gst = _normalizedGstin(gstinController.text);
-    if (gst.isEmpty) return null;
-    if (gst.length != 15) {
-      return 'A GST number has 15 characters, like 22ABCDE1234F1ZA.';
-    }
-    if (!RegExp(
-      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$',
-    ).hasMatch(gst)) {
-      return 'Enter the GST number in the format 22ABCDE1234F1ZA.';
-    }
-    final stateCode = int.parse(gst.substring(0, 2));
-    if (!((stateCode >= 1 &&
-            stateCode <= 38 &&
-            stateCode != 25 &&
-            stateCode != 28) ||
-        stateCode == 97)) {
-      return 'A GST number starts with a state code (01–38). Check the first two digits.';
-    }
-    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    var sum = 0;
-    for (var index = 0; index < 14; index++) {
-      final value = chars.indexOf(gst[index]) * (index.isEven ? 1 : 2);
-      sum += value ~/ 36 + value % 36;
-    }
-    if (gst[14] != chars[(36 - sum % 36) % 36]) {
-      return 'This GST number is not valid. Check it for a typing mistake.';
-    }
-    return null;
   }
 
   Future<void> _pickLogo() async {
@@ -359,7 +333,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     } finally {
       if (mounted) setState(() => uploadingLogo = false);

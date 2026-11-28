@@ -14,8 +14,6 @@ import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 import 'package:employer_kariger_app/screens/profile/payment_success_screen.dart';
-import 'package:employer_kariger_app/screens/jobs/ai_credits_screen.dart'
-    show AiCreditHistory;
 
 class PlansScreen extends StatefulWidget {
   const PlansScreen({super.key, this.focusDatabase = false});
@@ -36,6 +34,8 @@ class _PlansScreenState extends State<PlansScreen> {
   Json? aiCredits;
   bool canBuyAiCredits = false;
   List<Map<String, dynamic>> currentPlans = const [];
+  // The running plan of each type: buying another plan of that type ends it.
+  Map<String, dynamic>? currentJobPlan, currentDatabasePlan;
   Json? database;
   Json payment = {};
   Json? jobPosts;
@@ -123,6 +123,12 @@ class _PlansScreenState extends State<PlansScreen> {
             .where((rule) => rule.isNotEmpty)
             .toList();
         canBuyAiCredits = response['can_buy_ai_credits'] == true;
+        currentJobPlan = response['current'] is Map
+            ? Json.from(response['current'])
+            : null;
+        currentDatabasePlan = response['current_database'] is Map
+            ? Json.from(response['current_database'])
+            : null;
         currentPlans = _maps([
           if (response['current'] is Map) response['current'],
           if (response['current_database'] is Map) response['current_database'],
@@ -140,7 +146,7 @@ class _PlansScreenState extends State<PlansScreen> {
         }
       });
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -203,7 +209,7 @@ class _PlansScreenState extends State<PlansScreen> {
         checkingOut = false;
         checkoutPlanId = null;
       });
-      if (!await _confirmCheckout(response) || !mounted) {
+      if (!await _confirmCheckout(response, plan: plan) || !mounted) {
         return;
       }
       final subscriptionId =
@@ -229,9 +235,9 @@ class _PlansScreenState extends State<PlansScreen> {
         // source of truth for the recurring amount.
         'key': response['razorpay_key'],
         'subscription_id': pendingSubscriptionId,
-        'name': 'Karigar',
+        'name': 'Super Karigar',
         'description': '${plan['name'] ?? 'Employer plan'} subscription',
-        'theme': {'color': '#F97316'},
+        'theme': {'color': '#BF3A16'},
         'retry': {'enabled': true, 'max_count': 3},
         'prefill': {
           if (email.isNotEmpty) 'email': email,
@@ -243,7 +249,7 @@ class _PlansScreenState extends State<PlansScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     } finally {
       if (mounted) {
@@ -292,9 +298,9 @@ class _PlansScreenState extends State<PlansScreen> {
         'order_id': orderId,
         'amount': order['amount_paise'],
         'currency': 'INR',
-        'name': 'Karigar',
+        'name': 'Super Karigar',
         'description': '${pack['name'] ?? 'AI call credits'}',
-        'theme': {'color': '#F97316'},
+        'theme': {'color': '#BF3A16'},
         'prefill': {
           if (email.isNotEmpty) 'email': email,
           if (_checkoutPhone.isNotEmpty) 'contact': _checkoutPhone,
@@ -305,7 +311,7 @@ class _PlansScreenState extends State<PlansScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     } finally {
       if (mounted) {
@@ -393,7 +399,17 @@ class _PlansScreenState extends State<PlansScreen> {
       !email.endsWith('@phone.karigar') &&
       RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(email);
 
-  Future<bool> _confirmCheckout(Json response) async {
+  Future<bool> _confirmCheckout(Json response, {Json? plan}) async {
+    // Buying a plan while another of its type runs replaces it at once; the
+    // days left on the old one are not carried over. Say so before paying.
+    final running = plan == null
+        ? null
+        : (plan['type'] == 'database' ? currentDatabasePlan : currentJobPlan);
+    final runningEnds = DateTime.tryParse('${running?['ends_at'] ?? ''}');
+    final replaces =
+        running != null &&
+        running['plan']?.toString() != plan?['name']?.toString() &&
+        (runningEnds == null || runningEnds.isAfter(DateTime.now()));
     final raw = response['amounts'];
     if (raw is! Map || raw['total'] == null) {
       throw const FormatException(
@@ -423,6 +439,18 @@ class _PlansScreenState extends State<PlansScreen> {
                     'Total payable: ${money(amounts['total'])}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
+                  if (replaces) ...[
+                    const SizedBox(height: 12),
+                    Text(
+                      'Your ${running['plan']} plan'
+                      '${runningEnds == null ? '' : ' (till ${MaterialLocalizations.of(context).formatMediumDate(runningEnds.toLocal())})'}'
+                      ' ends as soon as this one starts. Its remaining days are not carried over.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -446,7 +474,7 @@ class _PlansScreenState extends State<PlansScreen> {
     final reset = DateTime.tryParse('${usage['resets_at'] ?? ''}');
     final used = usage['used'] ?? 0;
     final limit = usage['limit'] ?? 0;
-    return '$used of $limit job post${limit == 1 ? '' : 's'} used · 30-day period'
+    return '$used of $limit job post${limit == 1 ? '' : 's'} used'
         '${reset == null ? '' : ' · resets ${MaterialLocalizations.of(context).formatShortDate(reset.toLocal())}'}';
   }
 
@@ -488,7 +516,7 @@ class _PlansScreenState extends State<PlansScreen> {
         if (mounted) {
           ScaffoldMessenger.of(
             context,
-          ).showSnackBar(SnackBar(content: Text('$exception')));
+          ).showSnackBar(SnackBar(content: Text(errorText(exception))));
         }
       } finally {
         verifyingPayment = false;
@@ -526,7 +554,7 @@ class _PlansScreenState extends State<PlansScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     } finally {
       verifyingPayment = false;
@@ -794,7 +822,7 @@ class _AiCallsSection extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.brand50,
+            color: context.brandTint,
             borderRadius: BorderRadius.circular(16),
           ),
           child: Text(
@@ -820,7 +848,9 @@ class _AiCallsSection extends StatelessWidget {
         (pack) => _AiCallPackCard(
           pack: pack,
           canBuy: canBuy,
-          buying: buyingPackId == (pack['id'] as num?)?.toInt(),
+          buying:
+              buyingPackId != null &&
+              buyingPackId == (pack['id'] as num?)?.toInt(),
           onBuy: () => onBuy(pack),
         ),
       ),
@@ -841,11 +871,6 @@ class _AiCallsSection extends StatelessWidget {
           ),
         ),
       ],
-      AiCreditHistory(
-        initialCredits: credits == null
-            ? null
-            : Map<String, dynamic>.from(credits!),
-      ),
     ],
   );
 }
@@ -890,12 +915,12 @@ class _AiCallPackCard extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          '${pack['total_credits'] ?? pack['credits'] ?? 0} credits · ≈ ${pack['minutes'] ?? 0} min of calls',
+          '${pack['total_credits'] ?? pack['credits'] ?? 0} credits${(pack['bonus_credits'] as num? ?? 0) > 0 ? ' (incl. ${pack['bonus_credits']} bonus)' : ''} · ≈ ${pack['minutes'] ?? 0} min of calls',
           style: const TextStyle(color: AppColors.muted),
         ),
         const SizedBox(height: 8),
         Text(
-          '₹${asDouble(pack['price_with_gst']).round()} incl. GST',
+          '${money(pack['price_with_gst'])} incl. GST',
           style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 14),
@@ -1039,6 +1064,9 @@ class _PlanSection extends StatelessWidget {
                   (plan) => SizedBox(
                     width: width,
                     child: _Plan(
+                      // Its own state per plan: opening "more features" on one
+                      // tab's first card opened the other tab's first card too.
+                      key: ValueKey('plan-${plan['id']}-${plan['type'] ?? ''}'),
                       plan: plan,
                       gstPercent: gstPercent,
                       available: plan['purchasable'] == true,
@@ -1046,7 +1074,11 @@ class _PlanSection extends StatelessWidget {
                           ? plan['can_purchase'] == true
                           : plan['purchasable'] == true &&
                                 plan['is_current'] != true,
-                      selected: checkoutPlanId == (plan['id'] as num?)?.toInt(),
+                      // Only while that plan's checkout runs: null == null for an id-less
+                      // plan would spin every such button forever.
+                      selected:
+                          checkoutPlanId != null &&
+                          checkoutPlanId == (plan['id'] as num?)?.toInt(),
                       onChoose:
                           (plan['can_purchase'] is bool
                               ? plan['can_purchase'] == true
@@ -1067,6 +1099,7 @@ class _PlanSection extends StatelessWidget {
 
 class _Plan extends StatefulWidget {
   const _Plan({
+    super.key,
     required this.plan,
     required this.onChoose,
     required this.gstPercent,
@@ -1158,7 +1191,7 @@ class _PlanState extends State<_Plan> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.brand50,
+                color: context.brandTint,
                 borderRadius: BorderRadius.circular(15),
               ),
               child: Text(
@@ -1232,7 +1265,9 @@ class _PlanState extends State<_Plan> {
             ),
           ],
           Text(
-            '${_planPrice(plan['price'])} / ${plan['interval_label'] ?? plan['interval'] ?? ''}',
+            // The price already stands at the top; no "/ 30 days" after it,
+            // matching the website.
+            'Valid for ${plan['interval_label'] ?? plan['interval'] ?? ''}',
             style: TextStyle(color: colors.onSurfaceVariant),
           ),
           if (widget.gstPercent > 0 &&

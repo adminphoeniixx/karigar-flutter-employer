@@ -41,12 +41,18 @@ class _SearchableOptionSheetState extends State<_SearchableOptionSheet> {
   @override
   Widget build(BuildContext context) {
     final normalized = query.trim().toLowerCase();
-    final visible =
-        widget.values.toSet().where((value) {
-          return normalized.isEmpty || value.toLowerCase().contains(normalized);
-        }).toList()..sort(
-          (a, b) => _rank(a, normalized).compareTo(_rank(b, normalized)),
-        );
+    final matches = widget.values.toSet().where((value) {
+      return normalized.isEmpty || value.toLowerCase().contains(normalized);
+    }).toList();
+    // List.sort is not stable: with an empty search every rank ties and the
+    // A–Z list came out shuffled (Haryana above Andhra Pradesh). Keep the
+    // original order inside each rank.
+    final order = {for (var i = 0; i < matches.length; i++) matches[i]: i};
+    final visible = matches
+      ..sort((a, b) {
+        final byRank = _rank(a, normalized).compareTo(_rank(b, normalized));
+        return byRank != 0 ? byRank : order[a]!.compareTo(order[b]!);
+      });
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SizedBox(
@@ -108,8 +114,9 @@ class _SearchableOptionSheetState extends State<_SearchableOptionSheet> {
     if (lower.startsWith(query)) return 0;
     if (lower
         .split(RegExp(r'[^a-z0-9]+'))
-        .any((word) => word.startsWith(query)))
+        .any((word) => word.startsWith(query))) {
       return 1;
+    }
     return 2;
   }
 

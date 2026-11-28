@@ -532,6 +532,13 @@ class Applicant {
   );
   final int id;
   final String stage, status, statusLabel, createdAgo;
+
+  /// The badge text: the stage in hiring (a shortlisted karigar reads
+  /// "Shortlisted", a hire "Hired"), or "Withdrawn" if the karigar pulled out.
+  /// `statusLabel` is the raw application status, which stays "Pending"
+  /// for a shortlisted karigar and says "Accepted" for a hire.
+  String get stageLabel =>
+      status == 'withdrawn' ? 'Withdrawn' : applicationStageLabel(stage);
   final String? coverNote;
   final double? expectedWage;
   final bool shortlisted, contactUnlocked;
@@ -556,8 +563,10 @@ class DashboardData {
     this.profile,
     this.verificationEnabled = false,
     this.workerVerificationEnabled = true,
+    this.hiringPaused = false,
   });
   factory DashboardData.fromJson(Json json) => DashboardData(
+    hiringPaused: json['hiring_paused'] == true,
     greeting: '${json['greeting'] ?? ''}',
     stats: json['stats'] is Map
         ? Map<String, dynamic>.from(json['stats'])
@@ -591,4 +600,24 @@ class DashboardData {
   final EmployerProfile? profile;
   final bool verificationEnabled;
   final bool workerVerificationEnabled;
+
+  /// The job plan ran out: live jobs are hidden from karigars and closed to
+  /// applications until it is renewed.
+  final bool hiringPaused;
+
+  int get unreadNotifications => asInt(stats['unread_notifications']);
+  int get unreadMessages => asInt(stats['unread_messages']);
 }
+
+/// The word for an application stage (pending, shortlisted, interview,
+/// hired, rejected), the same on every screen.
+String applicationStageLabel(String stage) => switch (stage.toLowerCase()) {
+  'pending' => 'Pending',
+  'shortlisted' => 'Shortlisted',
+  'interview' => 'Interview',
+  'hired' => 'Hired',
+  'rejected' => 'Rejected',
+  'withdrawn' => 'Withdrawn',
+  '' => 'Applicant',
+  final other => '${other[0].toUpperCase()}${other.substring(1)}',
+};

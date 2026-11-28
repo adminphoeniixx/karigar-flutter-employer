@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/screens/auth/onboarding_screen.dart';
+import 'package:employer_kariger_app/core/dialog_controllers.dart';
+import 'package:employer_kariger_app/widgets/common.dart' show roleLabel;
+import 'package:employer_kariger_app/widgets/confirm_action.dart';
 
 List<Map<String, dynamic>> _mapList(dynamic value) =>
     (value as List? ?? const [])
@@ -36,9 +40,15 @@ class _DeviceSessionsScreenState extends State<DeviceSessionsScreen> {
     });
     try {
       final response = await AppScope.of(context).api.sessions();
-      if (mounted) setState(() => sessions = _mapList(response['sessions']));
+      // This phone first, then the rest as the server orders them.
+      final rows = _mapList(response['sessions'])
+        ..sort(
+          (a, b) =>
+              (b['current'] == true ? 1 : 0) - (a['current'] == true ? 1 : 0),
+        );
+      if (mounted) setState(() => sessions = rows);
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -88,7 +98,7 @@ class _DeviceSessionsScreenState extends State<DeviceSessionsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     }
   }
@@ -113,11 +123,7 @@ class _DeviceSessionsScreenState extends State<DeviceSessionsScreen> {
                         child: Icon(LucideIcons.smartphone),
                       ),
                       title: Text('${session['device'] ?? 'Unknown device'}'),
-                      subtitle: Text(
-                        session['current'] == true
-                            ? 'This device · ${session['last_used_ago'] ?? ''}'
-                            : 'Last used ${session['last_used_ago'] ?? ''}',
-                      ),
+                      subtitle: Text(_sessionLine(session)),
                       trailing: IconButton(
                         tooltip: 'Sign out',
                         onPressed: () => _remove(session),
@@ -166,7 +172,7 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
         if (apiRoles.isNotEmpty) roles = apiRoles;
       });
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -201,8 +207,10 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                 decoration: const InputDecoration(labelText: 'Role'),
                 items: roles
                     .map(
-                      (value) =>
-                          DropdownMenuItem(value: value, child: Text(value)),
+                      (value) => DropdownMenuItem(
+                        value: value,
+                        child: Text(roleLabel(value)),
+                      ),
                     )
                     .toList(),
                 onChanged: (value) {
@@ -226,8 +234,7 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
     );
     final memberName = name.text.trim();
     final memberPhone = phone.text.replaceAll(RegExp(r'\D'), '');
-    name.dispose();
-    phone.dispose();
+    disposeAfterClose([name, phone]);
     if (submit != true) return;
     if (memberName.isEmpty || !RegExp(r'^[6-9]\d{9}$').hasMatch(memberPhone)) {
       _message('Enter a name and valid 10-digit mobile number.');
@@ -237,7 +244,7 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
       await api.addTeamMember(name: memberName, phone: memberPhone, role: role);
       await _load();
     } catch (exception) {
-      _message('$exception');
+      _message(errorText(exception));
     }
   }
 
@@ -248,18 +255,27 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
       ).api.updateTeamMember((member['id'] as num).toInt(), role);
       await _load();
     } catch (exception) {
-      _message('$exception');
+      _message(errorText(exception));
     }
   }
 
   Future<void> _remove(Map<String, dynamic> member) async {
+    // One tap on Remove used to take the member off straight away.
+    final ok = await confirmAction(
+      context,
+      title: 'Remove ${member['name'] ?? 'this member'}?',
+      message:
+          'They will no longer be able to log in to your account or see your jobs and applicants.',
+      confirmLabel: 'Remove',
+    );
+    if (!ok || !mounted) return;
     try {
       await AppScope.of(
         context,
       ).api.removeTeamMember((member['id'] as num).toInt());
       await _load();
     } catch (exception) {
-      _message('$exception');
+      _message(errorText(exception));
     }
   }
 
@@ -314,7 +330,12 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                             ),
                             title: Text('${member['name'] ?? ''}'),
                             subtitle: Text(
-                              '${member['phone'] ?? ''} · ${member['added_ago'] ?? ''}',
+                              [
+                                '${member['phone'] ?? ''}',
+                                if (member['role'] != null)
+                                  roleLabel('${member['role']}'),
+                                '${member['added_ago'] ?? ''}',
+                              ].where((part) => part.isNotEmpty).join(' · '),
                             ),
                             trailing: PopupMenuButton<String>(
                               onSelected: (value) => value == 'remove'
@@ -326,8 +347,8 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
                                     value: role,
                                     child: Text(
                                       role == member['role']
-                                          ? '$role ✓'
-                                          : 'Make $role',
+                                          ? '${roleLabel(role)} ✓'
+                                          : 'Make ${roleLabel(role)}',
                                     ),
                                   ),
                                 ),
@@ -346,4 +367,14 @@ class _TeamMembersScreenState extends State<TeamMembersScreen> {
             ),
           ),
   );
+}
+
+/// "This device · 2 minutes ago", "Last used 1 day ago", or "Not used yet"
+/// for a sign-in that never made a request (it used to read just "Last used").
+String _sessionLine(Map<String, dynamic> session) {
+  final ago = '${session['last_used_ago'] ?? ''}'.trim();
+  if (session['current'] == true) {
+    return ago.isEmpty ? 'This device' : 'This device · $ago';
+  }
+  return ago.isEmpty ? 'Not used yet' : 'Last used $ago';
 }

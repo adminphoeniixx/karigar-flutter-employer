@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../core/app_scope.dart';
@@ -40,15 +41,16 @@ class _AiCallSettingsScreenState extends State<AiCallSettingsScreen> {
       if (!mounted) return;
       final setting = response['settings'];
       setState(() {
-        if (setting is Map)
+        if (setting is Map) {
           values = {...values, ...Map<String, dynamic>.from(setting)};
+        }
         options = response['options'] is Map
             ? Map<String, dynamic>.from(response['options'])
             : const {};
         callsOn = response['calls_on'] != false;
       });
     } catch (e) {
-      if (mounted) setState(() => error = '$e');
+      if (mounted) setState(() => error = errorText(e));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -74,11 +76,12 @@ class _AiCallSettingsScreenState extends State<AiCallSettingsScreen> {
       context: context,
       initialTime: initial,
     );
-    if (selected != null)
+    if (selected != null) {
       _set(
         key,
         '${selected.hour.toString().padLeft(2, '0')}:${selected.minute.toString().padLeft(2, '0')}',
       );
+    }
   }
 
   Future<void> _save() async {
@@ -86,8 +89,9 @@ class _AiCallSettingsScreenState extends State<AiCallSettingsScreen> {
     if (days.isEmpty) return _notice('Choose at least one calling day.');
     if (_minute(values['window_start']) != null &&
         _minute(values['window_end']) != null &&
-        _minute(values['window_start'])! >= _minute(values['window_end'])!)
+        _minute(values['window_start'])! >= _minute(values['window_end'])!) {
       return _notice('End time must be after start time.');
+    }
     setState(() => saving = true);
     try {
       final response = await AppScope.of(
@@ -95,13 +99,14 @@ class _AiCallSettingsScreenState extends State<AiCallSettingsScreen> {
       ).api.updateAiCallSettings(values);
       if (!mounted) return;
       final setting = response['settings'];
-      if (setting is Map)
+      if (setting is Map) {
         setState(
           () => values = {...values, ...Map<String, dynamic>.from(setting)},
         );
+      }
       _notice('${response['message'] ?? 'AI call settings saved'}');
     } catch (e) {
-      _notice('$e');
+      _notice(errorText(e));
     } finally {
       if (mounted) setState(() => saving = false);
     }
@@ -115,22 +120,28 @@ class _AiCallSettingsScreenState extends State<AiCallSettingsScreen> {
   }
 
   void _notice(String text) {
-    if (mounted)
+    if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (loading)
+    if (loading) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    if (error != null)
+    }
+    if (error != null) {
       return Scaffold(
         appBar: AppBar(title: const Text('AI call settings')),
         body: Center(
           child: OutlinedButton(onPressed: _load, child: const Text('Retry')),
         ),
       );
+    }
     final window = options['window'] as Map? ?? const {};
+    // The server names the zone "Asia/Kolkata"; employers know it as IST.
+    final rawZone = '${window['timezone'] ?? 'IST'}';
+    final zone = rawZone == 'Asia/Kolkata' ? 'IST' : rawZone;
     return Scaffold(
       appBar: AppBar(title: const Text('AI call settings')),
       bottomNavigationBar: SafeArea(
@@ -211,13 +222,17 @@ class _AiCallSettingsScreenState extends State<AiCallSettingsScreen> {
           _Section(
             title: 'Calling hours',
             subtitle:
-                'Optional. Keep platform hours, or set a narrower window (${window['start'] ?? '—'}–${window['end'] ?? '—'} ${window['timezone'] ?? 'IST'}).',
+                'Optional. Keep platform hours, or set a narrower window (${window['start'] ?? '—'}–${window['end'] ?? '—'} $zone).',
             child: Row(
               children: [
                 Expanded(
                   child: _TimeTile(
                     label: 'Start',
-                    value: values['window_start']?.toString() ?? 'Platform',
+                    // Unset means the platform hours: show that time, not
+                    // the bare word "Platform".
+                    value:
+                        values['window_start']?.toString() ??
+                        '${window['start'] ?? '—'} (default)',
                     onTap: () => _time('window_start'),
                   ),
                 ),
@@ -225,7 +240,9 @@ class _AiCallSettingsScreenState extends State<AiCallSettingsScreen> {
                 Expanded(
                   child: _TimeTile(
                     label: 'End',
-                    value: values['window_end']?.toString() ?? 'Platform',
+                    value:
+                        values['window_end']?.toString() ??
+                        '${window['end'] ?? '—'} (default)',
                     onTap: () => _time('window_end'),
                   ),
                 ),
@@ -346,36 +363,42 @@ class _Section extends StatelessWidget {
   final String? subtitle;
   final Widget child;
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.only(bottom: 14),
-    padding: const EdgeInsets.all(15),
-    decoration: BoxDecoration(
+  // A Material, not a coloured Container: the radio and switch tiles paint
+  // their tap ink on it, which a Container's colour would hide.
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 14),
+    child: Material(
       color: Theme.of(context).colorScheme.surface,
-      borderRadius: BorderRadius.circular(16),
-      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-    ),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
-        ),
-        if (subtitle != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 4, bottom: 10),
-            child: Text(
-              subtitle!,
-              style: TextStyle(
-                fontSize: 12,
-                height: 1.3,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
             ),
-          ),
-        const SizedBox(height: 10),
-        child,
-      ],
+            if (subtitle != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 10),
+                child: Text(
+                  subtitle!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.3,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            const SizedBox(height: 10),
+            child,
+          ],
+        ),
+      ),
     ),
   );
 }
@@ -390,29 +413,33 @@ class _ChoiceList extends StatelessWidget {
   final String selected;
   final ValueChanged<String> onChanged;
   @override
-  Widget build(BuildContext context) => Column(
-    children: items.map((item) {
-      final value = '${item['value']}';
-      return RadioListTile<String>(
-        contentPadding: EdgeInsets.zero,
-        dense: true,
-        value: value,
-        groupValue: selected,
-        onChanged: (v) {
-          if (v != null) onChanged(v);
-        },
-        title: Text(
-          '${item['label']}',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-        subtitle: item['description']?.toString().isNotEmpty == true
-            ? Text(
-                '${item['description']}',
-                style: const TextStyle(fontSize: 12),
-              )
-            : null,
-      );
-    }).toList(),
+  // One RadioGroup holds the choice for all the tiles (per-tile groupValue
+  // and onChanged are deprecated).
+  Widget build(BuildContext context) => RadioGroup<String>(
+    groupValue: selected,
+    onChanged: (v) {
+      if (v != null) onChanged(v);
+    },
+    child: Column(
+      children: items.map((item) {
+        final value = '${item['value']}';
+        return RadioListTile<String>(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          value: value,
+          title: Text(
+            '${item['label']}',
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: item['description']?.toString().isNotEmpty == true
+              ? Text(
+                  '${item['description']}',
+                  style: const TextStyle(fontSize: 12),
+                )
+              : null,
+        );
+      }).toList(),
+    ),
   );
 }
 

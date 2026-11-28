@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
@@ -41,7 +42,7 @@ class _ReviewsScreenState extends State<ReviewsScreen> {
             .toList();
       });
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }

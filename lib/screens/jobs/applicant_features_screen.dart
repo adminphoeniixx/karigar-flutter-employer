@@ -44,7 +44,7 @@ class _MatchedWorkersScreenState extends State<MatchedWorkersScreen> {
           .toList();
       if (mounted) setState(() => rows = workers);
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -73,7 +73,7 @@ class _MatchedWorkersScreenState extends State<MatchedWorkersScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     } finally {
       if (mounted) setState(() => inviting.remove(worker.userId));
@@ -136,7 +136,13 @@ class _MatchedWorkersScreenState extends State<MatchedWorkersScreen> {
                                           ),
                                         ),
                                         Text(
-                                          '${worker.city} · ${worker.experienceYears} yrs · ★ ${worker.rating.average.toStringAsFixed(1)}',
+                                          // No "★ 0.0" for a karigar nobody has rated yet.
+                                          [
+                                            worker.city,
+                                            '${worker.experienceYears} yrs',
+                                            if (worker.rating.average > 0)
+                                              '★ ${worker.rating.average.toStringAsFixed(1)}',
+                                          ].join(' · '),
                                           style: const TextStyle(
                                             color: AppColors.muted,
                                             fontSize: 12,
@@ -205,10 +211,14 @@ class ApplicantScreeningCallPanel extends StatelessWidget {
     super.key,
     required this.call,
     required this.workerName,
+    this.summaryMaxLines,
   });
 
   final Map<String, dynamic>? call;
   final String workerName;
+
+  /// Home clamps the summary; "View conversation" still shows all of it.
+  final int? summaryMaxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -229,8 +239,8 @@ class ApplicantScreeningCallPanel extends StatelessWidget {
       margin: const EdgeInsets.only(top: 4),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.brand50,
-        border: Border.all(color: AppColors.brand200),
+        color: context.brandTint,
+        border: Border.all(color: context.brandTintBorder),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
@@ -259,7 +269,12 @@ class ApplicantScreeningCallPanel extends StatelessWidget {
           ],
           if (summary.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Text(summary, style: const TextStyle(fontSize: 12.5, height: 1.35)),
+            Text(
+              summary,
+              maxLines: summaryMaxLines,
+              overflow: summaryMaxLines == null ? null : TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 12.5, height: 1.35),
+            ),
           ],
           if (charged != null)
             Padding(
@@ -284,8 +299,12 @@ class ApplicantScreeningCallPanel extends StatelessWidget {
               ),
               icon: const Icon(LucideIcons.messagesSquare, size: 16),
               label: const Text('View conversation'),
+              // The default 48 px tap area left an empty band under the
+              // link at the bottom of the card.
               style: TextButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
+                minimumSize: const Size(0, 36),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 foregroundColor: AppColors.brandDark,
               ),
             ),
@@ -299,7 +318,11 @@ class ApplicantScreeningCallPanel extends StatelessWidget {
 /// A morning-of-interview AI check-in is separate from screening, but uses the
 /// same compact treatment so employers can act on it without opening a call.
 class InterviewReminderCallPanel extends StatelessWidget {
-  const InterviewReminderCallPanel({super.key, required this.call, required this.workerName});
+  const InterviewReminderCallPanel({
+    super.key,
+    required this.call,
+    required this.workerName,
+  });
   final Map<String, dynamic>? call;
   final String workerName;
 
@@ -307,7 +330,9 @@ class InterviewReminderCallPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final item = call;
     if (item == null) return const SizedBox.shrink();
-    final outcome = '${item['outcome_label'] ?? item['status_label'] ?? item['status'] ?? 'Pending'}'.trim();
+    final outcome =
+        '${item['outcome_label'] ?? item['status_label'] ?? item['status'] ?? 'Pending'}'
+            .trim();
     final summary = '${item['summary'] ?? ''}'.trim();
     final proposed = '${item['proposed_interview_label'] ?? ''}'.trim();
     return Container(
@@ -319,17 +344,46 @@ class InterviewReminderCallPanel extends StatelessWidget {
         border: Border.all(color: const Color(0xffb8d9f5)),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(LucideIcons.calendarCheck, size: 16, color: AppColors.brandDark),
-          const SizedBox(width: 7),
-          const Expanded(child: Text('Interview reminder call', style: TextStyle(fontWeight: FontWeight.w700))),
-          _CallOutcomeChip(label: outcome),
-        ]),
-        if (summary.isNotEmpty) ...[const SizedBox(height: 8), Text(summary, style: const TextStyle(fontSize: 12.5, height: 1.35))],
-        if (proposed.isNotEmpty) ...[const SizedBox(height: 7), Text('Requested: $proposed', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))],
-        if (item['called_label'] != null) ...[const SizedBox(height: 7), Text('${item['called_label']} · ${item['credits_charged'] ?? 0} credits', style: const TextStyle(fontSize: 12, color: AppColors.muted))],
-      ]),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                LucideIcons.calendarCheck,
+                size: 16,
+                color: AppColors.brandDark,
+              ),
+              const SizedBox(width: 7),
+              const Expanded(
+                child: Text(
+                  'Interview reminder call',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              _CallOutcomeChip(label: outcome),
+            ],
+          ),
+          if (summary.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(summary, style: const TextStyle(fontSize: 12.5, height: 1.35)),
+          ],
+          if (proposed.isNotEmpty) ...[
+            const SizedBox(height: 7),
+            Text(
+              'Requested: $proposed',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
+          if (item['called_label'] != null) ...[
+            const SizedBox(height: 7),
+            Text(
+              '${item['called_label']} · ${item['credits_charged'] ?? 0} credits',
+              style: const TextStyle(fontSize: 12, color: AppColors.muted),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -350,14 +404,16 @@ class _CallOutcomeChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     decoration: BoxDecoration(
-      color: Colors.white,
-      border: Border.all(color: AppColors.brand200),
+      color: context.isDarkTheme ? context.brandTint : Colors.white,
+      border: Border.all(color: context.brandTintBorder),
       borderRadius: BorderRadius.circular(20),
     ),
     child: Text(
       label,
-      style: const TextStyle(
-        color: AppColors.brandDark,
+      style: TextStyle(
+        color: context.isDarkTheme
+            ? const Color(0xFFFFC9B5)
+            : AppColors.brandDark,
         fontSize: 11,
         fontWeight: FontWeight.w700,
       ),
@@ -410,7 +466,7 @@ class _ScreeningConversationScreenState
         );
       }
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -453,9 +509,9 @@ class _ScreeningConversationScreenState
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: AppColors.brand50,
+                        color: context.brandTint,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.brand200),
+                        border: Border.all(color: context.brandTintBorder),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,8 +619,8 @@ class _CallRecordingPlayerState extends State<_CallRecordingPlayer> {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(14),
     decoration: BoxDecoration(
-      color: AppColors.brand50,
-      border: Border.all(color: AppColors.brand200),
+      color: context.brandTint,
+      border: Border.all(color: context.brandTintBorder),
       borderRadius: BorderRadius.circular(14),
     ),
     child: StreamBuilder<Duration>(
@@ -743,7 +799,7 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
         blockedBecause = response['blocked_because']?.toString();
       });
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -773,7 +829,7 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
           ),
         ),
       );
-      if (action == null) return;
+      if (action == null || !mounted) return;
       String? at;
       if (action == 'schedule') {
         final date = await showDatePicker(
@@ -786,7 +842,7 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
           context: context,
           initialTime: const TimeOfDay(hour: 10, minute: 0),
         );
-        if (time == null) return;
+        if (time == null || !mounted) return;
         at = DateTime(
           date.year,
           date.month,
@@ -837,7 +893,7 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     }
   }
@@ -858,7 +914,7 @@ class _ScreeningCallsScreenState extends State<ScreeningCallsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     }
   }

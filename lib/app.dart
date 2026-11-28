@@ -4,13 +4,16 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 
+import 'controllers/account_data_reset.dart';
 import 'controllers/auth_controller.dart';
+import 'screens/auth/registration_screen.dart';
 import 'controllers/employer_controllers.dart';
 import 'core/api/api_client.dart';
 import 'core/app_scope.dart';
 import 'core/app_language.dart';
 import 'core/theme.dart';
 import 'core/app_theme_controller.dart';
+import 'core/push/push_notifications.dart';
 import 'screens/auth/onboarding_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/dashboard/main_shell.dart';
@@ -35,6 +38,11 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
   late final ProfileController profile;
   late final AppLanguage language;
   late final AppThemeController theme;
+  late final AccountDataReset accountDataReset;
+  late final PushNotifications push;
+  final navigatorKey = GlobalKey<NavigatorState>();
+  final messengerKey = GlobalKey<ScaffoldMessengerState>();
+  bool _pushStarted = false;
   bool ready = false;
   String? maintenanceMessage;
   DateTime? maintenanceUntil;
@@ -55,58 +63,114 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
     profile = ProfileController(api);
     language = AppLanguage();
     theme = AppThemeController();
+    accountDataReset = AccountDataReset(auth, [
+      dashboard.clear,
+      jobs.clear,
+      workers.clear,
+      profile.clear,
+    ]);
+    push = PushNotifications(
+      api: api,
+      navigatorKey: navigatorKey,
+      messengerKey: messengerKey,
+    );
+    auth.beforeLogout = push.stop;
+    auth.addListener(_syncPush);
     Future.wait<void>([
       _initialize(),
       Future<void>.delayed(const Duration(milliseconds: 1400)),
     ]).whenComplete(() {
-      if (mounted) setState(() => ready = true);
+      if (!mounted) return;
+      setState(() => ready = true);
+      final signedIn = _syncPush();
+      // A push tapped while the app was closed: open its screen over home.
+      if (signedIn) {
+        WidgetsBinding.instance.addPostFrameCallback(
+          (_) => push.openLaunchMessage(),
+        );
+      }
     });
+  }
+
+  /// Push starts once the app has started (Firebase is up) and an employer is
+  /// signed in, and is marked stopped again on sign-out. Returns whether an
+  /// employer is signed in.
+  bool _syncPush() {
+    final role = auth.user?['role']?.toString().toLowerCase();
+    final employer = auth.authenticated && (role == null || role == 'employer');
+    if (!employer) {
+      _pushStarted = false;
+      return false;
+    }
+    if (ready && !_pushStarted) {
+      _pushStarted = true;
+      push.start();
+    }
+    return true;
   }
 
   Future<void> _initialize() async {
     // Paint the existing splash before starting platform initialization.
     await WidgetsBinding.instance.endOfFrame;
     if (!mounted) return;
-    final initialize = widget.onInitialize;
-    if (initialize != null) {
-      await initialize().timeout(const Duration(seconds: 8));
-    }
+    // Everything the splash waits for runs side by side, so a slow network
+    // costs one wait, not three in a row. Each step swallows its own failure:
+    // a Firebase timeout or a failed check must never skip restoring the
+    // saved login, which would show a signed-in user the login screen.
+    final results = await Future.wait<Object?>([
+      _quietly(widget.onInitialize?.call()),
+      _quietly(api.maintenance()),
+      _quietly(
+        api.appUpdate(
+          platform: Platform.isIOS ? 'ios' : 'android',
+          version: '1.0.0',
+        ),
+      ),
+      _quietly(auth.restore(), timeout: const Duration(seconds: 12)),
+      _quietly(language.restore()),
+      _quietly(theme.restore()),
+    ]);
     if (!mounted) return;
+    final maintenance = results[1];
+    if (maintenance is Map && maintenance['maintenance'] == true) {
+      maintenanceMessage =
+          maintenance['message']?.toString() ??
+          'We are improving Super Karigar. Back soon.';
+      maintenanceUntil = DateTime.tryParse(
+        '${maintenance['until'] ?? ''}',
+      )?.toLocal();
+      return;
+    }
+    final update = results[2];
+    if (update is Map && update['update_available'] == true) {
+      updateMessage =
+          update['message']?.toString() ??
+          'A newer version of Super Karigar is available.';
+      updateUrl = update['store_url']?.toString();
+      updateVersion = update['latest_version']?.toString();
+      forceUpdate = update['force_update'] == true;
+    }
+  }
+
+  /// The step's result, or null when it fails or takes longer than [timeout].
+  Future<Object?> _quietly(
+    Future<Object?>? step, {
+    Duration timeout = const Duration(seconds: 8),
+  }) async {
+    if (step == null) return null;
     try {
-      final maintenance = await api.maintenance().timeout(
-        const Duration(seconds: 8),
-      );
-      if (maintenance['maintenance'] == true) {
-        maintenanceMessage =
-            maintenance['message']?.toString() ??
-            'We are improving Super Karigar. Back soon.';
-        maintenanceUntil = DateTime.tryParse(
-          '${maintenance['until'] ?? ''}',
-        )?.toLocal();
-        return;
-      }
-      final update = await api
-          .appUpdate(
-            platform: Platform.isIOS ? 'ios' : 'android',
-            version: '1.0.0',
-          )
-          .timeout(const Duration(seconds: 8));
-      if (update['update_available'] == true) {
-        updateMessage =
-            update['message']?.toString() ??
-            'A newer version of Super Karigar is available.';
-        updateUrl = update['store_url']?.toString();
-        updateVersion = update['latest_version']?.toString();
-        forceUpdate = update['force_update'] == true;
-      }
-    } catch (_) {}
-    await auth.restore();
-    await language.restore();
-    await theme.restore();
+      return await step.timeout(timeout);
+    } catch (error) {
+      debugPrint('[Startup] step skipped: $error');
+      return null;
+    }
   }
 
   @override
   void dispose() {
+    accountDataReset.dispose();
+    auth.removeListener(_syncPush);
+    push.dispose();
     client.close();
     auth.dispose();
     dashboard.dispose();
@@ -131,6 +195,8 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
     child: AnimatedBuilder(
       animation: Listenable.merge([language, theme]),
       builder: (context, _) => MaterialApp(
+        navigatorKey: navigatorKey,
+        scaffoldMessengerKey: messengerKey,
         title: 'Super Karigar Employer',
         debugShowCheckedModeBanner: false,
         locale: language.materialLocale,
@@ -182,7 +248,11 @@ class _KarigarEmployerAppState extends State<KarigarEmployerApp> {
                 message: updateMessage,
                 storeUrl: updateUrl,
                 version: updateVersion,
-                child: const MainShell(),
+                // A sign-up left half way (app closed before step 5) used to
+                // open Home with an empty profile, and never asked again.
+                child: employerNeedsRegistration(auth.user)
+                    ? const RegistrationScreen()
+                    : const MainShell(),
               )
             : _OptionalUpdatePrompt(
                 message: updateMessage,

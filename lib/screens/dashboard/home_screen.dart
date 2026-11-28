@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/push/push_router.dart' as router;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 import '../../widgets/contact_actions.dart';
 import '../../widgets/common.dart';
@@ -22,6 +24,8 @@ import 'package:employer_kariger_app/screens/profile/profile_screen.dart';
 import 'package:employer_kariger_app/screens/workers/worker_profile_screen.dart';
 import 'package:employer_kariger_app/screens/workers/shortlisted_screen.dart';
 import 'package:employer_kariger_app/screens/workers/workers_screen.dart';
+import 'package:employer_kariger_app/core/dialog_controllers.dart';
+import 'package:employer_kariger_app/widgets/confirm_action.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,7 +34,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final controller = AppScope.of(context).dashboard;
   bool _loaded = false;
 
@@ -40,10 +44,24 @@ class _HomeScreenState extends State<HomeScreen> {
     if (!_loaded) {
       _loaded = true;
       controller.addListener(_refresh);
+      WidgetsBinding.instance.addObserver(this);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) controller.load();
       });
+    } else if (Visibility.of(context)) {
+      _retryAfterError();
     }
+  }
+
+  /// Back on Home (or in the app) after a failed load, e.g. once the net is
+  /// back: try again by itself instead of waiting for Retry.
+  void _retryAfterError() {
+    if (controller.error != null && !controller.loading) controller.load();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) _retryAfterError();
   }
 
   void _refresh() {
@@ -114,6 +132,13 @@ class _HomeScreenState extends State<HomeScreen> {
         await api.applicantStatus(applicantId, 'accepted');
         _message('Hire offer sent.');
       } else if (action == 'reject') {
+        final sure = await confirmAction(
+          context,
+          title: 'Reject this applicant?',
+          message: 'They will be told they were not selected for this job.',
+          confirmLabel: 'Reject',
+        );
+        if (!sure) return;
         await api.applicantStatus(applicantId, 'rejected');
         _message('Applicant rejected.');
       }
@@ -141,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       );
     } catch (exception) {
-      if (mounted) _message('$exception');
+      if (mounted) _message(errorText(exception));
     }
   }
 
@@ -184,7 +209,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (date != null) setSheetState(() => startDate = date);
                 },
                 icon: const Icon(LucideIcons.calendarDays),
-                label: Text('Joining date * · ${_dateValue(startDate)}'),
+                label: Text('Joining date * · ${_dateLabel(startDate)}'),
               ),
             ],
           ),
@@ -203,8 +228,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     final offeredWage = num.tryParse(wage.text.trim());
     final offerMessage = message.text.trim();
-    wage.dispose();
-    message.dispose();
+    disposeAfterClose([wage, message]);
     if (confirmed != true || offeredWage == null) {
       if (confirmed == true) _message('Enter a valid monthly salary.');
       return;
@@ -221,8 +245,27 @@ class _HomeScreenState extends State<HomeScreen> {
       _message('Hire offer sent.');
       await controller.load();
     } catch (exception) {
-      if (mounted) _message('$exception');
+      if (mounted) _message(errorText(exception));
     }
+  }
+
+  /// "27 Nov 2026" for the button; [_dateValue] stays the API's format.
+  String _dateLabel(DateTime value) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
+    return '${value.day} ${months[value.month - 1]} ${value.year}';
   }
 
   String _dateValue(DateTime value) =>
@@ -230,7 +273,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    if (_loaded) controller.removeListener(_refresh);
+    if (_loaded) {
+      controller.removeListener(_refresh);
+      WidgetsBinding.instance.removeObserver(this);
+    }
     super.dispose();
   }
 
@@ -240,6 +286,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final stats = data?.stats ?? const <String, dynamic>{};
     final greeting = data?.greeting.isNotEmpty == true
         ? data!.greeting
+        : controller.savedGreeting?.isNotEmpty == true
+        ? controller.savedGreeting!
         : 'Your business';
     final initials = greeting
         .split(RegExp(r'\s+'))
@@ -302,16 +350,26 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
         actions: [
+          // The dot shows only when there is something unread, and the counts
+          // are fetched again on the way back.
           _HeaderAction(
             icon: LucideIcons.messageSquare,
-            onTap: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const MessagesScreen()),
-            ),
+            showDot: (data?.unreadMessages ?? 0) > 0,
+            onTap: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MessagesScreen()),
+              );
+              if (mounted) controller.load();
+            },
           ),
           _HeaderAction(
             icon: LucideIcons.bell,
-            onTap: () => openNotifications(context),
+            showDot: (data?.unreadNotifications ?? 0) > 0,
+            onTap: () async {
+              await openNotifications(context);
+              if (mounted) controller.load();
+            },
           ),
           const SizedBox(width: 12),
         ],
@@ -320,47 +378,62 @@ class _HomeScreenState extends State<HomeScreen> {
           ? const Center(child: CircularProgressIndicator())
           : controller.error != null && data == null
           ? Center(
-              child: OutlinedButton(
-                onPressed: controller.load,
-                child: Text(context.tr('Retry')),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(controller.error!, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    OutlinedButton(
+                      onPressed: controller.load,
+                      child: Text(context.tr('Retry')),
+                    ),
+                  ],
+                ),
               ),
             )
-          : ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
-              children: [
-                _PostJobBanner(
-                  onTap: () async {
-                    final created = await Navigator.push<Object?>(
-                      context,
-                      MaterialPageRoute(builder: (_) => const PostJobScreen()),
-                    );
-                    if (created != null && mounted) await controller.load();
-                  },
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatCard(
+          : RefreshIndicator(
+              onRefresh: controller.load,
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 28),
+                children: [
+                  if (data?.hiringPaused == true) ...[
+                    const _HiringPausedCard(),
+                    const SizedBox(height: 14),
+                  ],
+                  _PostJobBanner(
+                    onTap: () async {
+                      final created = await Navigator.push<Object?>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const PostJobScreen(),
+                        ),
+                      );
+                      if (created != null && mounted) await controller.load();
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  // One slim card instead of four tall tiles, so recent
+                  // applicants start in the top half of the screen.
+                  _StatStrip(
+                    items: [
+                      _StatItem(
                         icon: LucideIcons.briefcaseBusiness,
                         value: '${stats['active_jobs'] ?? 0}',
-                        label: context.tr('Active Jobs'),
-                        iconColor: AppColors.primary,
-                        iconBackground: AppColors.brand50,
+                        label: 'Active Jobs',
+                        color: AppColors.primary,
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(builder: (_) => const JobsScreen()),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatCard(
+                      _StatItem(
                         icon: LucideIcons.usersRound,
                         value: '${stats['total_applicants'] ?? 0}',
-                        label: context.tr('Total Applicants'),
-                        iconColor: AppColors.indigo,
-                        iconBackground: AppColors.indigoBg,
+                        label: 'Applicants',
+                        color: AppColors.indigo,
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -368,19 +441,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _StatCard(
+                      _StatItem(
                         icon: LucideIcons.star,
                         value: '${stats['shortlisted'] ?? 0}',
-                        label: context.tr('Shortlisted'),
-                        iconColor: AppColors.amber,
-                        iconBackground: AppColors.amberBg,
+                        label: 'Shortlisted',
+                        color: AppColors.amber,
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -388,15 +453,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _StatCard(
+                      _StatItem(
                         icon: LucideIcons.check,
                         value: '${stats['hired'] ?? 0}',
-                        label: context.tr('Hired'),
-                        iconColor: AppColors.green,
-                        iconBackground: AppColors.greenBg,
+                        label: 'Hired',
+                        color: AppColors.green,
                         onTap: () => Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -407,141 +468,135 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                _DatabaseCard(
-                  title: (data?.database.title ?? 'Karigar Database')
-                      .replaceAll('Worker', 'Karigar')
-                      .replaceAll('worker', 'karigar'),
-                  subtitle:
-                      data?.database.subtitle ??
-                      'Buy a database plan to see karigar numbers',
-                  cta: data?.database.cta ?? 'Buy Database',
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const PlansScreen(focusDatabase: true),
-                    ),
+                    ],
                   ),
-                ),
-                if (data?.verificationEnabled == true &&
-                    data?.profile?.verified != true) ...[
-                  const SizedBox(height: 16),
-                  _VerifyCard(
+                  const SizedBox(height: 10),
+                  _DatabaseCard(
+                    title: (data?.database.title ?? 'Karigar Database')
+                        .replaceAll('Worker', 'Karigar')
+                        .replaceAll('worker', 'karigar'),
+                    subtitle:
+                        data?.database.subtitle ??
+                        'Buy a database plan to see karigar numbers',
+                    cta: data?.database.cta ?? 'Buy Database',
                     onTap: () => Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const KycScreen()),
+                      MaterialPageRoute(
+                        builder: (_) => const PlansScreen(focusDatabase: true),
+                      ),
                     ),
                   ),
-                ],
-                const SizedBox(height: 22),
-                _ListHeading(
-                  context.tr('Recent applicants'),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const WorkersScreen(initialTab: 2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...(data?.applicants ?? const []).map((applicant) {
-                  final profile = applicant.worker;
-                  final worker = Worker(
-                    profile.name,
-                    profile.skills.isEmpty ? 'Karigar' : profile.skills.first,
-                    profile.experienceYears,
-                    profile.rating.average,
-                    profile.distanceKm ?? 0,
-                    profile.expectedWage,
-                    profile.skills,
-                    status: applicant.statusLabel,
-                    verified: profile.verified,
-                  );
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _ApplicantCard(
-                      worker: worker,
-                      displayName: profile.name,
-                      status: applicant.statusLabel,
-                      stage: applicant.stage,
-                      skills: profile.skills,
-                      phone: profile.phone,
-                      distanceLabel: profile.distanceLabel,
-                      locationLabel: profile.locationLabel,
-                      ai: applicant.ai,
-                      screeningCall: applicant.screeningCall,
-                      onChat: () => _chatApplicant(applicant, worker),
-                      onPrimary: () =>
-                          _applicantAction(applicant.id, 'shortlist'),
-                      onHire: () => _hireApplicant(applicant),
-                      onReject: () => _applicantAction(applicant.id, 'reject'),
+                  if (data?.verificationEnabled == true &&
+                      data?.profile?.verified != true) ...[
+                    const SizedBox(height: 10),
+                    _VerifyCard(
                       onTap: () => Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (_) => WorkerProfileScreen(
-                            worker: worker,
-                            profileId: profile.id,
-                            workerUserId: profile.userId,
-                            jobId: (applicant.job?['id'] as num?)?.toInt(),
-                            phone: profile.phone,
-                            contactUnlocked: true,
-                            canMessage: true,
-                            alwaysShowContact: true,
+                        MaterialPageRoute(builder: (_) => const KycScreen()),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  _ListHeading(
+                    context.tr('Recent applicants'),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WorkersScreen(initialTab: 2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  ...(data?.applicants ?? const []).map((applicant) {
+                    final profile = applicant.worker;
+                    final worker = Worker(
+                      profile.name,
+                      profile.skills.isEmpty ? 'Karigar' : profile.skills.first,
+                      profile.experienceYears,
+                      profile.rating.average,
+                      profile.distanceKm ?? 0,
+                      profile.expectedWage,
+                      profile.skills,
+                      status: applicant.stageLabel,
+                      verified: profile.verified,
+                    );
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _ApplicantCard(
+                        worker: worker,
+                        displayName: profile.name,
+                        status: applicant.stageLabel,
+                        stage: applicant.stage,
+                        skills: profile.skills,
+                        phone: profile.phone,
+                        distanceLabel: profile.distanceLabel,
+                        locationLabel: profile.locationLabel,
+                        ai: applicant.ai,
+                        screeningCall: applicant.screeningCall,
+                        onChat: () => _chatApplicant(applicant, worker),
+                        onPrimary: () =>
+                            _applicantAction(applicant.id, 'shortlist'),
+                        onHire: () => _hireApplicant(applicant),
+                        onReject: () =>
+                            _applicantAction(applicant.id, 'reject'),
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => WorkerProfileScreen(
+                              worker: worker,
+                              profileId: profile.id,
+                              workerUserId: profile.userId,
+                              jobId: (applicant.job?['id'] as num?)?.toInt(),
+                              phone: profile.phone,
+                              contactUnlocked: true,
+                              canMessage: true,
+                              alwaysShowContact: true,
+                            ),
                           ),
                         ),
                       ),
+                    );
+                  }),
+                  const SizedBox(height: 22),
+                  _ListHeading(
+                    context.tr('Your active jobs'),
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const JobsScreen()),
                     ),
-                  );
-                }),
-                const SizedBox(height: 22),
-                _ListHeading(
-                  context.tr('Your active jobs'),
-                  onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const JobsScreen()),
                   ),
-                ),
-                const SizedBox(height: 12),
-                ...(data?.jobs ?? const []).take(2).map((item) {
-                  final job = Job(
-                    item.title,
-                    item.category,
-                    item.wageLabel,
-                    item.vacancies,
-                    item.stats['applicants'] as int? ?? 0,
-                    item.stats['shortlisted'] as int? ?? 0,
-                    item.stats['hired'] as int? ?? 0,
-                    item.status,
-                    id: item.id,
-                    workModeLabel: item.workModeLabel,
-                    interviewModeLabel: item.interviewModeLabel,
-                  );
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: jobCard(
-                      job,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => JobManageScreen(job: job),
+                  const SizedBox(height: 12),
+                  ...(data?.jobs ?? const []).take(2).map((item) {
+                    final job = router.jobCard(item);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: jobCard(
+                        job,
+                        () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => JobManageScreen(job: job),
+                          ),
                         ),
                       ),
-                    ),
-                  );
-                }),
-              ],
+                    );
+                  }),
+                ],
+              ),
             ),
     );
   }
 }
 
 class _HeaderAction extends StatelessWidget {
-  const _HeaderAction({required this.icon, required this.onTap});
+  const _HeaderAction({
+    required this.icon,
+    required this.onTap,
+    this.showDot = false,
+  });
   final IconData icon;
   final VoidCallback onTap;
+  final bool showDot;
 
   @override
   Widget build(BuildContext context) {
@@ -563,18 +618,19 @@ class _HeaderAction extends StatelessWidget {
               child: Icon(icon, size: 21),
             ),
           ),
-          Positioned(
-            top: 7,
-            right: 7,
-            child: Container(
-              width: 6,
-              height: 6,
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
+          if (showDot)
+            Positioned(
+              top: 7,
+              right: 7,
+              child: Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -585,40 +641,51 @@ class _PostJobBanner extends StatelessWidget {
   const _PostJobBanner({required this.onTap});
   final VoidCallback onTap;
 
+  // One row: the question on the left, the button on the right. It used to
+  // stack into three rows on phones with a large display size.
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.all(16),
+    padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
     decoration: BoxDecoration(
       gradient: const LinearGradient(
         begin: Alignment.topLeft,
         end: Alignment.bottomRight,
         colors: [AppColors.brandDark, AppColors.gradientEnd],
       ),
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(18),
     ),
-    child: LayoutBuilder(
-      builder: (context, constraints) {
-        final compact = constraints.maxWidth < 300;
-        final copy = const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Hiring today?',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+    child: Row(
+      children: [
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  'Hiring today?',
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
-            ),
-            SizedBox(height: 3),
-            Text(
-              'Post a job free — reach karigars instantly',
-              style: TextStyle(color: Color(0xFFFBECE5), fontSize: 11.5),
-            ),
-          ],
-        );
-        final button = SizedBox(
-          height: 42,
+              SizedBox(height: 2),
+              Text(
+                'Post a job — reach karigars near you instantly',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: Color(0xFFFBECE5), fontSize: 11.5),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          height: 40,
           child: FilledButton.icon(
             onPressed: onTap,
             style: FilledButton.styleFrom(
@@ -627,97 +694,119 @@ class _PostJobBanner extends StatelessWidget {
               foregroundColor: AppColors.brandDark,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(13),
+                borderRadius: BorderRadius.circular(12),
               ),
             ),
-            icon: const Icon(LucideIcons.plus, size: 19),
+            icon: const Icon(LucideIcons.plus, size: 18),
             label: const Text('Post Job'),
           ),
-        );
-        if (compact) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [copy, const SizedBox(height: 12), button],
-          );
-        }
-        return Row(
-          children: [
-            Expanded(child: copy),
-            button,
-          ],
-        );
-      },
+        ),
+      ],
     ),
   );
 }
 
-class _StatCard extends StatelessWidget {
-  const _StatCard({
+class _StatItem {
+  const _StatItem({
     required this.icon,
     required this.value,
     required this.label,
-    required this.iconColor,
-    required this.iconBackground,
+    required this.color,
     required this.onTap,
   });
   final IconData icon;
-  final String value;
-  final String label;
-  final Color iconColor;
-  final Color iconBackground;
+  final String value, label;
+  final Color color;
   final VoidCallback onTap;
+}
+
+/// Four equal columns in one card: icon + number on top, label below.
+class _StatStrip extends StatelessWidget {
+  const _StatStrip({required this.items});
+  final List<_StatItem> items;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 120),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: colors.surface,
-            border: Border.all(color: colors.outlineVariant),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x0A000000),
-                blurRadius: 8,
-                offset: Offset(0, 3),
+    final cells = <Widget>[];
+    for (var i = 0; i < items.length; i++) {
+      if (i > 0) {
+        cells.add(
+          VerticalDivider(width: 1, thickness: 1, color: colors.outlineVariant),
+        );
+      }
+      final item = items[i];
+      cells.add(
+        Expanded(
+          child: Semantics(
+            button: true,
+            label: '${context.tr(item.label)}: ${item.value}',
+            child: InkWell(
+              onTap: item.onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 10,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            item.icon,
+                            color: context.accentText(item.color),
+                            size: 15,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            item.value,
+                            maxLines: 1,
+                            style: TextStyle(
+                              color: context.accentText(item.color),
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        item.label,
+                        maxLines: 1,
+                        style: TextStyle(
+                          color: colors.onSurfaceVariant,
+                          fontSize: 11.5,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? iconColor.withValues(alpha: .18)
-                      : iconBackground,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: iconColor, size: 19),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              Text(
-                label,
-                style: TextStyle(color: colors.onSurfaceVariant, fontSize: 12),
-              ),
-            ],
+        ),
+      );
+    }
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border.all(color: colors.outlineVariant),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: cells,
           ),
         ),
       ),
@@ -741,22 +830,22 @@ class _DatabaseCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
             Container(
-              width: 44,
-              height: 44,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: isDark
                     ? colors.primary.withValues(alpha: .18)
                     : AppColors.brand50,
-                borderRadius: BorderRadius.circular(13),
+                borderRadius: BorderRadius.circular(11),
               ),
               child: const Icon(
                 LucideIcons.layers,
                 color: AppColors.primary,
-                size: 21,
+                size: 18,
               ),
             ),
             const SizedBox(width: 12),
@@ -766,13 +855,17 @@ class _DatabaseCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 16,
+                      fontSize: 14.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   Text(
                     subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
                       color: colors.onSurfaceVariant,
@@ -782,11 +875,11 @@ class _DatabaseCard extends StatelessWidget {
               ),
             ),
             SizedBox(
-              height: 38,
+              height: 36,
               child: FilledButton(
                 onPressed: onTap,
                 style: FilledButton.styleFrom(
-                  minimumSize: const Size(54, 38),
+                  minimumSize: const Size(54, 36),
                   padding: const EdgeInsets.symmetric(horizontal: 13),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(11),
@@ -810,8 +903,8 @@ class _VerifyCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(15),
     decoration: BoxDecoration(
-      color: AppColors.brand50,
-      border: Border.all(color: AppColors.brand200),
+      color: context.brandTint,
+      border: Border.all(color: context.brandTintBorder),
       borderRadius: BorderRadius.circular(16),
     ),
     child: Row(
@@ -957,9 +1050,17 @@ class _ApplicantCard extends StatelessWidget {
                         ? colors.primary.withValues(alpha: .25)
                         : AppColors.brand100,
                     child: Text(
-                      displayName.split(' ').map((e) => e[0]).take(2).join(),
-                      style: const TextStyle(
-                        color: AppColors.brandDark,
+                      displayName
+                          .split(RegExp(r'\s+'))
+                          .where((e) => e.isNotEmpty)
+                          .map((e) => e[0])
+                          .take(2)
+                          .join()
+                          .toUpperCase(),
+                      style: TextStyle(
+                        color: isDark
+                            ? const Color(0xFFFFC9B5)
+                            : AppColors.brandDark,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -1022,13 +1123,16 @@ class _ApplicantCard extends StatelessWidget {
                       vertical: 5,
                     ),
                     decoration: BoxDecoration(
-                      color: statusBackground,
+                      color: context.accentBackground(
+                        statusColor,
+                        statusBackground,
+                      ),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       status,
                       style: TextStyle(
-                        color: statusColor,
+                        color: context.accentText(statusColor),
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
@@ -1075,6 +1179,7 @@ class _ApplicantCard extends StatelessWidget {
                 ApplicantScreeningCallPanel(
                   call: screeningCall,
                   workerName: displayName,
+                  summaryMaxLines: 2,
                 ),
               ],
               const Padding(
@@ -1086,6 +1191,7 @@ class _ApplicantCard extends StatelessWidget {
                 expanded: true,
                 onChat: onChat,
                 compact: true,
+                inline: true,
               ),
               if (canManage) ...[
                 const SizedBox(height: 10),
@@ -1221,21 +1327,26 @@ Widget jobCard(Job job, VoidCallback onTap) {
                     ),
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 9,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusBackground,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    job.status,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                Builder(
+                  builder: (context) => Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 9,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: context.accentBackground(
+                        statusColor,
+                        statusBackground,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      job.status,
+                      style: TextStyle(
+                        color: context.accentText(statusColor),
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -1285,8 +1396,9 @@ Widget jobCard(Job job, VoidCallback onTap) {
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.fromLTRB(17, 12, 17, 13),
-            decoration: const BoxDecoration(
-              color: Color(0xFFF8F5F0),
+            decoration: BoxDecoration(
+              // A faint shade that reads in light and dark mode alike.
+              color: Colors.black.withValues(alpha: .035),
               border: Border(top: BorderSide(color: AppColors.line2)),
             ),
             child: Row(
@@ -1357,4 +1469,58 @@ class _HomeMetricDivider extends StatelessWidget {
     margin: const EdgeInsets.only(right: 12),
     color: AppColors.line,
   );
+}
+
+/// Shown while the job plan has run out: the jobs still say "Active" in the
+/// list, but karigars can't see them or apply.
+class _HiringPausedCard extends StatelessWidget {
+  const _HiringPausedCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Icon(LucideIcons.eyeOff, color: colors.onErrorContainer),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your plan has ended',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: colors.onErrorContainer,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Your jobs are hidden from karigars and closed to new applications.',
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: colors.onErrorContainer,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PlansScreen()),
+            ),
+            child: const Text('Renew'),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -21,6 +21,62 @@ class AppStrings {
   }
 
   static const _employerHi = <String, String>{
+    'Karigar Database': 'कारीगर डेटाबेस',
+    'Buy a database plan to see karigar numbers':
+        'कारीगरों के नंबर देखने के लिए डेटाबेस प्लान लें',
+    'Buy Database': 'डेटाबेस खरीदें',
+    'Pending': 'बाकी',
+    'Rejected': 'रिजेक्ट',
+    'Interview': 'इंटरव्यू',
+    'Withdrawn': 'वापस लिया',
+    'MY JOBS': 'मेरी जॉब्स',
+    'JOB LISTINGS': 'जॉब लिस्टिंग',
+    'Review applicants and manage each posting.':
+        'आवेदक देखें और हर जॉब संभालें।',
+    'Applicants': 'आवेदक',
+    'AI Interviews': 'AI इंटरव्यू',
+    'AI Credits': 'AI क्रेडिट',
+    'Paused': 'रुकी हुई',
+    'Your plan has ended': 'आपका प्लान खत्म हो गया है',
+    'Your jobs are hidden from karigars and closed to new applications.':
+        'आपकी जॉब्स कारीगरों से छिपी हैं और नए आवेदन बंद हैं।',
+    'Your plan has ended, so these jobs are paused: karigars can\'t see them or apply. Renew the plan to open them again.':
+        'प्लान खत्म होने से ये जॉब्स रुकी हुई हैं: कारीगर इन्हें देख या इन पर आवेदन नहीं कर सकते। फिर से खोलने के लिए प्लान रिन्यू करें।',
+    'Renew': 'रिन्यू करें',
+    'Reject this applicant?': 'इस आवेदक को रिजेक्ट करें?',
+    'They will be told they were not selected for this job.':
+        'उन्हें बताया जाएगा कि इस जॉब के लिए उनका चयन नहीं हुआ।',
+    'Reject': 'रिजेक्ट करें',
+    'Close this job?': 'यह जॉब बंद करें?',
+    'Karigars will no longer see it or apply. Its applicants stay in your list.':
+        'कारीगर इसे नहीं देख पाएंगे और आवेदन नहीं कर पाएंगे। इसके आवेदक आपकी सूची में रहेंगे।',
+    'Close job': 'जॉब बंद करें',
+    'This device': 'यह डिवाइस',
+    'Not used yet': 'अभी इस्तेमाल नहीं हुआ',
+    'AI call finished': 'AI कॉल पूरी हुई',
+    'KYC reviewed': 'KYC की जांच हुई',
+    'New applicant': 'नया आवेदक',
+    'New message': 'नया संदेश',
+    'Job check': 'जॉब की जांच',
+    'Job needs a check': 'जॉब की जांच ज़रूरी है',
+    'Plan reminder': 'प्लान रिमाइंडर',
+    'AI credits running low': 'AI क्रेडिट कम हो रहे हैं',
+    'Interview reminder call': 'इंटरव्यू रिमाइंडर कॉल',
+    'Interview reminder': 'इंटरव्यू रिमाइंडर',
+    'Your business is verified. You can post jobs.':
+        'आपका बिज़नेस सत्यापित है। आप जॉब पोस्ट कर सकते हैं।',
+    'We are checking your documents. This usually takes a working day.':
+        'हम आपके दस्तावेज़ जांच रहे हैं। इसमें आमतौर पर एक कामकाजी दिन लगता है।',
+    'Business details': 'बिज़नेस की जानकारी',
+    'Business type': 'बिज़नेस का प्रकार',
+    'Legal name': 'कानूनी नाम',
+    'GST number': 'GST नंबर',
+    'Documents': 'दस्तावेज़',
+    'Photo sent': 'फोटो भेजी गई',
+    'To change these details, contact support.':
+        'यह जानकारी बदलने के लिए सपोर्ट से संपर्क करें।',
+    'We will tell you if anything needs fixing.':
+        'कुछ ठीक करना हुआ तो हम आपको बताएंगे।',
     'Find Karigars': 'कारीगर खोजें',
     'Find karigars': 'कारीगर खोजें',
     'Database contacts': 'डेटाबेस संपर्क',
@@ -101,12 +157,46 @@ class AppStrings {
     'Email': 'ईमेल',
     'Later': 'बाद में',
     'Load more': 'और दिखाएं',
+    'Step {current} of {total}': 'चरण {current} / {total}',
+    'Shortlist again': 'फिर से शॉर्टलिस्ट करें',
+    'Use another number': 'दूसरा नंबर इस्तेमाल करें',
+    'Choose your business type above to see the documents you need.':
+        'ज़रूरी दस्तावेज़ देखने के लिए ऊपर बिज़नेस का प्रकार चुनें।',
+    'Verify & Finish': 'वेरिफ़ाई करें और पूरा करें',
+    'Our team checks your proofs.': 'हमारी टीम आपके प्रमाण जांचती है।',
+    'A GST number or the business PAN is enough.':
+        'GST नंबर या बिज़नेस PAN, कोई एक काफ़ी है।',
+    'Enter a GST number or the business PAN.': 'GST नंबर या बिज़नेस PAN डालें।',
+    'Select the type of work.': 'काम का प्रकार चुनें।',
+    'Select at least one skill you hire for.':
+        'कम से कम एक हुनर चुनें जिसके लिए आप रखते हैं।',
+    'Shortlist': 'शॉर्टलिस्ट करें',
+    'This takes the rejection back. They will be told they are shortlisted.':
+        'इससे रिजेक्शन वापस हो जाएगा। कारीगर को बताया जाएगा कि वे शॉर्टलिस्ट हैं।',
+    'Work & pay': 'काम और वेतन',
+    'Karigar profile': 'कारीगर प्रोफ़ाइल',
+    'Shift & interview': 'शिफ़्ट और इंटरव्यू',
+    'Preview & publish': 'प्रीव्यू और पोस्ट',
+    'Leave without saving?': 'बिना सेव किए बाहर जाएं?',
+    'Your changes will be lost. Save a draft to finish it later.':
+        'आपके बदलाव मिट जाएंगे। बाद में पूरा करने के लिए ड्राफ्ट सेव करें।',
+    'Your changes to this job will be lost.':
+        'इस जॉब में किए गए बदलाव मिट जाएंगे।',
+    'Keep editing': 'बदलाव जारी रखें',
+    'Save draft': 'ड्राफ्ट सेव करें',
+    'Leave without saving': 'बिना सेव किए बाहर जाएं',
   };
 
   // Hinglish keeps familiar business terms in English and presents common app
   // actions in Roman Hindi. Text without a curated equivalent stays English,
   // so changing language never makes an action harder to understand.
   static const _hinglish = <String, String>{
+    'No internet connection. Check your internet and try again.':
+        'Internet nahi hai. Internet check karke dobara koshish karein.',
+    'Post a job — reach karigars near you instantly':
+        'Job post karein — paas ke karigars tak turant pahunchein',
+    'Post your job and reach thousands of work-ready karigars near you. Talk to them directly — no middlemen.':
+        'Apni job post karein aur paas ke hazaron karigars tak pahunchein. Unse seedhe baat karein — koi middleman nahi.',
     'Settings': 'Settings',
     'Preferences': 'Pasand',
     'Language': 'Bhasha',
@@ -118,6 +208,12 @@ class AppStrings {
     'Login & security': 'Login aur security',
     'Help & Support': 'Madad aur support',
     'Log out': 'Log out',
+    'Log out?': 'Log out karein?',
+    'AI credit history': 'AI credit history',
+    'Credits added and spent on AI calls':
+        'AI calls par jude aur kharch hue credits',
+    'You will need an OTP to log in again.':
+        'Dobara login karne ke liye OTP lagega.',
     'Home': 'Home',
     'Post': 'Post karein',
     'Karigars': 'Karigar',
@@ -164,6 +260,12 @@ class AppStrings {
     'Terms & Privacy': 'नियम और गोपनीयता',
     'Help & Support': 'मदद और सहायता',
     'Log out': 'लॉग आउट',
+    'Log out?': 'लॉग आउट करें?',
+    'AI credit history': 'AI क्रेडिट का हिसाब',
+    'Credits added and spent on AI calls':
+        'AI कॉल पर जुड़े और खर्च हुए क्रेडिट',
+    'You will need an OTP to log in again.':
+        'दोबारा लॉगिन करने के लिए OTP लगेगा।',
     'Super Karigar Employer · v1.0.0': 'सुपर कारीगर एम्प्लॉयर · v1.0.0',
     'Home': 'होम',
     'Post': 'पोस्ट करें',
@@ -177,8 +279,12 @@ class AppStrings {
     'Recent applicants': 'हाल के आवेदक',
     'Your active jobs': 'आपकी चालू जॉब्स',
     'Hiring today?': 'आज भर्ती करनी है?',
-    'Post a job free — reach karigars instantly':
-        'मुफ्त जॉब पोस्ट करें — कारीगरों तक तुरंत पहुंचें',
+    'Post a job — reach karigars near you instantly':
+        'जॉब पोस्ट करें — पास के कारीगरों तक तुरंत पहुंचें',
+    'No internet connection. Check your internet and try again.':
+        'इंटरनेट कनेक्शन नहीं है। इंटरनेट जांचें और फिर कोशिश करें।',
+    'Post your job and reach thousands of work-ready karigars near you. Talk to them directly — no middlemen.':
+        'अपनी जॉब पोस्ट करें और पास के हज़ारों काम के लिए तैयार कारीगरों तक पहुंचें। उनसे सीधे बात करें — कोई बिचौलिया नहीं।',
     'Post Job': 'जॉब पोस्ट करें',
     'Retry': 'फिर कोशिश करें',
     'Buy': 'खरीदें',
@@ -201,9 +307,81 @@ class AppStrings {
     'Business Verification': 'बिज़नेस सत्यापन',
     'Shortlisted Karigars': 'शॉर्टलिस्ट किए कारीगर',
     'Reviews & Ratings': 'रेटिंग और समीक्षा',
+    'At workplace / Site': 'कार्यस्थल / साइट पर',
+    'Work from home': 'घर से काम',
+    'Both (Site & Home)': 'दोनों (साइट और घर)',
+    'Interview in person': 'आमने-सामने इंटरव्यू',
+    'Interview on phone / video': 'फ़ोन / वीडियो पर इंटरव्यू',
+    'Interview in person or on phone / video':
+        'आमने-सामने या फ़ोन / वीडियो पर इंटरव्यू',
+    'Strong match': 'बहुत अच्छा मेल',
+    'Good match': 'अच्छा मेल',
+    'Maybe': 'शायद',
+    'Weak match': 'कम मेल',
+    'AI match': 'AI मेल',
+    'monthly': 'महीना',
+    'daily': 'दिन',
+    'weekly': 'हफ़्ता',
+    'hourly': 'घंटा',
+    'month': 'महीना',
+    'day': 'दिन',
+    'Not disclosed': 'नहीं बताया',
+    '{count} opening': '{count} पद',
+    '{count} openings': '{count} पद',
+    'Performance': 'प्रदर्शन',
+    'Views': 'देखा गया',
+    'Applied': 'आवेदन किया',
+    'AI shortlist from database': 'डेटाबेस से AI शॉर्टलिस्ट',
+    'Everyone who reached each step. A hired karigar also counts as shortlisted.':
+        'हर चरण तक पहुंचे सभी लोग। नियुक्त कारीगर शॉर्टलिस्ट में भी गिना जाता है।',
+    'Draft': 'ड्राफ्ट',
+    'AI screening call': 'AI स्क्रीनिंग कॉल',
+    'View conversation': 'बातचीत देखें',
+    'Monthly pay looks too high. Check the amount.':
+        'मासिक वेतन बहुत ज़्यादा लग रहा है। राशि जांचें।',
+    'Tap the map to move the pin': 'पिन हटाने के लिए मैप पर टैप करें',
+    'Pin set for this work location. Tap the map to move it.':
+        'काम की जगह का पिन लग गया। बदलने के लिए मैप पर टैप करें।',
+    'Pick the state and city, then tap the map on the exact spot.':
+        'राज्य और शहर चुनें, फिर मैप पर सही जगह टैप करें।',
+    'Chat': 'चैट',
+    'Phone call': 'फ़ोन कॉल',
+    'In-app message': 'ऐप में संदेश',
+    'Quick message': 'तुरंत संदेश',
+    'Offer sent': 'प्रस्ताव भेजा गया',
+    'Interested': 'रुचि है',
+    'Completed': 'पूरा हुआ',
+    'Dialing': 'कॉल लग रही है',
+    'Not interested': 'रुचि नहीं',
+    'Unlock contact': 'संपर्क अनलॉक करें',
+    'Industry *': 'उद्योग *',
+    'Remove': 'हटाएं',
+    'Skills': 'कौशल',
   };
 }
 
 extension AppStringsContext on BuildContext {
   String tr(String source) => AppStrings.text(this, source);
+
+  /// [tr] with `{name}` placeholders filled in after translating.
+  String trArgs(String source, Map<String, String> values) {
+    var text = tr(source);
+    values.forEach((key, value) => text = text.replaceAll('{$key}', value));
+    return text;
+  }
+
+  /// The server's pay line ("₹23,400 – ₹28,600 / monthly") with its period
+  /// word translated; the server always answers in English.
+  String trWage(String label) => label
+      .replaceAllMapped(
+        RegExp(r'/ (monthly|daily|weekly|hourly|month|day)$'),
+        (m) => '/ ${tr(m[1]!)}',
+      )
+      .replaceFirst('Not disclosed', tr('Not disclosed'));
+
+  /// "1 opening", "3 openings", translated.
+  String trOpenings(int count) => trArgs(
+    count == 1 ? '{count} opening' : '{count} openings',
+    {'count': '$count'},
+  );
 }

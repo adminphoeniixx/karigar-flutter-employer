@@ -152,12 +152,15 @@ void main() {
     });
     await tester.pumpWidget(harness(api, const PostJobScreen()));
     await tester.pumpAndSettle();
+    // The four-step form: the title is the first box, "Next" checks the step.
     await tester.enterText(find.byType(TextField).first, 'Mason for villa');
-    await tester.enterText(find.byType(TextField).at(1), '');
-    await tester.tap(find.text('Post job'));
+    await tester.tap(find.text('Next'));
     await tester.pump();
-    expect(saved, isNull);
-    await tester.tap(find.text('Save as draft'));
+    expect(saved, isNull, reason: 'step 1 still misses craft, city, openings');
+    // The summary names what is missing instead of a general "fix the red
+    // fields".
+    expect(find.text('• Pick the state.'), findsOneWidget);
+    await tester.tap(find.text('Save draft'));
     await tester.pumpAndSettle();
     expect(saved?['title'], 'Mason for villa');
     expect(saved?['status'], 'draft');
@@ -179,7 +182,7 @@ void main() {
     'is_draft': true,
   });
   testWidgets(
-    'existing live job has only active/closed status and saves with PUT',
+    'editing a live job keeps it live and saves with PUT',
     (tester) async {
       Json? saved;
       final api = service((request) async {
@@ -206,10 +209,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Save draft'), findsNothing);
       expect(find.text('Publish'), findsNothing);
-      await tester.tap(find.text('closed'));
+      // Closing a live job lives on its manage screen now; the form keeps it
+      // live and saves it on the last of its four steps.
+      for (var step = 0; step < 3; step++) {
+        await tester.tap(find.text('Next'));
+        await tester.pumpAndSettle();
+      }
       await tester.tap(find.text('Save changes'));
       await tester.pumpAndSettle();
-      expect(saved?['status'], 'closed');
+      expect(saved?['status'], 'active');
       expect(saved?['title'], 'Live mason');
     },
   );
@@ -233,6 +241,10 @@ void main() {
     await tester.pumpWidget(harness(api, PostJobScreen(job: draft)));
     await tester.pumpAndSettle();
     expect(find.text('Save draft'), findsOneWidget);
+    for (var step = 0; step < 3; step++) {
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+    }
     await tester.tap(find.text('Publish'));
     await tester.pumpAndSettle();
     expect(find.text(message), findsOneWidget);
@@ -287,6 +299,9 @@ void main() {
   testWidgets('plan labels and GST confirmation precede native checkout', (
     tester,
   ) async {
+    // Checkout analytics persist to SharedPreferences on Android, which a
+    // widget test emulates; unmocked, that call never completes.
+    SharedPreferences.setMockInitialValues({});
     final nativeCalls = <MethodCall>[];
     Json? callback;
     const channel = MethodChannel('razorpay_flutter');
@@ -350,9 +365,9 @@ void main() {
     });
     await tester.pumpWidget(harness(api, const PlansScreen()));
     await tester.pumpAndSettle();
-    expect(find.text('3 of 5 job posts used this month'), findsOneWidget);
+    expect(find.text('3 of 5 job posts used'), findsOneWidget);
     await tester.scrollUntilVisible(find.text('Choose Basic'), 220);
-    expect(find.text('Recommended'), findsOneWidget);
+    expect(find.text('Most popular'), findsOneWidget);
     expect(find.text('5 job posts per month'), findsOneWidget);
     expect(find.text('job post limit'), findsNothing);
     expect(find.text('+ 18% GST · ₹588.82 total'), findsOneWidget);

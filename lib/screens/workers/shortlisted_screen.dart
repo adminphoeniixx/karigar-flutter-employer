@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -41,7 +42,7 @@ class _ShortlistedScreenState extends State<ShortlistedScreen> {
           .toList();
       if (mounted) setState(() => applicants = rows);
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -89,7 +90,7 @@ class _ShortlistedScreenState extends State<ShortlistedScreen> {
                           profile.expectedWage,
                           profile.skills,
                           verified: profile.verified,
-                          status: applicant.statusLabel,
+                          status: applicant.stageLabel,
                         );
                         return _ShortlistedWorkerCard(
                           applicant: applicant,
@@ -221,7 +222,7 @@ class _ShortlistedWorkerCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                 decoration: BoxDecoration(
-                  color: AppColors.brand50,
+                  color: context.brandTint,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -296,7 +297,7 @@ class _ShortlistedWorkerCard extends StatelessWidget {
                             const SizedBox(width: 4),
                             Expanded(
                               child: Text(
-                                '${worker.distance.toStringAsFixed(1)} km away',
+                                '${formatKm(worker.distance)} away',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(

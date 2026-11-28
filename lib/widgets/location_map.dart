@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -29,6 +31,10 @@ class _LocationMapState extends State<LocationMap> {
   late double _zoom;
   late bool _hasSelection;
   bool _mapReady = false;
+  // The map ignores drags until it is tapped once. A page scroll that
+  // started over the map used to move the pin and rewrite the address.
+  bool _unlocked = false;
+  Timer? _dragReport;
 
   @override
   void initState() {
@@ -40,15 +46,18 @@ class _LocationMapState extends State<LocationMap> {
 
   @override
   void dispose() {
+    _dragReport?.cancel();
     _controller.dispose();
     super.dispose();
   }
 
   void _select(LatLng point) {
+    _dragReport?.cancel();
     _controller.move(point, _zoom);
     setState(() {
       _selectedLocation = point;
       _hasSelection = true;
+      _unlocked = true;
     });
     widget.onLocationChanged?.call(point);
   }
@@ -78,13 +87,25 @@ class _LocationMapState extends State<LocationMap> {
                       minZoom: 3,
                       maxZoom: 18,
                       onMapReady: () => setState(() => _mapReady = true),
+                      interactionOptions: InteractionOptions(
+                        flags: _unlocked
+                            ? InteractiveFlag.all & ~InteractiveFlag.rotate
+                            : InteractiveFlag.none,
+                      ),
                       onPositionChanged: (camera, hasGesture) {
                         _zoom = camera.zoom;
-                        if (hasGesture) {
+                        if (hasGesture && _unlocked) {
                           _selectedLocation = camera.center;
                           _hasSelection = true;
-                          widget.onLocationChanged?.call(camera.center);
                           setState(() {});
+                          // Report once the drag settles, not on every frame
+                          // (each report looks the address up again).
+                          _dragReport?.cancel();
+                          final center = camera.center;
+                          _dragReport = Timer(
+                            const Duration(milliseconds: 500),
+                            () => widget.onLocationChanged?.call(center),
+                          );
                         }
                       },
                       onTap: (_, point) => _select(point),
@@ -159,7 +180,8 @@ class _LocationMapState extends State<LocationMap> {
           !_hasSelection
               ? 'Tap the map to select a location'
               : 'Selected: ${_selectedLocation.latitude.toStringAsFixed(5)}, '
-                    '${_selectedLocation.longitude.toStringAsFixed(5)}',
+                    '${_selectedLocation.longitude.toStringAsFixed(5)}'
+                    '${_unlocked ? '' : ' · Tap the map to move the pin'}',
           style: TextStyle(
             fontSize: 11.5,
             color: Theme.of(context).colorScheme.onSurfaceVariant,

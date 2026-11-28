@@ -1,10 +1,13 @@
 import 'dart:async';
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 
 import 'package:flutter/material.dart' hide Text;
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/app_scope.dart';
+import 'package:employer_kariger_app/core/push/push_router.dart';
+import 'package:employer_kariger_app/models/api_models.dart' show asInt;
 import 'package:employer_kariger_app/core/app_strings.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/jobs/job_manage_screen.dart';
@@ -15,43 +18,114 @@ import 'package:employer_kariger_app/screens/jobs/ai_credits_screen.dart';
 class JobsScreen extends StatefulWidget {
   const JobsScreen({super.key});
 
+  /// While a new job is in the safety check ("Checking"), the list asks the
+  /// server this often whether it went live.
+  static const checkEvery = Duration(seconds: 5);
+
+  /// The check takes a minute or two. If a job is still "Checking" after this
+  /// long, stop asking (the check queue may be stuck) until the employer comes
+  /// back to the list or pulls to refresh.
+  static const checkFor = Duration(minutes: 3);
+
   @override
   State<JobsScreen> createState() => _JobsScreenState();
 }
 
-class _JobsScreenState extends State<JobsScreen> {
+class _JobsScreenState extends State<JobsScreen> with WidgetsBindingObserver {
   late final controller = AppScope.of(context).jobs;
   Timer? _checkingRefresh;
   bool _listeningToJobs = false;
 
+  /// Checks left in the current window; null until a job is "Checking".
+  int? _checksLeft;
+  bool _onScreen = true;
+  bool _appActive = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_listeningToJobs) controller.removeListener(_syncCheckingRefresh);
     _checkingRefresh?.cancel();
     super.dispose();
   }
 
+  bool get _hasCheckingJob => controller.items.any(
+    (job) => job.moderation?['status']?.toString() == 'checking',
+  );
+
+  static final _checksPerWindow =
+      JobsScreen.checkFor.inSeconds ~/ JobsScreen.checkEvery.inSeconds;
+
+  bool get _checkTimedOut => (_checksLeft ?? 1) <= 0;
+
+  void _stopChecking() {
+    _checkingRefresh?.cancel();
+    _checkingRefresh = null;
+  }
+
+  /// Asks again only while a job is "Checking", this list is the screen the
+  /// employer is looking at (not a hidden tab, not under another page) and
+  /// the app is open, and for at most [JobsScreen.checkFor].
   void _syncCheckingRefresh() {
-    final hasCheckingJob = controller.items.any(
-      (job) => job.moderation?['status']?.toString() == 'checking',
-    );
-    if (hasCheckingJob && _checkingRefresh == null) {
-      _checkingRefresh = Timer.periodic(const Duration(seconds: 4), (_) {
-        if (mounted && !controller.loading) controller.load();
-      });
-    } else if (!hasCheckingJob) {
-      _checkingRefresh?.cancel();
-      _checkingRefresh = null;
+    if (!_hasCheckingJob) {
+      _checksLeft = null;
+      _stopChecking();
+      return;
     }
+    _checksLeft ??= _checksPerWindow;
+    if (!_onScreen || !_appActive || _checkTimedOut) {
+      _stopChecking();
+      return;
+    }
+    _checkingRefresh ??= Timer.periodic(JobsScreen.checkEvery, (_) {
+      if (_checkTimedOut) return _stopChecking();
+      _checksLeft = _checksLeft! - 1;
+      if (mounted && !controller.loading) controller.load();
+    });
+  }
+
+  /// Back on the list (its tab shown again, or the app reopened). Load again
+  /// when the last load failed (it may have run offline, before the internet
+  /// came back) or a job is still "Checking", which also gets a fresh window.
+  void _cameBack() {
+    final checking = _hasCheckingJob;
+    if (checking) _checksLeft = _checksPerWindow;
+    if ((checking || controller.error != null) && !controller.loading) {
+      controller.load();
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final active = state == AppLifecycleState.resumed;
+    if (active == _appActive) return;
+    _appActive = active;
+    if (active && _onScreen) _cameBack();
+    _syncCheckingRefresh();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // A tab of the bottom bar stays alive while hidden, and this list can be
+    // covered by a page pushed over it: neither should keep asking.
+    final onScreen =
+        Visibility.of(context) && (ModalRoute.isCurrentOf(context) ?? true);
+    if (onScreen != _onScreen) {
+      _onScreen = onScreen;
+      if (onScreen && _appActive) _cameBack();
+    }
     if (!_listeningToJobs) {
       controller.addListener(_syncCheckingRefresh);
       _listeningToJobs = true;
     }
+    _syncCheckingRefresh();
     if (controller.items.isEmpty && !controller.loading) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && controller.items.isEmpty && !controller.loading) {
@@ -63,8 +137,11 @@ class _JobsScreenState extends State<JobsScreen> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: controller,
+    // The dashboard says whether the plan has run out (jobs shown as paused).
+    listenable: Listenable.merge([controller, AppScope.of(context).dashboard]),
     builder: (context, _) {
+      // While the job plan has run out, live jobs are hidden from karigars.
+      final paused = AppScope.of(context).dashboard.data?.hiringPaused ?? false;
       final liveJobs = controller.items
           .map(
             (job) => Job(
@@ -75,16 +152,11 @@ class _JobsScreenState extends State<JobsScreen> {
               job.stats['applicants'] as int? ?? 0,
               job.stats['shortlisted'] as int? ?? 0,
               job.stats['hired'] as int? ?? 0,
-              job.moderation?['status'] == 'pending'
-                  ? 'Under review'
-                  : job.moderation?['status'] == 'rejected'
-                  ? 'Not approved'
-                  : job.moderation?['status'] == 'checking'
-                  ? 'Checking…'
-                  : job.status.isEmpty
-                  ? ''
-                  : '${job.status[0].toUpperCase()}${job.status.substring(1)}',
+              paused && jobStatusLabel(job) == 'Active'
+                  ? 'Paused'
+                  : jobStatusLabel(job),
               id: job.id,
+              views: asInt(job.stats['views']),
               moderationNote: job.moderation?['note']?.toString(),
               moderationStatus: job.moderation?['status']?.toString(),
               moderationMethod: job.moderation?['method']?.toString(),
@@ -133,7 +205,7 @@ class _JobsScreenState extends State<JobsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('$exception')));
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
       }
     }
   }
@@ -169,7 +241,18 @@ class _JobsScreenState extends State<JobsScreen> {
             onRetry: () => controller.load(),
           )
         : RefreshIndicator(
-            onRefresh: () => controller.load(),
+            onRefresh: () async {
+              // A pull also restarts the wait for a job that is "Checking".
+              if (_hasCheckingJob) _checksLeft = _checksPerWindow;
+              await controller.load();
+              // The list stays as it was; say the refresh failed (offline
+              // used to fail without a word).
+              if (context.mounted && controller.error != null) {
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(controller.error!)));
+              }
+            },
             child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
@@ -194,6 +277,15 @@ class _JobsScreenState extends State<JobsScreen> {
                     },
                   ),
                 ),
+                if ((AppScope.of(context).dashboard.data?.hiringPaused ??
+                        false) &&
+                    controller.status == 'active')
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
+                      child: _PausedNote(),
+                    ),
+                  ),
                 if (liveJobs.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,
@@ -514,11 +606,13 @@ class _JobListCard extends StatelessWidget {
                   spacing: 14,
                   runSpacing: 6,
                   children: [
-                    _JobDetail(icon: LucideIcons.indianRupee, label: job.wage),
+                    _JobDetail(
+                      icon: LucideIcons.indianRupee,
+                      label: context.trWage(job.wage),
+                    ),
                     _JobDetail(
                       icon: LucideIcons.briefcaseBusiness,
-                      label:
-                          '${job.openings} opening${job.openings == 1 ? '' : 's'}',
+                      label: context.trOpenings(job.openings),
                     ),
                   ],
                 ),
@@ -552,8 +646,8 @@ class _JobListCard extends StatelessWidget {
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.fromLTRB(17, 12, 17, 13),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF8F5F0),
+                decoration: BoxDecoration(
+                  color: context.softSurface,
                   border: Border(top: BorderSide(color: AppColors.line2)),
                 ),
                 child: Row(
@@ -693,4 +787,24 @@ class _JobsMessage extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _PausedNote extends StatelessWidget {
+  const _PausedNote();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+        'Your plan has ended, so these jobs are paused: karigars can\'t see them or apply. Renew the plan to open them again.',
+        style: TextStyle(fontSize: 12.5, color: colors.onErrorContainer),
+      ),
+    );
+  }
 }

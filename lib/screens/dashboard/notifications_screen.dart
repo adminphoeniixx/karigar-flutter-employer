@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
+import 'package:employer_kariger_app/core/push/push_router.dart';
 import 'package:employer_kariger_app/core/theme.dart';
-import 'package:employer_kariger_app/screens/profile/plans_screen.dart';
-import 'package:employer_kariger_app/core/data.dart';
-import 'package:employer_kariger_app/models/api_models.dart';
-import 'package:employer_kariger_app/screens/jobs/job_manage_screen.dart';
+import 'package:employer_kariger_app/widgets/common.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -17,6 +16,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
+  bool _opening = false;
   bool loading = true;
   String? error;
   List<Map<String, dynamic>> items = const [];
@@ -27,6 +27,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     if (loading && items.isEmpty && error == null) _load();
   }
 
+  int _page = 1, _lastPage = 1;
+  bool _loadingMore = false;
+
   Future<void> _load() async {
     setState(() {
       loading = true;
@@ -34,20 +37,49 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     });
     try {
       final response = await AppScope.of(context).api.notifications();
-      final wrapper = response['notifications'];
-      final rows = wrapper is Map ? wrapper['data'] : null;
       if (!mounted) return;
-      setState(() {
-        items = (rows as List? ?? const [])
-            .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
-      });
+      setState(() => _apply(response, more: false));
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  /// The server sends 20 at a time; older ones load as the list nears its end.
+  Future<void> _loadMore() async {
+    if (_loadingMore || loading || _page >= _lastPage) return;
+    setState(() => _loadingMore = true);
+    try {
+      final response = await AppScope.of(
+        context,
+      ).api.notifications(page: _page + 1);
+      if (mounted) setState(() => _apply(response, more: true));
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
+      }
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _apply(Map<String, dynamic> response, {required bool more}) {
+    final wrapper = response['notifications'] is Map
+        ? Map<String, dynamic>.from(response['notifications'] as Map)
+        : <String, dynamic>{};
+    final incoming = (wrapper['data'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final known = {for (final item in items) item['id']};
+    items = more
+        ? [...items, ...incoming.where((item) => !known.contains(item['id']))]
+        : incoming;
+    _page = (wrapper['current_page'] as num?)?.toInt() ?? 1;
+    _lastPage = (wrapper['last_page'] as num?)?.toInt() ?? _page;
   }
 
   Future<void> _read(Map<String, dynamic> item) async {
@@ -71,62 +103,26 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     } catch (_) {}
   }
 
+  /// Opens what the row is about: the job (applicants, screening calls,
+  /// interviews, job checks), chats, plans, AI credits or KYC.
   Future<void> _open(Map<String, dynamic> item) async {
     await _read(item);
-    if (!mounted) return;
-    if (item['type']?.toString() == 'application.interview_reminder') {
-      final data = item['data'] is Map
-          ? Map<String, dynamic>.from(item['data'] as Map)
-          : const <String, dynamic>{};
-      final url = '${item['url'] ?? data['url'] ?? ''}';
-      final match = RegExp(r'/employer/jobs/(\\d+)/applicants').firstMatch(url);
-      final jobId = int.tryParse(match?.group(1) ?? '${data['job_id'] ?? ''}');
-      if (jobId != null) {
-        final jobs = await AppScope.of(context).api.jobs();
-        if (!mounted) return;
-        EmployerJob? job;
-        for (final candidate in jobs) {
-          if (candidate.id == jobId) {
-            job = candidate;
-            break;
-          }
-        }
-        if (job != null) {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => JobManageScreen(job: _job(job!))),
-          );
-        }
-      }
-      return;
+    if (!mounted || _opening) return;
+    final api = AppScope.of(context).api;
+    final data = {
+      ...item,
+      if (item['data'] is Map)
+        ...Map<String, dynamic>.from(item['data'] as Map),
+    };
+    setState(() => _opening = true);
+    try {
+      final screen = await screenForNotification(data, api);
+      if (screen == null || !mounted) return;
+      await Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
+    } finally {
+      if (mounted) setState(() => _opening = false);
     }
-    if (item['type']?.toString() != 'plan.reminder') return;
-    final data = item['data'] is Map
-        ? Map<String, dynamic>.from(item['data'] as Map)
-        : const <String, dynamic>{};
-    final planType =
-        data['plan_type']?.toString() ?? item['plan_type']?.toString();
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PlansScreen(focusDatabase: planType == 'database'),
-      ),
-    );
   }
-
-  Job _job(EmployerJob job) => Job(
-    job.title,
-    job.category,
-    job.wageLabel,
-    job.vacancies,
-    job.stats['applicants'] as int? ?? 0,
-    job.stats['shortlisted'] as int? ?? 0,
-    job.stats['hired'] as int? ?? 0,
-    job.status,
-    id: job.id,
-    workModeLabel: job.workModeLabel,
-    interviewModeLabel: job.interviewModeLabel,
-  );
 
   @override
   Widget build(BuildContext context) => Scaffold(
@@ -150,7 +146,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(vertical: 6),
-              itemCount: items.isEmpty ? 1 : items.length,
+              itemCount: items.isEmpty
+                  ? 1
+                  : items.length + (_page < _lastPage ? 1 : 0),
               separatorBuilder: (context, _) => Divider(
                 height: 1,
                 indent: 68,
@@ -164,13 +162,16 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     child: Center(child: Text('No notifications yet')),
                   );
                 }
+                if (index == items.length) {
+                  return PageEndLoader(onReached: _loadMore);
+                }
                 final item = items[index];
                 return _Notification(
                   item['title']?.toString().trim().isNotEmpty == true
                       ? item['title'].toString()
                       : _title('${item['type'] ?? ''}'),
                   '${item['message'] ?? ''}',
-                  '${item['created_ago'] ?? ''}',
+                  shortAgo('${item['created_ago'] ?? ''}'),
                   item['read'] != true,
                   _icon('${item['type'] ?? ''}'),
                   onTap: () => _open(item),
@@ -180,12 +181,24 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
   );
 
-  String _title(String type) => type
-      .replaceAll(RegExp(r'[_\\.-]+'), ' ')
-      .split(' ')
-      .where((part) => part.isNotEmpty)
-      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
-      .join(' ');
+  /// A title for rows the server sent without one.
+  String _title(String type) =>
+      notificationTitles[type] ??
+      type
+          .replaceFirst(RegExp(r'Notification$'), '')
+          .replaceAllMapped(
+            RegExp(r'([a-z])([A-Z])'),
+            (m) => '${m[1]} ${m[2]!.toLowerCase()}',
+          )
+          .replaceAll(RegExp(r'[_.-]+'), ' ')
+          .split(' ')
+          .where((part) => part.isNotEmpty)
+          .map(
+            (part) => const {'kyc', 'ai', 'gst'}.contains(part.toLowerCase())
+                ? part.toUpperCase()
+                : '${part[0].toUpperCase()}${part.substring(1)}',
+          )
+          .join(' ');
 
   IconData _icon(String type) {
     if (type.contains('plan')) return LucideIcons.walletCards;
@@ -298,3 +311,20 @@ class _Notification extends StatelessWidget {
     );
   }
 }
+
+/// Readable titles for the notification types the server sends untitled.
+const notificationTitles = <String, String>{
+  'screening.completed': 'AI call finished',
+  'kyc.reviewed': 'KYC reviewed',
+  'application.received': 'New applicant',
+  'chat.message': 'New message',
+  'job.moderation': 'Job check',
+  'job.review_needed': 'Job needs a check',
+  'plan.reminder': 'Plan reminder',
+  'ai_credits.low': 'AI credits running low',
+  'interview.reminder_call': 'Interview reminder call',
+  'application.interview_reminder': 'Interview reminder',
+  // Old rows saved the class name as the type.
+  'NewApplicationNotification': 'New applicant',
+  'NewMessageNotification': 'New message',
+};

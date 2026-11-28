@@ -7,7 +7,7 @@ import '../core/api/api_client.dart';
 import '../models/api_models.dart';
 
 class EmployerApiService {
-  const EmployerApiService(this.client, {MetaAnalytics? analytics})
+  EmployerApiService(this.client, {MetaAnalytics? analytics})
     : _analytics = analytics;
   final MetaAnalytics? _analytics;
   MetaAnalytics get analytics => _analytics ?? MetaAnalytics.instance;
@@ -50,7 +50,35 @@ class EmployerApiService {
   Future<Json> setLocale(String locale) =>
       client.post(ApiConstants.locale, body: {'locale': locale});
 
-  Future<Json> reference() => client.get(ApiConstants.reference);
+  /// How long one answer from `/reference` is shared between screens.
+  static const referenceKeptFor = Duration(minutes: 30);
+  Future<Json>? _reference;
+  DateTime _referenceAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// States, crafts, skills, languages and shifts: the same for every
+  /// employer and rarely changed, yet seven screens need them. They share one
+  /// request for [referenceKeptFor]. A request that fails is dropped, so the
+  /// next screen asks again.
+  Future<Json> reference() {
+    final now = DateTime.now();
+    final kept = _reference;
+    if (kept != null && now.difference(_referenceAt) < referenceKeptFor) {
+      return kept;
+    }
+    final request = client.get(ApiConstants.reference);
+    _reference = request;
+    _referenceAt = now;
+    unawaited(
+      request.then<void>(
+        (_) {},
+        onError: (Object _) {
+          if (identical(_reference, request)) _reference = null;
+        },
+      ),
+    );
+    return request;
+  }
+
   Future<Json> maintenance() =>
       client.get(ApiConstants.appMaintenance, query: {'app': 'employer'});
   Future<Json> appUpdate({required String platform, required String version}) =>

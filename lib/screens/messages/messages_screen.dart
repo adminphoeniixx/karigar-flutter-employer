@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart' hide Text;
+import 'package:employer_kariger_app/core/api/api_exception.dart';
 import '../../widgets/localized_text.dart';
 
 import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/data.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/screens/messages/chat_screen.dart';
+import 'package:employer_kariger_app/widgets/common.dart';
 
 class MessagesScreen extends StatefulWidget {
   const MessagesScreen({super.key});
@@ -32,17 +34,51 @@ class _MessagesScreenState extends State<MessagesScreen> {
     try {
       final response = await AppScope.of(context).api.conversations();
       if (!mounted) return;
-      setState(() {
-        items = (response['data'] as List? ?? const [])
-            .whereType<Map>()
-            .map((item) => Map<String, dynamic>.from(item))
-            .toList();
-      });
+      setState(() => _apply(response, more: false));
     } catch (exception) {
-      if (mounted) setState(() => error = '$exception');
+      if (mounted) setState(() => error = errorText(exception));
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  int _page = 1, _lastPage = 1;
+  bool _loadingMore = false;
+
+  /// The server sends 20 chats at a time; the rest load on scroll.
+  Future<void> _loadMore() async {
+    if (_loadingMore || loading || _page >= _lastPage) return;
+    setState(() => _loadingMore = true);
+    try {
+      final response = await AppScope.of(
+        context,
+      ).api.conversations(page: _page + 1);
+      if (mounted) setState(() => _apply(response, more: true));
+    } catch (exception) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(errorText(exception))));
+      }
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _apply(Map<String, dynamic> response, {required bool more}) {
+    final incoming = (response['data'] as List? ?? const [])
+        .whereType<Map>()
+        .map((item) => Map<String, dynamic>.from(item))
+        .toList();
+    final known = {for (final item in items) item['id']};
+    items = more
+        ? [...items, ...incoming.where((item) => !known.contains(item['id']))]
+        : incoming;
+    final meta = response['meta'] is Map
+        ? Map<String, dynamic>.from(response['meta'] as Map)
+        : <String, dynamic>{};
+    _page = (meta['current_page'] as num?)?.toInt() ?? 1;
+    _lastPage = (meta['last_page'] as num?)?.toInt() ?? _page;
   }
 
   @override
@@ -51,15 +87,28 @@ class _MessagesScreenState extends State<MessagesScreen> {
     body: loading && items.isEmpty
         ? const Center(child: CircularProgressIndicator())
         : error != null && items.isEmpty
+        // Say why: offline it used to show a bare Retry button.
         ? Center(
-            child: OutlinedButton(onPressed: _load, child: const Text('Retry')),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('$error', textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  OutlinedButton(onPressed: _load, child: const Text('Retry')),
+                ],
+              ),
+            ),
           )
         : RefreshIndicator(
             onRefresh: _load,
             child: ListView.separated(
               physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(vertical: 6),
-              itemCount: items.isEmpty ? 1 : items.length,
+              itemCount: items.isEmpty
+                  ? 1
+                  : items.length + (_page < _lastPage ? 1 : 0),
               separatorBuilder: (context, _) => Divider(
                 height: 1,
                 indent: 82,
@@ -73,7 +122,13 @@ class _MessagesScreenState extends State<MessagesScreen> {
                     child: Center(child: Text('No conversations yet')),
                   );
                 }
+                if (index == items.length) {
+                  return PageEndLoader(onReached: _loadMore);
+                }
                 final item = items[index];
+                final job = item['job'] is Map
+                    ? '${(item['job'] as Map)['title'] ?? ''}'.trim()
+                    : '';
                 final participant = item['participant'] is Map
                     ? Map<String, dynamic>.from(item['participant'])
                     : <String, dynamic>{};
@@ -86,8 +141,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
                 return _ConversationTile(
                   worker: worker,
                   name: name,
+                  // The same karigar can have one chat per job.
+                  job: job,
                   preview: '${last['body'] ?? 'Start chatting'}',
-                  time: '${last['created_ago'] ?? ''}',
+                  time: shortAgo('${last['created_ago'] ?? ''}'),
                   unread: unread,
                   onTap: () async {
                     await Navigator.push(
@@ -112,6 +169,7 @@ class _ConversationTile extends StatelessWidget {
   const _ConversationTile({
     required this.worker,
     required this.name,
+    this.job = '',
     required this.preview,
     required this.time,
     required this.unread,
@@ -119,7 +177,7 @@ class _ConversationTile extends StatelessWidget {
   });
 
   final Worker worker;
-  final String name, preview, time;
+  final String name, job, preview, time;
   final int unread;
   final VoidCallback onTap;
 
@@ -162,6 +220,17 @@ class _ConversationTile extends StatelessWidget {
                             : FontWeight.w700,
                       ),
                     ),
+                    if (job.isNotEmpty)
+                      Text(
+                        job,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.brandDark,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     const SizedBox(height: 4),
                     Text(
                       preview,

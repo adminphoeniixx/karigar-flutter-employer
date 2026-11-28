@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart' as material;
 
+import '../core/app_language.dart';
+import '../core/app_scope.dart';
 import '../core/app_strings.dart';
 
 /// Drop-in Text widget used by employer screens. Unlike Material's Text, it
@@ -45,8 +47,18 @@ class Text extends material.StatelessWidget {
   final String? semanticsLabel;
   final material.InlineSpan? textSpan;
 
+  /// Listens to the chosen language: most labels are `const`, so without
+  /// this they kept the old language on screens that stay alive (Home, My
+  /// Jobs) until the app was restarted.
   @override
-  material.Widget build(material.BuildContext context) => textSpan == null
+  material.Widget build(material.BuildContext context) =>
+      material.ListenableBuilder(
+        listenable:
+            AppScope.maybeOf(context)?.appLanguage ?? AppLanguage.shared,
+        builder: (context, _) => _build(context),
+      );
+
+  material.Widget _build(material.BuildContext context) => textSpan == null
       ? material.Text(
           context.tr(data),
           style: style,

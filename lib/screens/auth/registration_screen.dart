@@ -1,4 +1,8 @@
+import 'onboarding_screen.dart';
 import 'dart:async';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:employer_kariger_app/core/gstin.dart';
 import 'dart:ui' as ui;
 import 'package:employer_kariger_app/core/analytics/meta_analytics.dart';
 import 'package:flutter/material.dart' hide Text;
@@ -35,6 +39,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final gstinController = TextEditingController();
   final panController = TextEditingController();
   final gstinFocusNode = FocusNode();
+  final panFocusNode = FocusNode();
   final industryOtherController = TextEditingController();
   final otherSkillController = TextEditingController();
   String? industry;
@@ -50,6 +55,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   List<String> setupErrors = const [];
   Timer? _setupErrorTimer;
   String? gstinError;
+
+  /// A PAN problem shows under the PAN box, not the GST one.
+  String? panError;
   List<String> industries = const [];
   List<String> states = const [];
   List<String> cities = const [];
@@ -99,6 +107,92 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (!_loadedReference) {
       _loadedReference = true;
       _loadReference();
+      unawaited(_restoreDraft());
+    }
+  }
+
+  // Sign-up is sent to the server only at the end. A half-done sign-up,
+  // reopened, started again from an empty step 1; the answers are now kept
+  // on the phone (per number) until sign-up finishes.
+  String get _draftKey =>
+      'signup_draft_${AppScope.of(context).auth.user?['phone'] ?? ''}';
+
+  Future<void> _saveDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _draftKey,
+      jsonEncode({
+        'step': step,
+        'name': nameController.text,
+        'hiring_as': hiringAs,
+        'company': companyController.text,
+        'company_size': companySize,
+        'industry': industry,
+        'industry_other': industryOtherController.text,
+        'hiring_frequency': hiringFrequency,
+        'state': state,
+        'city': city,
+        'area': areaController.text,
+        'address': addressController.text,
+        'lat': selectedLocation?.latitude,
+        'lng': selectedLocation?.longitude,
+        'trades': selectedTrades.toList(),
+      }),
+    );
+  }
+
+  Future<void> _clearDraft() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_draftKey);
+  }
+
+  Future<void> _restoreDraft() async {
+    final key = _draftKey;
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(key);
+    if (raw == null || !mounted) return;
+    final Map<String, dynamic> draft;
+    try {
+      draft = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+    } catch (_) {
+      await prefs.remove(key);
+      return;
+    }
+    String? text(String k) {
+      final v = draft[k];
+      return v is String && v.isNotEmpty ? v : null;
+    }
+
+    setState(() {
+      nameController.text = text('name') ?? nameController.text;
+      hiringAs = text('hiring_as') ?? hiringAs;
+      companyController.text = text('company') ?? '';
+      companySize = text('company_size') ?? companySize;
+      industry = text('industry');
+      industryOtherController.text = text('industry_other') ?? '';
+      hiringFrequency = text('hiring_frequency');
+      areaController.text = text('area') ?? '';
+      addressController.text = text('address') ?? '';
+      final lat = draft['lat'], lng = draft['lng'];
+      if (lat is num && lng is num) {
+        selectedLocation = LatLng(lat.toDouble(), lng.toDouble());
+      }
+      selectedTrades
+        ..clear()
+        ..addAll((draft['trades'] as List? ?? const []).map((e) => '$e'));
+      final saved = draft['step'];
+      if (saved is int) step = saved.clamp(0, 4);
+    });
+    final savedState = text('state');
+    final savedCity = text('city');
+    if (savedState != null) {
+      await _loadCities(savedState);
+      if (mounted && savedCity != null) {
+        setState(() {
+          city = savedCity;
+          if (!cities.contains(savedCity)) cities = [...cities, savedCity];
+        });
+      }
     }
   }
 
@@ -365,8 +459,9 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       }
       if (!mounted) return;
       setState(() {
-        if (detectedCity != null && detectedCity.isNotEmpty)
+        if (detectedCity != null && detectedCity.isNotEmpty) {
           city = detectedCity;
+        }
         final area = place.subLocality?.trim() ?? place.thoroughfare?.trim();
         if (area != null && area.isNotEmpty) areaController.text = area;
       });
@@ -380,6 +475,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (!_validateStep()) return;
     if (step < 4) {
       setState(() => step++);
+      unawaited(_saveDraft());
     } else {
       _saveAndFinish(finish: true);
     }
@@ -402,7 +498,10 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
         companyController.text.trim().isEmpty) {
       error = 'Enter your business or company name.';
     } else if (step == 1 && industry == null) {
-      error = 'Select an industry.';
+      // An individual's step 2 asks for the type of work, not an industry.
+      error = hiringAs == 'individual'
+          ? 'Select the type of work.'
+          : 'Select an industry.';
     } else if (step == 1 &&
         hiringAs == 'individual' &&
         hiringFrequency == null) {
@@ -412,7 +511,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     } else if (step == 2 && areaController.text.trim().isEmpty) {
       error = 'Enter your area or locality.';
     } else if (step == 3 && selectedTrades.isEmpty) {
-      error = 'Select at least one karigar category.';
+      error = 'Select at least one skill you hire for.';
     }
     if (error != null) _message(error);
     return error == null;
@@ -471,37 +570,34 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   String _normalizedTaxId(String value) =>
       value.toUpperCase().replaceAll(RegExp(r'[\s.\-]'), '');
 
+  static final _panShape = RegExp(r'^[A-Z]{5}[0-9]{4}[A-Z]$');
+
+  /// What stops "Verify & Finish" on the business step: a GST number or the
+  /// business PAN is needed (either one, as the server rules), each checked.
+  /// Individuals have neither on their step; checking them made "Add proofs
+  /// now" and "Verify & Finish" do nothing at all.
   String? _gstinProblem() {
+    if (hiringAs == 'individual') return null;
     final gst = _normalizedTaxId(gstinController.text);
-    if (gst.isEmpty) return 'Enter your GST number to verify your business.';
-    if (gst.length != 15) {
-      return 'A GST number has 15 characters, like 22ABCDE1234F1ZA.';
-    }
-    if (!RegExp(
-      r'^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$',
-    ).hasMatch(gst)) {
-      return 'Enter the GST number in the format 22ABCDE1234F1ZA.';
-    }
-    final stateCode = int.parse(gst.substring(0, 2));
-    if (!((stateCode >= 1 &&
-            stateCode <= 38 &&
-            stateCode != 25 &&
-            stateCode != 28) ||
-        stateCode == 97)) {
-      return 'A GST number starts with a state code (01–38). Check the first two digits.';
-    }
-    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    var sum = 0;
-    for (var index = 0; index < 14; index++) {
-      final value = chars.indexOf(gst[index]) * (index.isEven ? 1 : 2);
-      sum += value ~/ 36 + value % 36;
-    }
-    if (gst[14] != chars[(36 - sum % 36) % 36]) {
-      return 'This GST number is not valid. Check it for a typing mistake.';
-    }
     final pan = _normalizedTaxId(panController.text);
-    if (pan.length == 10 && gst.substring(2, 12) != pan) {
-      return 'This GSTIN does not belong to the PAN given above.';
+    if (gst.isEmpty && pan.isEmpty) {
+      return 'Enter a GST number or the business PAN.';
+    }
+    if (gst.isNotEmpty) {
+      final problem = gstinProblem(gst);
+      if (problem != null) return problem;
+      if (pan.length == 10 && gst.substring(2, 12) != pan) {
+        return 'This GSTIN does not belong to the PAN given below.';
+      }
+    }
+    return null;
+  }
+
+  String? _panProblem() {
+    if (hiringAs == 'individual') return null;
+    final pan = _normalizedTaxId(panController.text);
+    if (pan.isNotEmpty && !_panShape.hasMatch(pan)) {
+      return 'PAN must be in the format ABCDE1234F.';
     }
     return null;
   }
@@ -513,17 +609,25 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (loading) return;
     if (finish) {
       final gstError = _gstinProblem();
-      if (gstError != null) {
+      final panProblem = _panProblem();
+      if (gstError != null || panProblem != null) {
         setState(() {
           gstinError = gstError;
+          panError = panProblem;
           step = 4;
         });
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) gstinFocusNode.requestFocus();
+          if (!mounted) return;
+          (gstError != null ? gstinFocusNode : panFocusNode).requestFocus();
         });
         return;
       }
-      if (gstinError != null) setState(() => gstinError = null);
+      if (gstinError != null || panError != null) {
+        setState(() {
+          gstinError = null;
+          panError = null;
+        });
+      }
       final missing = _missingFinishFields();
       if (missing.isNotEmpty) {
         setState(() => step = missing.first.step);
@@ -559,6 +663,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       ].join(', '),
       if (finish && gstinController.text.trim().isNotEmpty)
         'gstin': _normalizedTaxId(gstinController.text),
+      // The PAN field was shown but never sent, so a PAN-only business
+      // could not finish.
+      if (finish &&
+          hiringAs != 'individual' &&
+          panController.text.trim().isNotEmpty)
+        'pan_number': _normalizedTaxId(panController.text),
     });
     if (!mounted) return;
     setState(() {
@@ -568,13 +678,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     if (!success) {
       final profile = AppScope.of(context).profile;
       final gstErrors = profile.validationErrors['gstin'];
-      if (gstErrors is List && gstErrors.isNotEmpty) {
+      final panErrors = profile.validationErrors['pan_number'];
+      final hasGst = gstErrors is List && gstErrors.isNotEmpty;
+      final hasPan = panErrors is List && panErrors.isNotEmpty;
+      if (hasGst || hasPan) {
         setState(() {
-          gstinError = '${gstErrors.first}';
+          gstinError = hasGst ? '${gstErrors.first}' : null;
+          panError = hasPan ? '${panErrors.first}' : null;
           step = 4;
         });
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) gstinFocusNode.requestFocus();
+          if (!mounted) return;
+          (hasGst ? gstinFocusNode : panFocusNode).requestFocus();
         });
         return;
       }
@@ -595,6 +710,8 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
       return;
     }
     unawaited(MetaAnalytics.instance.registrationCompleted());
+    await _clearDraft();
+    if (!mounted) return;
     if (openKyc) {
       await Navigator.of(
         context,
@@ -604,6 +721,16 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     Navigator.pushAndRemoveUntil(
       context,
       MaterialPageRoute(builder: (_) => const MainShell()),
+      (_) => false,
+    );
+  }
+
+  Future<void> _useAnotherNumber() async {
+    await AppScope.of(context).auth.logout();
+    if (!mounted) return;
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
       (_) => false,
     );
   }
@@ -620,6 +747,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
     gstinController.dispose();
     panController.dispose();
     gstinFocusNode.dispose();
+    panFocusNode.dispose();
     industryOtherController.dispose();
     otherSkillController.dispose();
     super.dispose();
@@ -687,7 +815,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           title: 'Tell us about yourself',
           subtitle: 'Karigars will see this contact name on your job posts.',
           children: [
-            const _FieldLabel('Your full name'),
+            const _FieldLabel('Your full name *'),
             _Input(hint: 'e.g. Anil Sharma', controller: nameController),
             const SizedBox(height: 16),
             const _FieldLabel('I am hiring as'),
@@ -706,6 +834,17 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
                   )
                   .toList(),
+            ),
+            const SizedBox(height: 28),
+            // The only way out of sign-up: a wrong number left people stuck.
+            Center(
+              child: TextButton.icon(
+                onPressed: loading ? null : _useAnotherNumber,
+                icon: const Icon(LucideIcons.logOut, size: 16),
+                label: Text(
+                  'Not +91 ${AppScope.of(context).auth.user?['phone'] ?? ''}? Use another number',
+                ),
+              ),
             ),
           ],
         );
@@ -782,14 +921,15 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
           subtitle: 'This appears on your public employer profile.',
           children: [
             if (hiringAs != 'individual') ...[
-              const _FieldLabel('Business / Company name'),
+              const _FieldLabel('Business / Company name *'),
               _Input(
                 hint: 'e.g. Sri Sai Constructions',
                 controller: companyController,
               ),
               const SizedBox(height: 16),
             ],
-            const _FieldLabel('Industry'),
+            // Required on Continue, so marked like the name above.
+            const _FieldLabel('Industry *'),
             _SelectBox(
               hint: industry ?? 'Select industry',
               onTap: () => _choose(
@@ -829,7 +969,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               child: Container(
                 height: 46,
                 decoration: BoxDecoration(
-                  color: AppColors.brand50,
+                  color: context.brandTint,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -855,7 +995,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            const _FieldLabel('State'),
+            const _FieldLabel('State *'),
             _SelectBox(
               hint: state ?? 'Select state',
               onTap: () => _choose(
@@ -865,7 +1005,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const _FieldLabel('City / District'),
+            const _FieldLabel('City / District *'),
             _SelectBox(
               hint: city ?? (referenceLoading ? 'Loading...' : 'Select city'),
               onTap: state == null
@@ -881,7 +1021,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     ),
             ),
             const SizedBox(height: 16),
-            const _FieldLabel('Area / locality'),
+            const _FieldLabel('Area / locality *'),
             _Input(
               hint: 'e.g. Sector 45, Andheri West',
               controller: areaController,
@@ -969,11 +1109,12 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
                     );
                   },
                 );
-                if (value != null && value.isNotEmpty)
+                if (value != null && value.isNotEmpty) {
                   setState(() {
                     availableTrades = [...availableTrades, value];
                     selectedTrades.add(value);
                   });
+                }
               },
               icon: const Icon(LucideIcons.plus, size: 17),
               label: const Text('Other'),
@@ -1009,7 +1150,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               ),
               const SizedBox(height: 8),
               const Text(
-                'Proof requirements are loaded securely from the verification API.',
+                'Our team checks your proofs.',
                 style: TextStyle(fontSize: 12, color: AppColors.muted),
               ),
             ],
@@ -1047,49 +1188,77 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
               onChanged: (_) {
                 // Once an invalid GSTIN is corrected, remove its old error
                 // without making the employer submit the form again.
-                if (gstinError == null) return;
-                setState(() => gstinError = _gstinProblem());
+                if (gstinError == null && panError == null) return;
+                setState(() {
+                  gstinError = _gstinProblem();
+                  panError = _panProblem();
+                });
               },
             ),
             const SizedBox(height: 16),
             const _FieldLabel('Business PAN'),
             _Input(
-              hint: 'ABCDE1234F (optional)',
+              hint: 'ABCDE1234F',
               controller: panController,
+              focusNode: panFocusNode,
               inputFormatters: [_TaxIdFormatter(maxLength: 10)],
               capitalLetters: true,
+              errorText: panError,
+              onChanged: (_) {
+                if (gstinError == null && panError == null) return;
+                setState(() {
+                  gstinError = _gstinProblem();
+                  panError = _panProblem();
+                });
+              },
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'A GST number or the business PAN is enough.',
+              style: TextStyle(fontSize: 12, color: AppColors.muted),
             ),
             const SizedBox(height: 16),
-            CustomPaint(
-              painter: _DashedBorderPainter(),
-              child: Container(
-                height: 96,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      LucideIcons.upload,
-                      color: AppColors.primary,
-                      size: 22,
-                    ),
-                    SizedBox(height: 7),
-                    Text(
-                      'Upload GST / registration proof',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+            // It looked like an upload area but did nothing: it now saves the
+            // profile and opens Verification, where the documents go.
+            InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: loading
+                  ? null
+                  : () => _saveAndFinish(finish: true, openKyc: true),
+              child: CustomPaint(
+                painter: _DashedBorderPainter(),
+                child: Container(
+                  height: 96,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: context.cardSurface,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        LucideIcons.upload,
+                        color: AppColors.primary,
+                        size: 22,
                       ),
-                    ),
-                    Text(
-                      'JPG / PNG / PDF · max 5MB',
-                      style: TextStyle(fontSize: 10.5, color: AppColors.muted),
-                    ),
-                  ],
+                      SizedBox(height: 7),
+                      Text(
+                        'Upload GST / registration proof',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        'JPG / PNG / PDF · max 5MB',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -1153,38 +1322,61 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   Widget _bottomBar() => Container(
     padding: const EdgeInsets.fromLTRB(16, 11, 16, 20),
-    decoration: const BoxDecoration(
-      color: AppColors.card,
+    decoration: BoxDecoration(
+      color: context.cardSurface,
       border: Border(top: BorderSide(color: AppColors.line)),
     ),
     child: step == 4
         ? Row(
             children: [
+              // Same height for both, one line each: "Skip for now" broke
+              // over two lines and sat taller than Verify & Finish.
               Expanded(
-                child: OutlinedButton(
-                  onPressed: loading
-                      ? null
-                      : () => _saveAndFinish(finish: false),
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
-                    foregroundColor: AppColors.foreground,
-                    side: const BorderSide(color: AppColors.line),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
+                flex: 2,
+                child: SizedBox(
+                  height: 52,
+                  child: OutlinedButton(
+                    onPressed: loading
+                        ? null
+                        : () => _saveAndFinish(finish: false),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      foregroundColor: AppColors.foreground,
+                      side: const BorderSide(color: AppColors.line),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: const FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text('Skip for now', maxLines: 1),
                     ),
                   ),
-                  child: const Text('Skip for now'),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
-                flex: 2,
-                child: FilledButton(
-                  onPressed: loading
-                      ? null
-                      : () => _saveAndFinish(finish: true),
-                  child: Text(
-                    finishingVerification ? 'Verifying...' : 'Verify & Finish',
+                flex: 3,
+                child: SizedBox(
+                  height: 52,
+                  child: FilledButton(
+                    onPressed: loading
+                        ? null
+                        : () => _saveAndFinish(finish: true),
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        finishingVerification
+                            ? 'Verifying...'
+                            : 'Verify & Finish',
+                        maxLines: 1,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -1317,8 +1509,10 @@ class _Input extends StatelessWidget {
   final String? errorText;
 
   @override
-  Widget build(BuildContext context) => SizedBox(
-    height: errorText == null ? 46 : 70,
+  // At least the old height, growing with the error: a fixed 70 px cut a
+  // two-line error to "…to verify …".
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: const BoxConstraints(minHeight: 46),
     child: TextField(
       controller: controller,
       focusNode: focusNode,
@@ -1333,6 +1527,7 @@ class _Input extends StatelessWidget {
         hintText: hint,
         counterText: '',
         errorText: errorText,
+        errorMaxLines: 3,
       ),
     ),
   );
@@ -1374,7 +1569,7 @@ class _SelectBox extends StatelessWidget {
       height: 48,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: context.cardSurface,
         border: Border.all(color: AppColors.line),
         borderRadius: BorderRadius.circular(12),
       ),
@@ -1454,7 +1649,7 @@ class _VerificationOption extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(13),
     decoration: BoxDecoration(
-      color: AppColors.card,
+      color: context.cardSurface,
       border: Border.all(color: AppColors.line),
       borderRadius: BorderRadius.circular(12),
     ),

@@ -88,7 +88,8 @@ void main() {
     expect(find.text('Steady hiring through the quarter'), findsOneWidget);
     expect(find.text('MRP ₹4,194'), findsOneWidget);
     expect(find.text('13% OFF'), findsOneWidget);
-    expect(find.text('₹3,649 / 90 days'), findsOneWidget);
+    // No "/ 90 days" after the price, like the website.
+    expect(find.text('Valid for 90 days'), findsOneWidget);
     expect(find.text('Each job stays live for 15 days'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
@@ -179,7 +180,7 @@ void main() {
     expect(find.text('AI call packs'), findsOneWidget);
     expect(find.text('Starter'), findsOneWidget);
     expect(find.text('40 credits · ≈ 40 min of calls'), findsOneWidget);
-    expect(find.text('₹589 incl. GST'), findsOneWidget);
+    expect(find.text('₹588.82 incl. GST'), findsOneWidget);
     expect(find.text('Buy credits'), findsOneWidget);
   });
   testWidgets('plan reminder opens database plans and uses the server title', (
@@ -397,7 +398,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(unlocked, isTrue);
     expect(find.text('9876543210'), findsOneWidget);
-    expect(find.text('Database (1)'), findsOneWidget);
+    expect(find.text('Database · 1'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }
