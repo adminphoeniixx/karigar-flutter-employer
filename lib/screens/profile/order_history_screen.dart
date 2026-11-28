@@ -65,7 +65,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           String.fromCharCodes(result.bytes.take(5)) != '%PDF-') {
         throw const FormatException('The server did not return a PDF.');
       }
-      final path = await FilePicker.saveFile(
+      final path = await FilePicker.platform.saveFile(
         dialogTitle: 'Save invoice PDF',
         fileName: (result.filename ?? 'Invoice-$id.pdf')
             .split(RegExp(r'[/\\]'))

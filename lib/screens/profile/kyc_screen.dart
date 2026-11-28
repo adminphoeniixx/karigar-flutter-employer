@@ -128,7 +128,7 @@ class _KycScreenState extends State<KycScreen> {
   }
 
   Future<void> _pick(_DocumentForm form) async {
-    final picked = await FilePicker.pickFiles(
+    final picked = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf'],
     );

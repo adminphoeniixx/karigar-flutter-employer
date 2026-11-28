@@ -70,7 +70,7 @@ class _InvoiceScreenState extends State<InvoiceScreen> {
       final name = (file.filename ?? 'Invoice-${widget.invoiceId}.pdf')
           .split(RegExp(r'[/\\]'))
           .last;
-      final path = await FilePicker.saveFile(
+      final path = await FilePicker.platform.saveFile(
         dialogTitle: 'Save invoice PDF',
         fileName: name,
         type: FileType.custom,

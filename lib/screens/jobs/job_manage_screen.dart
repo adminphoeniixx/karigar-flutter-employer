@@ -673,7 +673,7 @@ class _JobManageScreenState extends State<JobManageScreen> {
           download.filename ??
           applicant.resume?['name']?.toString() ??
           '${applicant.worker.name.replaceAll(RegExp(r'\s+'), '-')}-resume.pdf';
-      final path = await FilePicker.saveFile(
+      final path = await FilePicker.platform.saveFile(
         dialogTitle: 'Save applicant resume',
         fileName: suggestedName,
         bytes: Uint8List.fromList(download.bytes),
