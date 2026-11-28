@@ -14,8 +14,6 @@ import 'package:employer_kariger_app/core/app_scope.dart';
 import 'package:employer_kariger_app/core/theme.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 import 'package:employer_kariger_app/screens/profile/payment_success_screen.dart';
-import 'package:employer_kariger_app/screens/jobs/ai_credits_screen.dart'
-    show AiCreditHistory;
 
 class PlansScreen extends StatefulWidget {
   const PlansScreen({super.key, this.focusDatabase = false});
@@ -841,11 +839,6 @@ class _AiCallsSection extends StatelessWidget {
           ),
         ),
       ],
-      AiCreditHistory(
-        initialCredits: credits == null
-            ? null
-            : Map<String, dynamic>.from(credits!),
-      ),
     ],
   );
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -26,6 +27,7 @@ class ApiClient {
       );
 
   static const _tokenKey = 'employer_auth_token';
+  static const _requestTimeout = Duration(seconds: 30);
   final http.Client _client;
   final String baseUrl;
   String? _token;
@@ -95,8 +97,8 @@ class ApiClient {
       ..followRedirects = false;
     _logRequest('GET', uri);
     try {
-      final streamed = await _client.send(request);
-      final bytes = await streamed.stream.toBytes();
+      final streamed = await _client.send(request).timeout(_requestTimeout);
+      final bytes = await streamed.stream.toBytes().timeout(_requestTimeout);
       final response = http.Response.bytes(
         bytes,
         streamed.statusCode,
@@ -126,6 +128,11 @@ class ApiClient {
     } on http.ClientException catch (error) {
       _logNetworkError('GET', uri, error);
       throw const ApiException('The download could not be completed.');
+    } on TimeoutException catch (error) {
+      _logNetworkError('GET', uri, error);
+      throw const ApiException(
+        'The request took too long. Please check your internet and try again.',
+      );
     }
   }
 
@@ -153,7 +160,9 @@ class ApiClient {
     );
     try {
       final stopwatch = Stopwatch()..start();
-      final response = await http.Response.fromStream(await request.send());
+      final response = await http.Response.fromStream(
+        await request.send().timeout(_requestTimeout),
+      ).timeout(_requestTimeout);
       stopwatch.stop();
       return _decode(response, elapsed: stopwatch.elapsed);
     } on SocketException catch (error) {
@@ -164,6 +173,11 @@ class ApiClient {
     } on http.ClientException catch (error) {
       _logNetworkError('POST', request.url, error);
       throw const ApiException('The network request could not be completed.');
+    } on TimeoutException catch (error) {
+      _logNetworkError('POST', request.url, error);
+      throw const ApiException(
+        'The request took too long. Please check your internet and try again.',
+      );
     }
   }
 
@@ -180,8 +194,8 @@ class ApiClient {
     try {
       final stopwatch = Stopwatch()..start();
       final response = await http.Response.fromStream(
-        await _client.send(request),
-      );
+        await _client.send(request).timeout(_requestTimeout),
+      ).timeout(_requestTimeout);
       stopwatch.stop();
       return _decode(response, elapsed: stopwatch.elapsed);
     } on SocketException catch (error) {
@@ -192,6 +206,11 @@ class ApiClient {
     } on http.ClientException catch (error) {
       _logNetworkError(method, request.url, error);
       throw const ApiException('The network request could not be completed.');
+    } on TimeoutException catch (error) {
+      _logNetworkError(method, request.url, error);
+      throw const ApiException(
+        'The request took too long. Please check your internet and try again.',
+      );
     }
   }
 

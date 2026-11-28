@@ -3279,19 +3279,15 @@ class _PostJobScreenState extends State<PostJobScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Center(
-                // Keep both dimensions fixed so the spinner cannot be stretched
-                // by a dialog layout constraint on wider screens.
-                child: SizedBox.square(
-                  dimension: 32,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    color: AppColors.primary,
-                  ),
+                child: Icon(
+                  LucideIcons.shieldCheck,
+                  size: 36,
+                  color: AppColors.primary,
                 ),
               ),
               const SizedBox(height: 22),
               const Text(
-                'Checking your job',
+                'Job submitted for review',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
               ),

@@ -14,6 +14,8 @@ import 'package:employer_kariger_app/screens/profile/order_history_screen.dart';
 import 'package:employer_kariger_app/screens/profile/profile_edit_screen.dart';
 import 'package:employer_kariger_app/screens/profile/reviews_screen.dart';
 import 'package:employer_kariger_app/screens/profile/settings_screen.dart';
+import 'package:employer_kariger_app/screens/jobs/ai_credits_screen.dart'
+    show AiCreditHistoryScreen;
 import 'package:employer_kariger_app/screens/workers/shortlisted_screen.dart';
 import 'package:employer_kariger_app/widgets/common.dart';
 
@@ -187,6 +189,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       subtitle: 'View and download tax invoices',
                       trailing: '→',
                       onTap: () => _open(const InvoicesScreen()),
+                    ),
+                    _ProfileRow(
+                      icon: LucideIcons.receiptText,
+                      title: 'AI credit history',
+                      subtitle: 'Credits added and AI call charges',
+                      trailing: '→',
+                      onTap: () => _open(const AiCreditHistoryScreen()),
                     ),
                     _ProfileRow(
                       icon: LucideIcons.slidersHorizontal,

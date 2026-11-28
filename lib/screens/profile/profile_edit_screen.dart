@@ -51,6 +51,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
   final phoneController = TextEditingController();
   final industryController = TextEditingController();
   final aboutController = TextEditingController();
+  final addressController = TextEditingController();
   final stateController = TextEditingController();
   final cityController = TextEditingController();
   bool loading = true;
@@ -89,6 +90,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       phoneController.text = profile.phone ?? '';
       industryController.text = profile.industry ?? '';
       aboutController.text = profile.about ?? '';
+      addressController.text = profile.address ?? '';
       stateController.text = profile.state ?? '';
       cityController.text = profile.city ?? '';
       selectedHiringCategories
@@ -183,6 +185,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
 
   Future<void> _pinFromEnteredLocation() async {
     final query = [
+      addressController.text.trim(),
       cityController.text.trim(),
       stateController.text.trim(),
       'India',
@@ -246,6 +249,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       'industry': industryController.text.trim(),
       'hiring_categories': selectedHiringCategories.toList(),
       'about': aboutController.text.trim(),
+      'address': addressController.text.trim(),
       'state': stateController.text.trim(),
       'city': cityController.text.trim(),
       'latitude': _siteLocation.latitude,
@@ -376,6 +380,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       phoneController,
       industryController,
       aboutController,
+      addressController,
       stateController,
       cityController,
     ]) {
@@ -536,7 +541,23 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                   lines: 4,
                   controller: aboutController,
                 ),
-                const SectionTitle('Location'),
+                Padding(
+                  padding: const EdgeInsets.only(top: 6, bottom: 10, left: 4),
+                  child: Text(
+                    'LOCATION',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: .6,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                LabeledField(
+                  'Address / landmark',
+                  hint: 'Shop no., street, area or nearby landmark',
+                  controller: addressController,
+                ),
                 Row(
                   children: [
                     Expanded(
@@ -566,6 +587,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
                 const Text(
                   'Pin office / site location',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),

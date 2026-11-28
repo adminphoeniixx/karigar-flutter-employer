@@ -389,55 +389,52 @@ class _AiCreditsScreenState extends State<AiCreditsScreen> {
                       ),
                     ),
                   ),
-                if (_credits['enabled'] != false)
-                  const SectionTitle('Credit history'),
-                if (_credits['enabled'] != false)
-                  Container(
-                    margin: const EdgeInsets.only(top: 8, bottom: 10),
-                    padding: const EdgeInsets.all(3),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surface,
-                      border: Border.all(color: AppColors.line),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        for (final tab in const {
-                          'all': 'All',
-                          'added': 'Added',
-                          'spent': 'Spent',
-                        }.entries)
-                          Expanded(
-                            child: _CreditHistoryTab(
-                              label: tab.value,
-                              selected: _filter == tab.key,
-                              onTap: () {
-                                setState(() {
-                                  _filter = tab.key;
-                                  _ledgerPage = 1;
-                                });
-                                _loadLedger();
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
+                const SectionTitle('Credit history'),
+                Container(
+                  margin: const EdgeInsets.only(top: 8, bottom: 10),
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    border: Border.all(color: AppColors.line),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                if (_credits['enabled'] != false && _loadingLedger)
+                  child: Row(
+                    children: [
+                      for (final tab in const {
+                        'all': 'All',
+                        'added': 'Added',
+                        'spent': 'Spent',
+                      }.entries)
+                        Expanded(
+                          child: _CreditHistoryTab(
+                            label: tab.value,
+                            selected: _filter == tab.key,
+                            onTap: () {
+                              setState(() {
+                                _filter = tab.key;
+                                _ledgerPage = 1;
+                              });
+                              _loadLedger();
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                if (_loadingLedger)
                   const Padding(
                     padding: EdgeInsets.only(bottom: 10),
                     child: LinearProgressIndicator(),
                   ),
-                if (_credits['enabled'] != false && _ledger.isEmpty)
+                if (_ledger.isEmpty)
                   Text(
                     _creditHistoryEmptyText(_filter),
                     style: TextStyle(color: AppColors.muted),
                   )
-                else if (_credits['enabled'] != false)
+                else
                   ..._ledger.map(_LedgerRow.new),
-                if (_credits['enabled'] != false &&
-                    (_ledgerMeta['current_page'] as num? ?? 1) <
-                        (_ledgerMeta['last_page'] as num? ?? 1))
+                if ((_ledgerMeta['current_page'] as num? ?? 1) <
+                    (_ledgerMeta['last_page'] as num? ?? 1))
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: OutlinedButton(
@@ -954,13 +951,28 @@ class _LedgerRow extends StatelessWidget {
   }
 }
 
-/// Reusable ledger for the Plans catalog as well as the dedicated credits page.
+/// Reusable paginated ledger for the Profile and AI credits screens.
 class AiCreditHistory extends StatefulWidget {
   const AiCreditHistory({super.key, this.initialCredits});
   final Map<String, dynamic>? initialCredits;
 
   @override
   State<AiCreditHistory> createState() => _AiCreditHistoryState();
+}
+
+/// Paginated ledger, available from Profile so the Plans catalog stays short.
+class AiCreditHistoryScreen extends StatelessWidget {
+  const AiCreditHistoryScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('AI credit history')),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      physics: const AlwaysScrollableScrollPhysics(),
+      children: const [AiCreditHistory()],
+    ),
+  );
 }
 
 class _AiCreditHistoryState extends State<AiCreditHistory> {
@@ -971,18 +983,22 @@ class _AiCreditHistoryState extends State<AiCreditHistory> {
   List<Map<String, dynamic>> _rows = const [];
   bool _loading = true;
   bool _loadingMore = false;
+  bool _initialLoadStarted = false;
   ScrollPosition? _scrollPosition;
 
   @override
   void initState() {
     super.initState();
     _credits = widget.initialCredits ?? const {};
-    _refresh();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    if (!_initialLoadStarted) {
+      _initialLoadStarted = true;
+      _refresh();
+    }
     final position = Scrollable.maybeOf(context)?.position;
     if (position == _scrollPosition) return;
     _scrollPosition?.removeListener(_onScroll);
@@ -1062,7 +1078,6 @@ class _AiCreditHistoryState extends State<AiCreditHistory> {
 
   @override
   Widget build(BuildContext context) {
-    if (_credits['enabled'] == false) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
